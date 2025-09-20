@@ -6,7 +6,10 @@ import (
 	"strings"
 
 	"github.com/EricWvi/sonora/handler"
+	"github.com/EricWvi/sonora/handler/album"
 	"github.com/EricWvi/sonora/handler/media"
+	"github.com/EricWvi/sonora/handler/singer"
+	"github.com/EricWvi/sonora/handler/track"
 	"github.com/EricWvi/sonora/log"
 	"github.com/EricWvi/sonora/middleware"
 	"github.com/gin-contrib/gzip"
@@ -40,7 +43,7 @@ func Load(g *gin.Engine, mw ...gin.HandlerFunc) *gin.Engine {
 		log.Error(log.WorkerCtx, err.Error())
 		os.Exit(1)
 	}
-	dir = viper.GetString("route.journal.dir")
+	dir = viper.GetString("route.admin.dir")
 	err = filepath.Walk(dir,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
@@ -48,7 +51,7 @@ func Load(g *gin.Engine, mw ...gin.HandlerFunc) *gin.Engine {
 			}
 			if !info.IsDir() {
 				p := strings.TrimPrefix(path, dir)
-				g.StaticFile("/journal"+p, path)
+				g.StaticFile("/admin"+p, path)
 			}
 			return nil
 		})
@@ -59,7 +62,7 @@ func Load(g *gin.Engine, mw ...gin.HandlerFunc) *gin.Engine {
 
 	// serve index.html at root path
 	g.StaticFile("/", viper.GetString("route.front.index"))
-	g.StaticFile("/journal/", viper.GetString("route.journal.index"))
+	g.StaticFile("/admin/", viper.GetString("route.admin.index"))
 
 	g.GET("/ping", handler.Ping)
 	// middleware.BodyWriter retrieves response body
@@ -76,6 +79,15 @@ func Load(g *gin.Engine, mw ...gin.HandlerFunc) *gin.Engine {
 	back := g.Group(viper.GetString("route.back.base"))
 	// middleware.Logging logs request and response
 	back.Use(middleware.Logging())
+
+	back.GET("/singer", singer.DefaultHandler)
+	back.POST("/singer", singer.DefaultHandler)
+
+	back.GET("/album", album.DefaultHandler)
+	back.POST("/album", album.DefaultHandler)
+
+	back.GET("/track", track.DefaultHandler)
+	back.POST("/track", track.DefaultHandler)
 
 	// Handle 404 for all unmatched routes
 	g.NoRoute(func(c *gin.Context) {

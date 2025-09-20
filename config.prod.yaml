@@ -1,0 +1,15 @@
+addr: :8765
+route:
+  back:
+    base: "/api"
+  front:
+    dir: "dist"
+    index: "dist/index.html"
+  admin:
+    dir: "admin"
+    index: "admin/admin.html"
+db:
+  name: sonora
+  host: postgres
+  port: 5432
+  username: onlyquant
