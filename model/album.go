@@ -52,7 +52,7 @@ func (a *Album) Get(db *gorm.DB, where map[string]any) error {
 func ListAllAlbums(db *gorm.DB, where map[string]any) ([]AlbumView, error) {
 	albums := make([]AlbumView, 0)
 	if err := db.Model(&Album{}).Where(where).
-		Order("created_at DESC").
+		Order("id DESC").
 		Omit("created_at", "updated_at", "deleted_at").
 		Find(&albums).Error; err != nil {
 		return nil, err
@@ -73,9 +73,9 @@ func ListAlbums(db *gorm.DB, where WhereExpr, page uint) ([]AlbumView, bool, err
 
 	// Retrieve one extra to check if there are more entries
 	if err := db.Model(&Album{}).
-		Order("created_at DESC").
+		Order("id DESC").
 		Offset(int(offset)).
-		Limit(albumPageSize + 1).
+		Limit(albumPageSize+1).
 		Omit("created_at", "updated_at", "deleted_at").
 		Find(&albums).Error; err != nil {
 		return nil, false, err

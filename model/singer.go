@@ -50,7 +50,7 @@ func (s *Singer) Get(db *gorm.DB, where map[string]any) error {
 func ListAllSingers(db *gorm.DB, where map[string]any) ([]SingerView, error) {
 	singers := make([]SingerView, 0)
 	if err := db.Model(&Singer{}).Where(where).
-		Order("created_at DESC").
+		Order("id DESC").
 		Omit("created_at", "updated_at", "deleted_at").
 		Find(&singers).Error; err != nil {
 		return nil, err
@@ -71,9 +71,9 @@ func ListSingers(db *gorm.DB, where WhereExpr, page uint) ([]SingerView, bool, e
 
 	// Retrieve one extra to check if there are more entries
 	if err := db.Model(&Singer{}).
-		Order("created_at DESC").
+		Order("id DESC").
 		Offset(int(offset)).
-		Limit(singerPageSize + 1).
+		Limit(singerPageSize+1).
 		Omit("created_at", "updated_at", "deleted_at").
 		Find(&singers).Error; err != nil {
 		return nil, false, err

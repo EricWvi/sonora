@@ -64,7 +64,7 @@ func (t *Track) Get(db *gorm.DB, where map[string]any) error {
 func ListAllTracks(db *gorm.DB, where map[string]any) ([]TrackView, error) {
 	tracks := make([]TrackView, 0)
 	if err := db.Model(&Track{}).Where(where).
-		Order("created_at DESC").
+		Order("id DESC").
 		Omit("created_at", "updated_at", "deleted_at").
 		Find(&tracks).Error; err != nil {
 		return nil, err
@@ -85,9 +85,9 @@ func ListTracks(db *gorm.DB, where WhereExpr, page uint) ([]TrackView, bool, err
 
 	// Retrieve one extra to check if there are more entries
 	if err := db.Model(&Track{}).
-		Order("created_at DESC").
+		Order("id DESC").
 		Offset(int(offset)).
-		Limit(trackPageSize + 1).
+		Limit(trackPageSize+1).
 		Omit("created_at", "updated_at", "deleted_at").
 		Find(&tracks).Error; err != nil {
 		return nil, false, err

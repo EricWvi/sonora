@@ -86,3 +86,53 @@ Located in `client/src/components/admin/`:
 - **Consistent sizing**: All buttons use `text-xs px-2 py-1` for uniformity
 - **Dark mode support**: Full light/dark theme switching
 - **Visual feedback**: Loading states, error handling, pending actions
+
+## CLI
+Python CLI tool for audio file operations located in `cli/`.
+
+### Structure
+- **app.py** - Main CLI application with argparse interface
+- **audio_metadata.py** - Audio metadata extraction module with AudioMetadata dataclass
+- **config.py** - Configuration for database, paths, and application settings
+
+### AudioMetadata Class
+```python
+@dataclass
+class AudioMetadata:
+    title: str
+    artists: List[str]          # List of artist names
+    album: str
+    genre: str
+    track_number: str
+    duration_seconds: Optional[float]  # Duration as number
+    date: str
+    file_path: str
+    file_size: int
+    format: str
+
+    @property
+    def artist(self) -> str:    # Artists joined with "; " for display
+
+    @property
+    def duration(self) -> str:  # Formatted MM:SS duration
+```
+
+### Commands
+- **show** `<file_path>` - Display metadata for a single audio file
+
+### Supported Formats
+- **MP3** (ID3 tags) - TPE1, TIT2, TALB, TCON, TDRC, TRCK
+- **OGG** (Vorbis comments) - artist, title, album, genre, date, tracknumber
+
+### Multiple Artists Support
+Handles various artist delimiters and joins with `; `:
+- **Null bytes** (`\x00`) - Primary format in ID3 tags
+- **Semicolons** (`;`) - Preserved as-is
+- **Slashes** (`/`) - Split and joined
+- **Commas** (`,`) - Split and joined
+
+### Usage
+```bash
+python app.py show music.mp3
+python app.py show song.ogg
+```
