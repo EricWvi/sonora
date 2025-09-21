@@ -11,6 +11,9 @@ from mutagen.oggvorbis import OggVorbis
 from mutagen.id3 import ID3NoHeaderError
 from dataclasses import dataclass
 from typing import Optional, List
+import imghdr
+import base64
+import struct
 
 
 @dataclass
@@ -191,6 +194,110 @@ def get_audio_files(directory_path, recursive=False):
             audio_files.extend(directory.glob(pattern))
 
     return sorted(audio_files)
+
+
+def extract_cover_art(file_path, output_path=None):
+    """
+    Extract cover art from an audio file and save it to disk
+
+    Args:
+        file_path: Path to the audio file (Path object or string)
+        output_path: Optional output path. If None, saves to same directory as audio file
+
+    Returns:
+        str: Path to saved cover art file, or None if no cover art found
+    """
+    try:
+        file_path = Path(file_path)
+        file_ext = file_path.suffix.lower()
+
+        cover_data = None
+        image_type = None
+
+        if file_ext == '.mp3':
+            audio = MP3(file_path)
+            # Look for attached pictures (APIC frames)
+            for key in audio.keys():
+                if key.startswith('APIC'):
+                    apic = audio[key]
+                    cover_data = apic.data
+                    # Determine image type from MIME type or data
+                    if apic.mime == 'image/jpeg':
+                        image_type = 'jpeg'
+                    elif apic.mime == 'image/png':
+                        image_type = 'png'
+                    else:
+                        # Try to detect from data
+                        image_type = imghdr.what(None, h=cover_data)
+                    break
+
+        elif file_ext == '.ogg':
+            audio = OggVorbis(file_path)
+            # OGG files have embedded images in METADATA_BLOCK_PICTURE
+            if 'metadata_block_picture' in audio:
+                metadata_blocks = audio['metadata_block_picture']
+                if metadata_blocks:
+                    # Decode the base64-encoded FLAC picture block
+                    try:
+                        block_data = base64.b64decode(metadata_blocks[0])
+
+                        # Parse FLAC picture block format
+                        # Skip picture type (4 bytes), MIME type length (4 bytes)
+                        mime_length = struct.unpack('>I', block_data[4:8])[0]
+                        mime_type = block_data[8:8+mime_length].decode('ascii')
+
+                        # Skip description length and description
+                        desc_start = 8 + mime_length
+                        desc_length = struct.unpack('>I', block_data[desc_start:desc_start+4])[0]
+
+                        # Skip width, height, depth, colors (16 bytes total)
+                        # Skip data length (4 bytes)
+                        data_start = desc_start + 4 + desc_length + 16 + 4
+
+                        # Extract the actual image data
+                        cover_data = block_data[data_start:]
+
+                        # Determine image type from MIME type
+                        if 'jpeg' in mime_type.lower():
+                            image_type = 'jpeg'
+                        elif 'png' in mime_type.lower():
+                            image_type = 'png'
+                        elif 'webp' in mime_type.lower():
+                            image_type = 'webp'
+                        else:
+                            # Try to detect from data
+                            image_type = imghdr.what(None, h=cover_data)
+
+                    except Exception as e:
+                        print(f"Error parsing OGG picture block: {e}")
+                        pass
+
+        if cover_data and image_type:
+            # Determine output file path
+            if output_path is None:
+                base_name = file_path.stem
+                parent_dir = file_path.parent
+                if image_type == 'jpeg':
+                    output_path = parent_dir / f"{base_name}.jpg"
+                elif image_type == 'png':
+                    output_path = parent_dir / f"{base_name}.png"
+                elif image_type == 'webp':
+                    output_path = parent_dir / f"{base_name}.webp"
+                else:
+                    output_path = parent_dir / f"{base_name}.{image_type}"
+            else:
+                output_path = Path(output_path)
+
+            # Write cover art to file
+            with open(output_path, 'wb') as f:
+                f.write(cover_data)
+
+            return str(output_path)
+
+    except Exception as e:
+        print(f"Error extracting cover art from {file_path}: {e}")
+
+    return None
 
 
 def is_supported_audio_file(file_path):

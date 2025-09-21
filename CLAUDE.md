@@ -119,10 +119,11 @@ class AudioMetadata:
 
 ### Commands
 - **show** `<file_path>` - Display metadata for a single audio file
+- **get-art** `<file_path>` - Extract cover art from audio file and save to same directory
 
 ### Supported Formats
-- **MP3** (ID3 tags) - TPE1, TIT2, TALB, TCON, TDRC, TRCK
-- **OGG** (Vorbis comments) - artist, title, album, genre, date, tracknumber
+- **MP3** (ID3 tags) - TPE1, TIT2, TALB, TCON, TDRC, TRCK, APIC (cover art)
+- **OGG** (Vorbis comments) - artist, title, album, genre, date, tracknumber, metadata_block_picture (cover art)
 
 ### Multiple Artists Support
 Handles various artist delimiters and joins with `; `:
@@ -131,8 +132,17 @@ Handles various artist delimiters and joins with `; `:
 - **Slashes** (`/`) - Split and joined
 - **Commas** (`,`) - Split and joined
 
+### Cover Art Extraction
+The `extract_cover_art()` utility function extracts embedded album art:
+- **MP3**: Extracts APIC frames from ID3 tags
+- **OGG**: Parses FLAC picture blocks from metadata_block_picture (base64-encoded)
+- **Formats**: Supports JPEG, PNG, and WebP image formats
+- **Output**: Saves to same directory as audio file with appropriate extension
+
 ### Usage
 ```bash
 python app.py show music.mp3
 python app.py show song.ogg
+python app.py get-art music.mp3      # Saves as music.jpg
+python app.py get-art song.ogg       # Saves as song.webp (or .jpg/.png)
 ```

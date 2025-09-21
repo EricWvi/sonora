@@ -11,3 +11,6 @@ db:
   host: postgres
   port: 5432
   username: onlyquant
+storage:
+  local:
+    dir: "objects"

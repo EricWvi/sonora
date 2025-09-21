@@ -13,8 +13,8 @@ DATABASE_CONFIG = {
     'host': os.getenv('DB_HOST', 'localhost'),
     'port': os.getenv('DB_PORT', 5432),
     'database': os.getenv('DB_NAME', 'sonora'),
-    'username': os.getenv('DB_USER', 'postgres'),
-    'password': os.getenv('DB_PASSWORD', ''),
+    'username': os.getenv('DB_USER', 'onlyquant'),
+    'password': os.getenv('POSTGRES_PASSWORD', '123456'),
 }
 
 # File paths
