@@ -19,7 +19,32 @@ func GetAllMigrations() []MigrationStep {
 			Up:      CreateSingerAlbumTrack,
 			Down:    DropSingerAlbumTrack,
 		},
+		{
+			Version: "v0.4.0",
+			Name:    "Create lyric table",
+			Up:      CreateLyricTable,
+			Down:    DropLyricTable,
+		},
 	}
+}
+
+// ------------------- v0.4.0 -------------------
+func CreateLyricTable(db *gorm.DB) error {
+	return db.Exec(`
+		CREATE TABLE public.d_lyric (
+			id SERIAL PRIMARY KEY,
+			content TEXT DEFAULT '' NOT NULL,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+			deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL
+		);
+	`).Error
+}
+
+func DropLyricTable(db *gorm.DB) error {
+	return db.Exec(`
+		DROP TABLE IF EXISTS public.d_lyric CASCADE;
+	`).Error
 }
 
 // ------------------- v0.2.0 -------------------
@@ -38,6 +63,7 @@ func CreateSingerAlbumTrack(db *gorm.DB) error {
 			id SERIAL PRIMARY KEY,
 			name VARCHAR(255) NOT NULL,
 			cover VARCHAR(1024) DEFAULT '' NOT NULL,
+			year SMALLINT DEFAULT 0 NOT NULL,
 			created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
 			updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
 			deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL
@@ -50,7 +76,9 @@ func CreateSingerAlbumTrack(db *gorm.DB) error {
 			album INTEGER DEFAULT 0 NOT NULL,
 			cover VARCHAR(255) DEFAULT '' NOT NULL,
 			url VARCHAR(255) DEFAULT '' NOT NULL,
-			lyric TEXT DEFAULT '' NOT NULL,
+			year SMALLINT DEFAULT 0 NOT NULL,
+			track_number SMALLINT DEFAULT 0 NOT NULL,
+			lyric INTEGER DEFAULT 0 NOT NULL,
 			duration INT DEFAULT 0 NOT NULL,
 			created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
 			updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),

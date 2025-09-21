@@ -8,22 +8,31 @@ import (
 )
 
 func (b Base) ListTracks(c *gin.Context, req *ListTracksRequest) *ListTracksResponse {
-	m := model.WhereMap{}
+	m := model.WhereExpr{}
 
-	tracks, err := model.ListTracks(config.ContextDB(c), m)
+	tracks, hasMore, err := model.ListTracks(config.ContextDB(c), m, req.Page)
 	if err != nil {
 		handler.Errorf(c, "%s", err.Error())
 		return nil
 	}
 
 	return &ListTracksResponse{
-		Tracks: tracks,
+		Tracks:  tracks,
+		HasMore: hasMore,
 	}
 }
 
 type ListTracksRequest struct {
+	Page      uint   `form:"page"`
+	Condition string `form:"condition"`
+}
+
+type QueryCondition struct {
+	Operator string `json:"operator"`
+	Value    any    `json:"value"`
 }
 
 type ListTracksResponse struct {
-	Tracks []model.Track `json:"tracks"`
+	Tracks  []model.TrackView `json:"tracks"`
+	HasMore bool              `json:"hasMore"`
 }

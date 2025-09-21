@@ -5,11 +5,14 @@ import react from "@vitejs/plugin-react-swc";
 
 // https://vite.dev/config/
 export default defineConfig({
-  publicDir: "public-journal",
+  publicDir: "public",
   build: {
-    outDir: "journal",
+    outDir: "dist",
     rollupOptions: {
-      input: path.resolve(__dirname, "admin.html"),
+      input: {
+        index: path.resolve(__dirname, "index.html"),
+        admin: path.resolve(__dirname, "admin.html"),
+      },
     },
   },
   server: {

@@ -5,11 +5,9 @@ route:
   front:
     dir: "client/dist"
     index: "client/dist/index.html"
-  admin:
-    dir: "client/admin"
-    index: "client/admin/admin.html"
+    admin: "client/dist/admin.html"
 db:
   name: sonora
-  host: postgres
+  host: localhost
   port: 5432
   username: onlyquant

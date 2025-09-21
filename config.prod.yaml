@@ -5,9 +5,7 @@ route:
   front:
     dir: "dist"
     index: "dist/index.html"
-  admin:
-    dir: "admin"
-    index: "admin/admin.html"
+    admin: "dist/admin.html"
 db:
   name: sonora
   host: postgres

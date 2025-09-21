@@ -8,9 +8,9 @@ import (
 )
 
 func (b Base) ListSingers(c *gin.Context, req *ListSingersRequest) *ListSingersResponse {
-	m := model.WhereMap{}
+	m := model.WhereExpr{}
 
-	singers, err := model.ListSingers(config.ContextDB(c), m)
+	singers, hasMore, err := model.ListSingers(config.ContextDB(c), m, req.Page)
 	if err != nil {
 		handler.Errorf(c, "%s", err.Error())
 		return nil
@@ -18,12 +18,21 @@ func (b Base) ListSingers(c *gin.Context, req *ListSingersRequest) *ListSingersR
 
 	return &ListSingersResponse{
 		Singers: singers,
+		HasMore: hasMore,
 	}
 }
 
 type ListSingersRequest struct {
+	Page      uint   `form:"page"`
+	Condition string `form:"condition"`
+}
+
+type QueryCondition struct {
+	Operator string `json:"operator"`
+	Value    any    `json:"value"`
 }
 
 type ListSingersResponse struct {
-	Singers []model.Singer `json:"singers"`
+	Singers []model.SingerView `json:"singers"`
+	HasMore bool               `json:"hasMore"`
 }
