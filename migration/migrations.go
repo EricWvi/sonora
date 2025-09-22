@@ -49,7 +49,28 @@ func GetAllMigrations() []MigrationStep {
 			Up:      CreateAlbumCoverUpdateTrigger,
 			Down:    DropAlbumCoverUpdateTrigger,
 		},
+		{
+			Version: "v0.9.0",
+			Name:    "Remove genre index due to low cardinality",
+			Up:      RemoveGenreIndex,
+			Down:    RestoreGenreIndex,
+		},
 	}
+}
+
+// ------------------- v0.9.0 -------------------
+func RemoveGenreIndex(db *gorm.DB) error {
+	return db.Exec(`
+		-- Remove genre index due to low cardinality
+		DROP INDEX IF EXISTS idx_track_genre;
+	`).Error
+}
+
+func RestoreGenreIndex(db *gorm.DB) error {
+	return db.Exec(`
+		-- Restore genre index if rollback is needed
+		CREATE INDEX idx_track_genre ON public.d_track (genre);
+	`).Error
 }
 
 // ------------------- v0.8.0 -------------------

@@ -12,6 +12,8 @@ export type Track = {
   duration: number;
   year: number;
   trackNumber: number;
+  genre: string;
+  albumText: string;
 };
 
 export interface QueryCondition {

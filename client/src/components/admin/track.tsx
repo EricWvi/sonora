@@ -1,5 +1,14 @@
 import { useState, useMemo } from "react";
-import { useTracks, useCreateTrack, useUpdateTrack, useDeleteTrack, getLyric, createLyric, updateLyric, type Track } from "@/hooks/use-tracks";
+import {
+  useTracks,
+  useCreateTrack,
+  useUpdateTrack,
+  useDeleteTrack,
+  getLyric,
+  createLyric,
+  updateLyric,
+  type Track,
+} from "@/hooks/use-tracks";
 import { fileUpload } from "@/lib/fileUpload";
 import { formatMediaUrl } from "@/lib/utils";
 
@@ -17,6 +26,8 @@ export function TrackAdmin() {
     url: "",
     lyric: 0,
     year: new Date().getFullYear(),
+    genre: "",
+    albumText: "",
   });
   const [lyricContent, setLyricContent] = useState("");
   const [originalLyricContent, setOriginalLyricContent] = useState("");
@@ -33,7 +44,7 @@ export function TrackAdmin() {
   // Filter and paginate tracks
   const filteredTracks = useMemo(() => {
     if (!tracks) return [];
-    return tracks.filter(track =>
+    return tracks.filter((track) =>
       track.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [tracks, searchTerm]);
@@ -51,12 +62,14 @@ export function TrackAdmin() {
   };
 
   const handleSearchKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       handleSearchSubmit();
     }
   };
 
-  const handleCoverUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCoverUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     setIsCoverUploading(true);
     setCoverUploadProgress(0);
 
@@ -66,18 +79,20 @@ export function TrackAdmin() {
       onSuccess: (response) => {
         try {
           const parsed = JSON.parse(response);
-          const imageUrl = parsed.photos?.[0] || '';
+          const imageUrl = parsed.photos?.[0] || "";
           setNewTrack({ ...newTrack, cover: imageUrl });
         } catch {
           setNewTrack({ ...newTrack, cover: response });
         }
         setIsCoverUploading(false);
         setCoverUploadProgress(0);
-      }
+      },
     });
   };
 
-  const handleAudioUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAudioUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     setIsAudioUploading(true);
     setAudioUploadProgress(0);
 
@@ -87,14 +102,14 @@ export function TrackAdmin() {
       onSuccess: (response) => {
         try {
           const parsed = JSON.parse(response);
-          const audioUrl = parsed.photos?.[0] || '';
+          const audioUrl = parsed.photos?.[0] || "";
           setNewTrack({ ...newTrack, url: audioUrl });
         } catch {
           setNewTrack({ ...newTrack, url: response });
         }
         setIsAudioUploading(false);
         setAudioUploadProgress(0);
-      }
+      },
     });
   };
 
@@ -141,6 +156,8 @@ export function TrackAdmin() {
         url: "",
         lyric: 0,
         year: new Date().getFullYear(),
+        genre: "",
+        albumText: "",
       });
       setLyricContent("");
       setOriginalLyricContent("");
@@ -150,10 +167,14 @@ export function TrackAdmin() {
       setIsAudioUploading(false);
       setShowForm(false);
       // Clear file inputs
-      const coverInput = document.querySelector('input[type="file"][accept="image/*"]') as HTMLInputElement;
-      const audioInput = document.querySelector('input[type="file"][accept="audio/*"]') as HTMLInputElement;
-      if (coverInput) coverInput.value = '';
-      if (audioInput) audioInput.value = '';
+      const coverInput = document.querySelector(
+        'input[type="file"][accept="image/*"]'
+      ) as HTMLInputElement;
+      const audioInput = document.querySelector(
+        'input[type="file"][accept="audio/*"]'
+      ) as HTMLInputElement;
+      if (coverInput) coverInput.value = "";
+      if (audioInput) audioInput.value = "";
     } catch (error) {
       console.error("Failed to save track:", error);
     }
@@ -168,6 +189,8 @@ export function TrackAdmin() {
       url: track.url,
       lyric: track.lyric,
       year: track.year,
+      genre: track.genre,
+      albumText: track.albumText,
     });
 
     // Fetch lyric content if track has a lyric ID
@@ -198,6 +221,8 @@ export function TrackAdmin() {
       url: "",
       lyric: 0,
       year: new Date().getFullYear(),
+      genre: "",
+      albumText: "",
     });
     setLyricContent("");
     setOriginalLyricContent("");
@@ -207,10 +232,14 @@ export function TrackAdmin() {
     setIsAudioUploading(false);
     setShowForm(false);
     // Clear file inputs
-    const coverInput = document.querySelector('input[type="file"][accept="image/*"]') as HTMLInputElement;
-    const audioInput = document.querySelector('input[type="file"][accept="audio/*"]') as HTMLInputElement;
-    if (coverInput) coverInput.value = '';
-    if (audioInput) audioInput.value = '';
+    const coverInput = document.querySelector(
+      'input[type="file"][accept="image/*"]'
+    ) as HTMLInputElement;
+    const audioInput = document.querySelector(
+      'input[type="file"][accept="audio/*"]'
+    ) as HTMLInputElement;
+    if (coverInput) coverInput.value = "";
+    if (audioInput) audioInput.value = "";
   };
 
   const handleDelete = async (id: number, name: string) => {
@@ -250,7 +279,9 @@ export function TrackAdmin() {
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-base font-medium">Single Tracks</h2>
         <button
-          onClick={() => editingTrack ? handleCancelEdit() : setShowForm(!showForm)}
+          onClick={() =>
+            editingTrack ? handleCancelEdit() : setShowForm(!showForm)
+          }
           className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600 rounded"
         >
           {showForm ? "Cancel" : "+ Add"}
@@ -259,13 +290,20 @@ export function TrackAdmin() {
 
       {showForm && (
         <div className="mb-3 p-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded">
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <form
+            onSubmit={handleSubmit}
+            className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3"
+          >
             <div>
-              <label className="block text-xs font-medium mb-1">Track Name</label>
+              <label className="block text-xs font-medium mb-1">
+                Track Name
+              </label>
               <input
                 type="text"
                 value={newTrack.name}
-                onChange={(e) => setNewTrack({ ...newTrack, name: e.target.value })}
+                onChange={(e) =>
+                  setNewTrack({ ...newTrack, name: e.target.value })
+                }
                 className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                 placeholder="Track name"
                 required
@@ -276,7 +314,9 @@ export function TrackAdmin() {
               <input
                 type="text"
                 value={newTrack.singer}
-                onChange={(e) => setNewTrack({ ...newTrack, singer: e.target.value })}
+                onChange={(e) =>
+                  setNewTrack({ ...newTrack, singer: e.target.value })
+                }
                 className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                 placeholder="Singer"
                 required
@@ -287,7 +327,12 @@ export function TrackAdmin() {
               <input
                 type="number"
                 value={newTrack.year}
-                onChange={(e) => setNewTrack({ ...newTrack, year: parseInt(e.target.value) || new Date().getFullYear() })}
+                onChange={(e) =>
+                  setNewTrack({
+                    ...newTrack,
+                    year: parseInt(e.target.value) || new Date().getFullYear(),
+                  })
+                }
                 className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                 placeholder={new Date().getFullYear().toString()}
                 min="1900"
@@ -295,7 +340,35 @@ export function TrackAdmin() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1">Cover Image</label>
+              <label className="block text-xs font-medium mb-1">Genre</label>
+              <input
+                type="text"
+                value={newTrack.genre}
+                onChange={(e) =>
+                  setNewTrack({ ...newTrack, genre: e.target.value })
+                }
+                className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                placeholder="Genre"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1">
+                Album Text
+              </label>
+              <input
+                type="text"
+                value={newTrack.albumText}
+                onChange={(e) =>
+                  setNewTrack({ ...newTrack, albumText: e.target.value })
+                }
+                className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                placeholder="Album name"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-xs font-medium mb-1">
+                Cover Image
+              </label>
               <div className="space-y-2">
                 <input
                   type="file"
@@ -319,13 +392,17 @@ export function TrackAdmin() {
                       alt="Cover preview"
                       className="w-8 h-8 rounded object-cover"
                     />
-                    <span className="text-xs text-green-600 dark:text-green-400">Image uploaded</span>
+                    <span className="text-xs text-green-600 dark:text-green-400">
+                      Image uploaded
+                    </span>
                   </div>
                 )}
               </div>
             </div>
-            <div className="md:col-span-2">
-              <label className="block text-xs font-medium mb-1">Audio File</label>
+            <div className="col-span-2">
+              <label className="block text-xs font-medium mb-1">
+                Audio File
+              </label>
               <div className="space-y-2">
                 <input
                   type="file"
@@ -344,12 +421,14 @@ export function TrackAdmin() {
                 )}
                 {newTrack.url && !isAudioUploading && (
                   <div className="flex items-center space-x-2">
-                    <span className="text-xs text-green-600 dark:text-green-400">Audio uploaded</span>
+                    <span className="text-xs text-green-600 dark:text-green-400">
+                      Audio uploaded
+                    </span>
                   </div>
                 )}
               </div>
             </div>
-            <div className="md:col-span-2">
+            <div>
               <label className="block text-xs font-medium mb-1">Lyrics</label>
               <textarea
                 value={lyricContent}
@@ -359,16 +438,19 @@ export function TrackAdmin() {
                 rows={3}
               />
             </div>
-            <div className="md:col-span-4 flex justify-start">
+            <div className="md:col-span-3 lg:col-span-5 flex justify-start">
               <button
                 type="submit"
                 disabled={createTrack.isPending || updateTrack.isPending}
                 className="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded disabled:opacity-50"
               >
                 {editingTrack
-                  ? (updateTrack.isPending ? "Updating..." : "Update")
-                  : (createTrack.isPending ? "Creating..." : "Create")
-                }
+                  ? updateTrack.isPending
+                    ? "Updating..."
+                    : "Update"
+                  : createTrack.isPending
+                    ? "Creating..."
+                    : "Create"}
               </button>
             </div>
           </form>
@@ -390,7 +472,9 @@ export function TrackAdmin() {
       <div className="space-y-1">
         {filteredTracks.length === 0 ? (
           <div className="text-center py-4 text-gray-500 dark:text-gray-400 text-sm">
-            {searchTerm ? "No single tracks found." : "No single tracks found. Add one above."}
+            {searchTerm
+              ? "No single tracks found."
+              : "No single tracks found. Add one above."}
           </div>
         ) : (
           paginatedTracks.map((track: Track) => (
@@ -409,7 +493,10 @@ export function TrackAdmin() {
                 <div>
                   <div className="font-medium text-sm">{track.name}</div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">
-                    {track.singer} • {track.year} • {formatDuration(track.duration)}
+                    {track.singer} •{" "}
+                    {track.albumText && <>{track.albumText} • </>}
+                    {track.year} • {track.genre} •{" "}
+                    {formatDuration(track.duration)}
                   </div>
                 </div>
               </div>
@@ -436,7 +523,7 @@ export function TrackAdmin() {
         {totalPages > 1 && (
           <div className="flex justify-center items-center space-x-2 mt-3">
             <button
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
               disabled={currentPage === 1}
               className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-gray-700"
             >
@@ -448,7 +535,9 @@ export function TrackAdmin() {
             </span>
 
             <button
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              onClick={() =>
+                setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+              }
               disabled={currentPage === totalPages}
               className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-gray-700"
             >

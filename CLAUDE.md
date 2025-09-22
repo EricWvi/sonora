@@ -21,8 +21,8 @@ notes:
   - `idx_media_link` - Index on d_media.link for UUID lookups
   - `idx_track_singer_trgm` - Trigram GIN index on d_track.singer for fuzzy search
   - `idx_track_album` - Index on d_track.album for joins/filtering
-  - `idx_track_genre` - Index on d_track.genre for filtering
   - `idx_track_name_trgm`, `idx_singer_name_trgm`, `idx_album_name_trgm` - Trigram indexes for search
+  - **Note**: Genre index was removed (v0.9.0) due to low cardinality - not efficient for filtering
 
 ## Implemented Models & Handlers
 
@@ -96,6 +96,7 @@ Located in `client/src/components/admin/`:
 - **Edit in Place**: Click Edit to populate form with existing data
 - **Responsive Forms**: Grid layouts that adapt to screen size
 - **Delete Confirmation**: Named confirmation dialogs (e.g., "Delete singer 'John Doe'?")
+- **Track Form Fields**: Includes name, singer, year, genre, album_text, cover image, audio file, and lyrics
 
 #### UI Design
 - **Compact styling**: Small fonts, reduced spacing, minimal padding
