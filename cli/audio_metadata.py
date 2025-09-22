@@ -126,13 +126,16 @@ def extract_metadata(file_path) -> Optional[AudioMetadata]:
                     lyrics = str(uslt.text)
                     break
 
-            # If no USLT found, check for TXXX:lyrics (user-defined text frame)
+            # If no USLT found, check for TXXX tags that might contain lyrics
             if not lyrics:
                 for key in audio.keys():
-                    if key.startswith('TXXX:') and 'lyrics' in key.lower():
+                    if key.startswith('TXXX:'):
                         txxx = audio[key]
-                        lyrics = str(txxx.text[0]) if hasattr(txxx, 'text') and txxx.text else str(txxx)
-                        break
+                        desc = getattr(txxx, 'desc', '').lower()
+                        # Check for various lyrics-related descriptions
+                        if any(term in desc for term in ['lyrics', 'lyric', 'uslt', 'unsynced']):
+                            lyrics = str(txxx.text[0]) if hasattr(txxx, 'text') and txxx.text else str(txxx)
+                            break
 
         elif file_ext == '.ogg':
             audio = OggVorbis(file_path)

@@ -139,6 +139,7 @@ class AudioMetadata:
 - **get-art** `<file_path>` - Extract cover art from audio file and save to same directory
 - **upload** `<subcommand>` - Upload songs
    - `album <folder>`: upload album, create cover and year extracted from a song inside
+   - `single <folder>`: upload individual tracks without creating album record
 
 ### Album Upload Workflow (`upload album <folder>`)
 1. **Scan folder** for supported audio files (.mp3, .ogg)
@@ -149,6 +150,16 @@ class AudioMetadata:
    - Find or create singer using SearchSinger API (searches existing, creates if not found)
    - Move audio file to `cli/output/<ab>/<cd>/<filename>` (UUID directory structure)
    - Create track record with proper singer, album, and file path relationships
+
+### Single Track Upload Workflow (`upload single <folder>`)
+1. **Scan folder** for supported audio files (.mp3, .ogg)
+2. **Process each track individually**:
+   - Extract metadata from the track
+   - Find or create singer(s) using SearchSinger API
+   - Extract and save track's own cover art (if available)
+   - Move audio file to `cli/output/<ab>/<cd>/<filename>` (UUID directory structure)
+   - Create track record with `album=0` and `albumText=<album name from track metadata>`
+   - No album record is created
 
 ### API Integration
 - **Base URL**: `http://localhost:8765/api` (configurable via `API_BASE_URL` env var)
@@ -192,6 +203,7 @@ python app.py show song.ogg
 python app.py get-art music.mp3      # Saves as music.jpg
 python app.py get-art song.ogg       # Saves as song.webp (or .jpg/.png)
 python app.py upload album /path/to/album/folder
+python app.py upload single /path/to/tracks/folder
 ```
 
 ### Example Album Upload
@@ -206,12 +218,12 @@ python app.py upload album input/spectrum/
 # Album created with ID: 11
 # Processing track 1/2: Another Life
 #   Singer: Westlife (ID: 15)
-#   Audio file moved to: output/33/b3/Westlife-Another Life.mp3
+#   Audio file saved with media UUID: d746ff24-4f8b-4ef3-816d-dd03a3944c98
 #   Lyrics created with ID: 6
 #   Track created with ID: 14
 # Processing track 2/2: Better Man
 #   Singer: Westlife (ID: 15)
-#   Audio file moved to: output/ca/22/Westlife-Better Man.mp3
+#   Audio file saved with media UUID: 38f14b5d-62b6-4656-83ca-5e836dc330bc
 #   Lyrics created with ID: 7
 #   Track created with ID: 15
 # Album upload completed successfully!

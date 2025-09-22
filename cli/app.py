@@ -8,6 +8,7 @@ Usage:
     python app.py show <file_path>         - Show metadata for a single audio file
     python app.py get-art <file_path>      - Extract cover art from audio file
     python app.py upload album <folder>    - Upload album from folder
+    python app.py upload single <folder>   - Upload individual tracks from folder
     python app.py help                     - Show this help message
 
 Examples:
@@ -15,13 +16,14 @@ Examples:
     python app.py show song.ogg
     python app.py get-art music.mp3
     python app.py upload album /path/to/album/folder
+    python app.py upload single /path/to/tracks/folder
 """
 
 import sys
 import argparse
 from pathlib import Path
 from audio_metadata import extract_metadata, extract_cover_art, get_audio_files
-from upload import upload_album
+from upload import upload_album, upload_single
 
 
 def show_command(file_path):
@@ -100,6 +102,21 @@ def upload_album_command(folder_path):
     return upload_album(folder_path)
 
 
+def upload_single_command(folder_path):
+    """Upload individual tracks from a folder"""
+    folder_path = Path(folder_path)
+
+    if not folder_path.exists():
+        print(f"Error: Folder '{folder_path}' does not exist")
+        return False
+
+    if not folder_path.is_dir():
+        print(f"Error: '{folder_path}' is not a directory")
+        return False
+
+    return upload_single(folder_path)
+
+
 def main():
     """Main CLI entry point"""
     parser = argparse.ArgumentParser(
@@ -107,9 +124,11 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python app.py show music.mp3     Show metadata for music.mp3
-  python app.py show song.ogg      Show metadata for song.ogg
-  python app.py get-art music.mp3  Extract cover art from music.mp3
+  python app.py show music.mp3            Show metadata for music.mp3
+  python app.py show song.ogg             Show metadata for song.ogg
+  python app.py get-art music.mp3         Extract cover art from music.mp3
+  python app.py upload album /path/folder Upload album from folder
+  python app.py upload single /path/folder Upload individual tracks from folder
         """
     )
 
@@ -131,6 +150,10 @@ Examples:
     album_parser = upload_subparsers.add_parser('album', help='Upload an album from a folder')
     album_parser.add_argument('folder', help='Path to the album folder')
 
+    # Upload single tracks subcommand
+    single_parser = upload_subparsers.add_parser('single', help='Upload individual tracks from a folder')
+    single_parser.add_argument('folder', help='Path to the folder containing tracks')
+
     # Parse arguments
     if len(sys.argv) == 1:
         parser.print_help()
@@ -147,6 +170,9 @@ Examples:
     elif args.command == 'upload':
         if args.upload_type == 'album':
             success = upload_album_command(args.folder)
+            sys.exit(0 if success else 1)
+        elif args.upload_type == 'single':
+            success = upload_single_command(args.folder)
             sys.exit(0 if success else 1)
         else:
             upload_parser.print_help()

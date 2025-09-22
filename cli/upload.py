@@ -190,6 +190,135 @@ def move_audio_file_to_output(file_path: Path, output_dir: Path) -> str:
     return media_uuid
 
 
+def upload_single(folder_path: Path) -> bool:
+    """Upload individual tracks from a folder without creating an album record"""
+    try:
+        # Ensure output directory exists
+        ensure_directories()
+
+        print(f"Processing single tracks from folder: {folder_path.name}")
+
+        # Get all audio files from the folder
+        audio_files = get_audio_files(folder_path)
+
+        if not audio_files:
+            print("No supported audio files found in the folder")
+            return False
+
+        print(f"Found {len(audio_files)} audio file(s)")
+
+        # Process each track individually
+        for i, audio_file in enumerate(audio_files, 1):
+            print(f"\nProcessing track {i}/{len(audio_files)}: {audio_file.name}")
+
+            # Extract metadata from this track
+            metadata = extract_metadata(audio_file)
+            if not metadata:
+                print(f"  Skipping: Could not extract metadata from {audio_file.name}")
+                continue
+
+            print(f"  Title: {metadata.title}")
+            print(f"  Album: {metadata.album}")
+
+            # Find or create all artists
+            artists_list = metadata.artists if metadata.artists else ["Unknown Artist"]
+            artist_ids = []
+
+            for artist_name in artists_list:
+                artist_id = find_or_create_singer(artist_name)
+                artist_ids.append(artist_id)
+                print(f"  Singer: {artist_name} (ID: {artist_id})")
+
+            # Concatenate all artists with "; "
+            all_artists = "; ".join(artists_list)
+
+            # Extract and save track cover art (if available)
+            cover_uuid = ""
+            try:
+                # Generate UUID for cover art
+                cover_uuid_temp = str(uuid.uuid4())
+                first_two = cover_uuid_temp[:2]
+                second_two = cover_uuid_temp[2:4]
+
+                # Create directory structure
+                cover_dir = OUTPUT_DIR / first_two / second_two
+                cover_dir.mkdir(parents=True, exist_ok=True)
+
+                # Extract cover art using existing function first
+                temp_cover = extract_cover_art(audio_file)
+                if temp_cover:
+                    # Determine file extension from temporary cover
+                    temp_cover_path = Path(temp_cover)
+                    extension = temp_cover_path.suffix
+
+                    # Move to proper output location with track name
+                    cover_filename = f"{metadata.title}{extension}"
+                    final_cover_path = cover_dir / cover_filename
+                    shutil.move(temp_cover, final_cover_path)
+
+                    # Create media record in database
+                    relative_path = f"{first_two}/{second_two}/{cover_filename}"
+                    cover_uuid = create_media_record(relative_path)
+                    print(f"  Cover art saved with media UUID: {cover_uuid}")
+            except Exception as e:
+                print(f"  Warning: Could not extract cover art: {e}")
+
+            # Move audio file to output directory and create media record
+            audio_uuid = move_audio_file_to_output(audio_file, OUTPUT_DIR)
+            print(f"  Audio file saved with media UUID: {audio_uuid}")
+
+            # Parse track number
+            track_number = 0
+            try:
+                if metadata.track_number and metadata.track_number.isdigit():
+                    track_number = int(metadata.track_number)
+            except (ValueError, AttributeError):
+                pass
+
+            # Parse duration
+            duration = 0
+            if metadata.duration_seconds:
+                duration = int(metadata.duration_seconds)
+
+            # Parse year
+            track_year = 0
+            try:
+                if metadata.date and metadata.date.isdigit():
+                    track_year = int(metadata.date)
+            except (ValueError, AttributeError):
+                pass
+
+            # Create lyric record if lyrics exist
+            lyric_id = 0
+            if metadata.lyric.strip():
+                lyric_id = create_lyric(metadata.lyric)
+                print(f"  Lyrics created with ID: {lyric_id}")
+
+            # Create track record with album=0 and albumText from metadata
+            track_id = create_track(
+                name=metadata.title,
+                singer=all_artists,  # All artists concatenated with "; "
+                album=0,  # No album association
+                cover=cover_uuid,  # Use track's own cover art
+                url=audio_uuid,  # Use media UUID for audio file
+                duration=duration,
+                year=track_year,
+                track_number=track_number,
+                lyric_id=lyric_id,
+                genre=metadata.genre,  # Use genre from metadata
+                album_text=metadata.album  # Use album name from track metadata
+            )
+            print(f"  Track created with ID: {track_id}")
+
+        print(f"\nSingle tracks upload completed successfully!")
+        print(f"Tracks processed: {len(audio_files)}")
+        return True
+
+    except Exception as e:
+        print(f"Error during single tracks upload: {e}")
+        return False
+
+
 def upload_album(folder_path: Path) -> bool:
     """Upload an album from a folder"""
     try:
@@ -258,7 +387,7 @@ def upload_album(folder_path: Path) -> bool:
 
             # Move audio file to output directory and create media record
             audio_uuid = move_audio_file_to_output(Path(metadata.file_path), OUTPUT_DIR)
-            print(f"  Audio file moved with media UUID: {audio_uuid}")
+            print(f"  Audio file saved with media UUID: {audio_uuid}")
 
             # Parse track number
             track_number = 0
