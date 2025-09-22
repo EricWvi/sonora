@@ -523,6 +523,8 @@ export function AlbumAdmin() {
         cover: albumData.cover,
         year: albumData.year,
         duration: editingTrack?.duration || 0, // Keep existing duration or 0 for new tracks
+        genre: editingTrack?.genre || "",
+        albumText: albumData.name,
       };
 
       if (editingTrack) {
