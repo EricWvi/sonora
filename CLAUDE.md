@@ -191,16 +191,35 @@ python app.py upload album input/spectrum/
 # Processing album folder: spectrum
 # Found 2 audio file(s)
 # Album: Spectrum (2019)
-# Album cover saved to: output/ac/95/Spectrum.webp
+# Album cover saved with media UUID: 93710dae-9ebd-487f-bea2-f9194cf2f1c0
 # Creating album record...
-# Album created with ID: 8
+# Album created with ID: 11
 # Processing track 1/2: Another Life
 #   Singer: Westlife (ID: 15)
-#   Audio file moved to: output/16/d0/Westlife-Another Life.mp3
-#   Track created with ID: 8
+#   Audio file moved to: output/33/b3/Westlife-Another Life.mp3
+#   Lyrics created with ID: 6
+#   Track created with ID: 14
 # Processing track 2/2: Better Man
 #   Singer: Westlife (ID: 15)
-#   Audio file moved to: output/7f/62/Westlife-Better Man.mp3
-#   Track created with ID: 9
+#   Audio file moved to: output/ca/22/Westlife-Better Man.mp3
+#   Lyrics created with ID: 7
+#   Track created with ID: 15
 # Album upload completed successfully!
+```
+
+### Database Testing
+You can verify the upload results using psql:
+
+```bash
+# Check media records
+psql postgresql://onlyquant:123456@localhost:5432/sonora -c "SELECT link, key FROM d_media ORDER BY created_at DESC LIMIT 1;"
+
+# Check album covers using UUIDs
+psql postgresql://onlyquant:123456@localhost:5432/sonora -c "SELECT name, cover FROM d_album WHERE id = 11;"
+
+# Check track covers and lyrics
+psql postgresql://onlyquant:123456@localhost:5432/sonora -c "SELECT name, cover, lyric FROM d_track WHERE album = 11;"
+
+# Check lyrics content
+psql postgresql://onlyquant:123456@localhost:5432/sonora -c "SELECT id, LENGTH(content) as lyric_length FROM d_lyric WHERE id IN (6, 7);"
 ```

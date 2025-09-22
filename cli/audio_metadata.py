@@ -29,6 +29,7 @@ class AudioMetadata:
     file_path: str
     file_size: int
     format: str
+    lyric: str = ""  # Embedded lyrics text
 
     @property
     def artist(self) -> str:
@@ -46,13 +47,18 @@ class AudioMetadata:
 
     def __str__(self):
         """Nice string representation for display"""
-        return f"""Title:        {self.title}
+        result = f"""Title:        {self.title}
 Track Number: {self.track_number}
 Album:        {self.album}
 Artist:       {self.artist}
 Genre:        {self.genre}
 Duration:     {self.duration}
 Date:         {self.date}"""
+
+        if self.lyric.strip():
+            result += f"\nLyrics:\n{self.lyric}"
+
+        return result
 
 
 def format_duration(seconds):
@@ -111,6 +117,23 @@ def extract_metadata(file_path) -> Optional[AudioMetadata]:
                 track_info = str(audio['TRCK'][0])
                 track_num = track_info.split('/')[0] if '/' in track_info else track_info
 
+            # Extract lyrics (USLT tag for unsynchronized lyrics or TXXX:lyrics)
+            lyrics = ""
+            # First check for standard USLT tags
+            for key in audio.keys():
+                if key.startswith('USLT'):
+                    uslt = audio[key]
+                    lyrics = str(uslt.text)
+                    break
+
+            # If no USLT found, check for TXXX:lyrics (user-defined text frame)
+            if not lyrics:
+                for key in audio.keys():
+                    if key.startswith('TXXX:') and 'lyrics' in key.lower():
+                        txxx = audio[key]
+                        lyrics = str(txxx.text[0]) if hasattr(txxx, 'text') and txxx.text else str(txxx)
+                        break
+
         elif file_ext == '.ogg':
             audio = OggVorbis(file_path)
             # Extract OGG metadata using Vorbis comments
@@ -146,6 +169,13 @@ def extract_metadata(file_path) -> Optional[AudioMetadata]:
             if 'tracknumber' in audio:
                 track_info = str(audio['tracknumber'][0])
                 track_num = track_info.split('/')[0] if '/' in track_info else track_info
+
+            # Extract lyrics (LYRICS tag for OGG)
+            lyrics = ""
+            if 'lyrics' in audio:
+                lyrics = str(audio['lyrics'][0])
+            elif 'unsyncedlyrics' in audio:
+                lyrics = str(audio['unsyncedlyrics'][0])
         else:
             return None
 
@@ -159,7 +189,8 @@ def extract_metadata(file_path) -> Optional[AudioMetadata]:
             date=str(date),
             file_path=str(file_path),
             file_size=file_path.stat().st_size,
-            format=file_ext[1:].upper()
+            format=file_ext[1:].upper(),
+            lyric=lyrics.strip()
         )
 
     except ID3NoHeaderError:

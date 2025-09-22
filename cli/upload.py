@@ -9,9 +9,37 @@ import requests
 import json
 import uuid
 import shutil
+import psycopg2
 from pathlib import Path
 from audio_metadata import extract_metadata, extract_cover_art, get_audio_files
-from config import API_BASE_URL, API_ENDPOINTS, OUTPUT_DIR, ensure_directories
+from config import API_BASE_URL, API_ENDPOINTS, OUTPUT_DIR, ensure_directories, get_database_url
+
+
+def create_media_record(file_path: str) -> str:
+    """Create a media record in the database and return the UUID"""
+    try:
+        # Generate UUID for the media record
+        media_uuid = str(uuid.uuid4())
+
+        # Connect to database
+        conn = psycopg2.connect(get_database_url())
+        cur = conn.cursor()
+
+        # Insert into d_media table
+        cur.execute(
+            "INSERT INTO d_media (link, key, created_at, updated_at) VALUES (%s, %s, NOW(), NOW())",
+            (media_uuid, file_path)
+        )
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return media_uuid
+
+    except Exception as e:
+        print(f"Failed to create media record: {e}")
+        raise Exception(f"Failed to create media record for {file_path}")
 
 
 def make_api_request(endpoint: str, action: str, data: dict = None) -> dict:
@@ -66,7 +94,7 @@ def create_album(name: str, cover: str = "", year: int = 0) -> int:
 
 def create_track(name: str, singer: str, album: int, cover: str = "",
                 url: str = "", duration: int = 0, year: int = 0,
-                track_number: int = 0) -> int:
+                track_number: int = 0, lyric_id: int = 0) -> int:
     """Create a new track"""
     response = make_api_request(API_ENDPOINTS['track'], 'CreateTrack', {
         'name': name,
@@ -74,7 +102,7 @@ def create_track(name: str, singer: str, album: int, cover: str = "",
         'album': album,
         'cover': cover,
         'url': url,
-        'lyric': 0,
+        'lyric': lyric_id,
         'duration': duration,
         'year': year,
         'trackNumber': track_number
@@ -85,8 +113,22 @@ def create_track(name: str, singer: str, album: int, cover: str = "",
     raise Exception(f"Failed to create track: {name}")
 
 
+def create_lyric(content: str) -> int:
+    """Create a new lyric record"""
+    if not content.strip():
+        return 0  # Return 0 for empty lyrics (default value)
+
+    response = make_api_request(API_ENDPOINTS['lyric'], 'CreateLyric', {
+        'content': content.strip()
+    })
+    if response and 'message' in response and 'id' in response['message']:
+        return response['message']['id']
+
+    raise Exception(f"Failed to create lyric")
+
+
 def extract_cover_art_to_output(file_path: Path, output_dir: Path, album_name: str) -> str:
-    """Extract cover art from audio file and save to output directory with UUID structure"""
+    """Extract cover art from audio file, save to output directory, create media record, and return UUID"""
     try:
         # Generate UUID for cover art
         cover_uuid = str(uuid.uuid4())
@@ -111,8 +153,12 @@ def extract_cover_art_to_output(file_path: Path, output_dir: Path, album_name: s
         final_cover_path = cover_dir / cover_filename
         shutil.move(temp_cover, final_cover_path)
 
-        # Return relative path
-        return f"{first_two}/{second_two}/{cover_filename}"
+        # Create media record in database
+        relative_path = f"{first_two}/{second_two}/{cover_filename}"
+        media_uuid = create_media_record(relative_path)
+
+        # Return media UUID (not file path)
+        return media_uuid
     except Exception as e:
         print(f"Failed to extract cover art: {e}")
         return ""
@@ -178,25 +224,30 @@ def upload_album(folder_path: Path) -> bool:
         print(f"Album: {album_name} ({album_year if album_year else 'Unknown year'})")
 
         # Extract and save album cover art
-        cover_path = extract_cover_art_to_output(Path(first_track.file_path), OUTPUT_DIR, album_name)
-        if cover_path:
-            print(f"Album cover saved to: output/{cover_path}")
+        cover_uuid = extract_cover_art_to_output(Path(first_track.file_path), OUTPUT_DIR, album_name)
+        if cover_uuid:
+            print(f"Album cover saved with media UUID: {cover_uuid}")
 
         # Create album record
         print("Creating album record...")
-        album_id = create_album(album_name, cover_path, album_year)
+        album_id = create_album(album_name, cover_uuid, album_year)
         print(f"Album created with ID: {album_id}")
 
         # Process each track
         for i, metadata in enumerate(tracks_metadata, 1):
             print(f"Processing track {i}/{len(tracks_metadata)}: {metadata.title}")
 
-            # Get primary artist (first one)
-            primary_artist = metadata.artists[0] if metadata.artists else "Unknown Artist"
+            # Find or create all artists
+            artists_list = metadata.artists if metadata.artists else ["Unknown Artist"]
+            artist_ids = []
 
-            # Find or create singer
-            singer_id = find_or_create_singer(primary_artist)
-            print(f"  Singer: {primary_artist} (ID: {singer_id})")
+            for artist_name in artists_list:
+                artist_id = find_or_create_singer(artist_name)
+                artist_ids.append(artist_id)
+                print(f"  Singer: {artist_name} (ID: {artist_id})")
+
+            # Concatenate all artists with "; "
+            all_artists = "; ".join(artists_list)
 
             # Move audio file to output directory
             audio_path = move_audio_file_to_output(Path(metadata.file_path), OUTPUT_DIR)
@@ -215,16 +266,23 @@ def upload_album(folder_path: Path) -> bool:
             if metadata.duration_seconds:
                 duration = int(metadata.duration_seconds)
 
+            # Create lyric record if lyrics exist
+            lyric_id = 0
+            if metadata.lyric.strip():
+                lyric_id = create_lyric(metadata.lyric)
+                print(f"  Lyrics created with ID: {lyric_id}")
+
             # Create track record
             track_id = create_track(
                 name=metadata.title,
-                singer=primary_artist,  # API expects singer name, not ID
+                singer=all_artists,  # All artists concatenated with "; "
                 album=album_id,
-                cover=cover_path,  # Use album cover for track
+                cover=cover_uuid,  # Use album cover UUID for track
                 url=audio_path,
                 duration=duration,
                 year=album_year,
-                track_number=track_number
+                track_number=track_number,
+                lyric_id=lyric_id
             )
             print(f"  Track created with ID: {track_id}")
 

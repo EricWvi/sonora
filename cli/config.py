@@ -36,7 +36,8 @@ API_BASE_URL = os.getenv('API_BASE_URL', 'http://localhost:8765/api')
 API_ENDPOINTS = {
     'singer': '/singer',
     'album': '/album',
-    'track': '/track'
+    'track': '/track',
+    'lyric': '/track'  # Lyric endpoints are under /track
 }
 
 # Logging configuration

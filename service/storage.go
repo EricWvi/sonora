@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/spf13/viper"
 )
 
 // LocalStorageService handles local file storage operations
@@ -18,7 +19,7 @@ type LocalStorageService struct {
 
 // InitLocalStorageService initializes a new local storage service
 func InitLocalStorageService() (*LocalStorageService, error) {
-	basePath := "objects"
+	basePath := viper.GetString("storage.local.dir")
 
 	// Create base directory if it doesn't exist
 	if err := os.MkdirAll(basePath, 0755); err != nil {
