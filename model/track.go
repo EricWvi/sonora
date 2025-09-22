@@ -29,6 +29,8 @@ type TrackField struct {
 	Duration    int    `gorm:"not null;default:0" json:"duration"`
 	Year        int16  `gorm:"not null;default:0" json:"year"`
 	TrackNumber int16  `gorm:"not null;default:0" json:"trackNumber"`
+	Genre       string `gorm:"size:50;not null" json:"genre"`
+	AlbumText   string `gorm:"size:255;not null" json:"albumText"`
 }
 
 const (
@@ -44,6 +46,8 @@ const (
 	Track_Duration    = "duration"
 	Track_Year        = "year"
 	Track_TrackNumber = "track_number"
+	Track_Genre       = "genre"
+	Track_AlbumText   = "album_text"
 )
 
 func (t *Track) TableName() string {

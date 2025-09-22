@@ -31,7 +31,124 @@ func GetAllMigrations() []MigrationStep {
 			Up:      CreateSearchIndex,
 			Down:    DropSearchIndex,
 		},
+		{
+			Version: "v0.6.0",
+			Name:    "Add genre and album_text columns to d_track",
+			Up:      AddTrackGenreAlbumText,
+			Down:    DropTrackGenreAlbumText,
+		},
+		{
+			Version: "v0.7.0",
+			Name:    "Add multiple indexes for performance optimization",
+			Up:      CreatePerformanceIndexes,
+			Down:    DropPerformanceIndexes,
+		},
+		{
+			Version: "v0.8.0",
+			Name:    "Add trigger to update track covers when album cover changes",
+			Up:      CreateAlbumCoverUpdateTrigger,
+			Down:    DropAlbumCoverUpdateTrigger,
+		},
 	}
+}
+
+// ------------------- v0.8.0 -------------------
+func CreateAlbumCoverUpdateTrigger(db *gorm.DB) error {
+	return db.Exec(`
+		-- Create trigger function to update track covers when album cover changes
+		CREATE OR REPLACE FUNCTION update_track_cover()
+		RETURNS TRIGGER AS $$
+		BEGIN
+			-- Update cover for all tracks with this album
+			UPDATE public.d_track
+			SET cover = NEW.cover
+			WHERE album = NEW.id;
+			RETURN NEW;
+		END;
+		$$ LANGUAGE plpgsql;
+
+		-- Create trigger
+		CREATE TRIGGER trigger_update_track_cover
+		AFTER UPDATE OF cover ON public.d_album
+		FOR EACH ROW
+		WHEN (OLD.cover IS DISTINCT FROM NEW.cover)
+		EXECUTE FUNCTION update_track_cover();
+	`).Error
+}
+
+func DropAlbumCoverUpdateTrigger(db *gorm.DB) error {
+	return db.Exec(`
+		-- Drop trigger and function
+		DROP TRIGGER IF EXISTS trigger_update_track_cover ON public.d_album;
+		DROP FUNCTION IF EXISTS update_track_cover();
+	`).Error
+}
+
+// ------------------- v0.7.0 -------------------
+func CreatePerformanceIndexes(db *gorm.DB) error {
+	return db.Exec(`
+		-- Index on d_media link column
+		CREATE INDEX idx_media_link ON public.d_media (link);
+
+		-- Trigram index on d_track singer column for text search
+		CREATE INDEX idx_track_singer_trgm ON public.d_track USING gin (singer gin_trgm_ops);
+
+		-- Index on d_track album column for joins and filtering
+		CREATE INDEX idx_track_album ON public.d_track (album);
+
+		-- Index on d_track genre column for filtering
+		CREATE INDEX idx_track_genre ON public.d_track (genre);
+	`).Error
+}
+
+func DropPerformanceIndexes(db *gorm.DB) error {
+	return db.Exec(`
+		DROP INDEX IF EXISTS idx_media_link;
+		DROP INDEX IF EXISTS idx_track_singer_trgm;
+		DROP INDEX IF EXISTS idx_track_album;
+		DROP INDEX IF EXISTS idx_track_genre;
+	`).Error
+}
+
+// ------------------- v0.6.0 -------------------
+func AddTrackGenreAlbumText(db *gorm.DB) error {
+	return db.Exec(`
+		ALTER TABLE public.d_track
+		ADD COLUMN genre VARCHAR(50) DEFAULT '' NOT NULL,
+		ADD COLUMN album_text VARCHAR(255) DEFAULT '' NOT NULL;
+
+		-- Create trigger function to update album_text when album name changes
+		CREATE OR REPLACE FUNCTION update_track_album_text()
+		RETURNS TRIGGER AS $$
+		BEGIN
+			-- Update album_text for all tracks with this album
+			UPDATE public.d_track
+			SET album_text = NEW.name
+			WHERE album = NEW.id;
+			RETURN NEW;
+		END;
+		$$ LANGUAGE plpgsql;
+
+		-- Create trigger
+		CREATE TRIGGER trigger_update_track_album_text
+		AFTER UPDATE OF name ON public.d_album
+		FOR EACH ROW
+		WHEN (OLD.name IS DISTINCT FROM NEW.name)
+		EXECUTE FUNCTION update_track_album_text();
+	`).Error
+}
+
+func DropTrackGenreAlbumText(db *gorm.DB) error {
+	return db.Exec(`
+		-- Drop trigger and function
+		DROP TRIGGER IF EXISTS trigger_update_track_album_text ON public.d_album;
+		DROP FUNCTION IF EXISTS update_track_album_text();
+
+		-- Drop columns
+		ALTER TABLE public.d_track
+		DROP COLUMN IF EXISTS genre,
+		DROP COLUMN IF EXISTS album_text;
+	`).Error
 }
 
 // ------------------- v0.5.0 -------------------

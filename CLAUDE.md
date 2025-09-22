@@ -9,10 +9,20 @@ The current development is in admin part.
 ## Database Schema (from migration/migrations.go)
 
 - **d_singer**: id, name, avatar, timestamps
-- **d_album**: id, name, cover, timestamps
-- **d_track**: id, name, singer, album, cover, url, lyric, duration, timestamps
+- **d_album**: id, name, cover, year, timestamps
+- **d_track**: id, name, singer, album, cover, url, lyric, duration, year, track_number, genre, album_text, timestamps
 - **d_user**: id, email, avatar, username, language, timestamps
-- **d_media**: id, link, key, timestamps
+- **d_media**: id, link (UUID), key, timestamps
+- **d_lyric**: id, content, timestamps
+
+notes:
+- **Database Triggers**: Automatically updates `album_text` or `cover` in tracks when album name or cover changes
+- **Performance Indexes**:
+  - `idx_media_link` - Index on d_media.link for UUID lookups
+  - `idx_track_singer_trgm` - Trigram GIN index on d_track.singer for fuzzy search
+  - `idx_track_album` - Index on d_track.album for joins/filtering
+  - `idx_track_genre` - Index on d_track.genre for filtering
+  - `idx_track_name_trgm`, `idx_singer_name_trgm`, `idx_album_name_trgm` - Trigram indexes for search
 
 ## Implemented Models & Handlers
 

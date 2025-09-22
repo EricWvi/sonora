@@ -94,7 +94,8 @@ def create_album(name: str, cover: str = "", year: int = 0) -> int:
 
 def create_track(name: str, singer: str, album: int, cover: str = "",
                 url: str = "", duration: int = 0, year: int = 0,
-                track_number: int = 0, lyric_id: int = 0) -> int:
+                track_number: int = 0, lyric_id: int = 0, genre: str = "",
+                album_text: str = "") -> int:
     """Create a new track"""
     response = make_api_request(API_ENDPOINTS['track'], 'CreateTrack', {
         'name': name,
@@ -105,7 +106,9 @@ def create_track(name: str, singer: str, album: int, cover: str = "",
         'lyric': lyric_id,
         'duration': duration,
         'year': year,
-        'trackNumber': track_number
+        'trackNumber': track_number,
+        'genre': genre,
+        'albumText': album_text
     })
     if response and 'message' in response and 'id' in response['message']:
         return response['message']['id']
@@ -165,7 +168,7 @@ def extract_cover_art_to_output(file_path: Path, output_dir: Path, album_name: s
 
 
 def move_audio_file_to_output(file_path: Path, output_dir: Path) -> str:
-    """Move audio file to output directory with UUID structure"""
+    """Move audio file to output directory with UUID structure and create media record"""
     # Generate UUID for audio file
     file_uuid = str(uuid.uuid4())
     first_two = file_uuid[:2]
@@ -179,8 +182,12 @@ def move_audio_file_to_output(file_path: Path, output_dir: Path) -> str:
     final_audio_path = audio_dir / file_path.name
     shutil.copy2(file_path, final_audio_path)
 
-    # Return relative path
-    return f"{first_two}/{second_two}/{file_path.name}"
+    # Create media record in database
+    relative_path = f"{first_two}/{second_two}/{file_path.name}"
+    media_uuid = create_media_record(relative_path)
+
+    # Return media UUID (not file path)
+    return media_uuid
 
 
 def upload_album(folder_path: Path) -> bool:
@@ -249,9 +256,9 @@ def upload_album(folder_path: Path) -> bool:
             # Concatenate all artists with "; "
             all_artists = "; ".join(artists_list)
 
-            # Move audio file to output directory
-            audio_path = move_audio_file_to_output(Path(metadata.file_path), OUTPUT_DIR)
-            print(f"  Audio file moved to: output/{audio_path}")
+            # Move audio file to output directory and create media record
+            audio_uuid = move_audio_file_to_output(Path(metadata.file_path), OUTPUT_DIR)
+            print(f"  Audio file moved with media UUID: {audio_uuid}")
 
             # Parse track number
             track_number = 0
@@ -278,11 +285,13 @@ def upload_album(folder_path: Path) -> bool:
                 singer=all_artists,  # All artists concatenated with "; "
                 album=album_id,
                 cover=cover_uuid,  # Use album cover UUID for track
-                url=audio_path,
+                url=audio_uuid,  # Use media UUID for audio file
                 duration=duration,
                 year=album_year,
                 track_number=track_number,
-                lyric_id=lyric_id
+                lyric_id=lyric_id,
+                genre=metadata.genre,  # Use genre from metadata
+                album_text=album_name  # Use album name as album_text
             )
             print(f"  Track created with ID: {track_id}")
 
