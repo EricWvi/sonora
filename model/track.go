@@ -61,9 +61,12 @@ func (t *Track) Get(db *gorm.DB, where map[string]any) error {
 	return nil
 }
 
-func ListAllTracks(db *gorm.DB, where map[string]any) ([]TrackView, error) {
+func ListAllTracks(db *gorm.DB, where WhereExpr) ([]TrackView, error) {
 	tracks := make([]TrackView, 0)
-	if err := db.Model(&Track{}).Where(where).
+	for i := range where {
+		db = db.Where(where[i])
+	}
+	if err := db.Model(&Track{}).
 		Order("id DESC").
 		Omit("created_at", "updated_at", "deleted_at").
 		Find(&tracks).Error; err != nil {

@@ -8,7 +8,7 @@ import (
 )
 
 func (b Base) ListSingles(c *gin.Context, req *ListSinglesRequest) *ListSinglesResponse {
-	m := model.WhereMap{}
+	m := model.WhereExpr{}
 	m.Eq(model.Track_Album, 0)
 
 	tracks, err := model.ListAllTracks(config.ContextDB(c), m)

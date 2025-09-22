@@ -47,9 +47,12 @@ func (s *Singer) Get(db *gorm.DB, where map[string]any) error {
 	return nil
 }
 
-func ListAllSingers(db *gorm.DB, where map[string]any) ([]SingerView, error) {
+func ListAllSingers(db *gorm.DB, where WhereExpr) ([]SingerView, error) {
 	singers := make([]SingerView, 0)
-	if err := db.Model(&Singer{}).Where(where).
+	for i := range where {
+		db = db.Where(where[i])
+	}
+	if err := db.Model(&Singer{}).
 		Order("id DESC").
 		Omit("created_at", "updated_at", "deleted_at").
 		Find(&singers).Error; err != nil {

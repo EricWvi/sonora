@@ -8,7 +8,7 @@ import (
 )
 
 func (b Base) ListAllAlbums(c *gin.Context, req *ListAllAlbumsRequest) *ListAllAlbumsResponse {
-	m := model.WhereMap{}
+	m := model.WhereExpr{}
 
 	albums, err := model.ListAllAlbums(config.ContextDB(c), m)
 	if err != nil {

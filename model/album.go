@@ -49,9 +49,12 @@ func (a *Album) Get(db *gorm.DB, where map[string]any) error {
 	return nil
 }
 
-func ListAllAlbums(db *gorm.DB, where map[string]any) ([]AlbumView, error) {
+func ListAllAlbums(db *gorm.DB, where WhereExpr) ([]AlbumView, error) {
 	albums := make([]AlbumView, 0)
-	if err := db.Model(&Album{}).Where(where).
+	for i := range where {
+		db = db.Where(where[i])
+	}
+	if err := db.Model(&Album{}).
 		Order("id DESC").
 		Omit("created_at", "updated_at", "deleted_at").
 		Find(&albums).Error; err != nil {

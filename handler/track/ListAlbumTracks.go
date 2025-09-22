@@ -13,7 +13,7 @@ func (b Base) ListAlbumTracks(c *gin.Context, req *ListAlbumTracksRequest) *List
 		return nil
 	}
 
-	m := model.WhereMap{}
+	m := model.WhereExpr{}
 	m.Eq(model.Track_Album, req.AlbumID)
 
 	tracks, err := model.ListAllTracks(config.ContextDB(c), m)

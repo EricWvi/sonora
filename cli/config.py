@@ -31,6 +31,14 @@ APP_NAME = 'Sonora CLI'
 APP_VERSION = '1.0.0'
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
+# API settings
+API_BASE_URL = os.getenv('API_BASE_URL', 'http://localhost:8765/api')
+API_ENDPOINTS = {
+    'singer': '/singer',
+    'album': '/album',
+    'track': '/track'
+}
+
 # Logging configuration
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
 LOG_FILE = BASE_DIR / 'sonora.log'

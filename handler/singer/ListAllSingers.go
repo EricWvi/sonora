@@ -8,7 +8,7 @@ import (
 )
 
 func (b Base) ListAllSingers(c *gin.Context, req *ListAllSingersRequest) *ListAllSingersResponse {
-	m := model.WhereMap{}
+	m := model.WhereExpr{}
 
 	singers, err := model.ListAllSingers(config.ContextDB(c), m)
 	if err != nil {

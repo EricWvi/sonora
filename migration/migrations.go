@@ -25,7 +25,40 @@ func GetAllMigrations() []MigrationStep {
 			Up:      CreateLyricTable,
 			Down:    DropLyricTable,
 		},
+		{
+			Version: "v0.5.0",
+			Name:    "Create search index for track, singer, album name",
+			Up:      CreateSearchIndex,
+			Down:    DropSearchIndex,
+		},
 	}
+}
+
+// ------------------- v0.5.0 -------------------
+func CreateSearchIndex(db *gorm.DB) error {
+	return db.Exec(`
+	    CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+		CREATE INDEX idx_track_name_trgm
+		ON public.d_track
+		USING gin (name gin_trgm_ops);
+
+		CREATE INDEX idx_singer_name_trgm
+		ON public.d_singer
+		USING gin (name gin_trgm_ops);
+
+		CREATE INDEX idx_album_name_trgm
+		ON public.d_album
+		USING gin (name gin_trgm_ops);
+	`).Error
+}
+
+func DropSearchIndex(db *gorm.DB) error {
+	return db.Exec(`
+		DROP INDEX IF EXISTS idx_track_name_trgm;
+		DROP INDEX IF EXISTS idx_singer_name_trgm;
+		DROP INDEX IF EXISTS idx_album_name_trgm;
+	`).Error
 }
 
 // ------------------- v0.4.0 -------------------

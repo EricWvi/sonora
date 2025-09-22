@@ -5,20 +5,23 @@ Sonora CLI Tool
 A command-line interface for common operations on audio files.
 
 Usage:
-    python app.py show <file_path>      - Show metadata for a single audio file
-    python app.py get-art <file_path>   - Extract cover art from audio file
-    python app.py help                  - Show this help message
+    python app.py show <file_path>         - Show metadata for a single audio file
+    python app.py get-art <file_path>      - Extract cover art from audio file
+    python app.py upload album <folder>    - Upload album from folder
+    python app.py help                     - Show this help message
 
 Examples:
     python app.py show music.mp3
     python app.py show song.ogg
     python app.py get-art music.mp3
+    python app.py upload album /path/to/album/folder
 """
 
 import sys
 import argparse
 from pathlib import Path
-from audio_metadata import extract_metadata, extract_cover_art
+from audio_metadata import extract_metadata, extract_cover_art, get_audio_files
+from upload import upload_album
 
 
 def show_command(file_path):
@@ -82,6 +85,21 @@ def get_art_command(file_path):
         return False
 
 
+def upload_album_command(folder_path):
+    """Upload an album from a folder"""
+    folder_path = Path(folder_path)
+
+    if not folder_path.exists():
+        print(f"Error: Folder '{folder_path}' does not exist")
+        return False
+
+    if not folder_path.is_dir():
+        print(f"Error: '{folder_path}' is not a directory")
+        return False
+
+    return upload_album(folder_path)
+
+
 def main():
     """Main CLI entry point"""
     parser = argparse.ArgumentParser(
@@ -105,6 +123,14 @@ Examples:
     get_art_parser = subparsers.add_parser('get-art', help='Extract cover art from an audio file')
     get_art_parser.add_argument('file', help='Path to the audio file')
 
+    # Upload command
+    upload_parser = subparsers.add_parser('upload', help='Upload content to the server')
+    upload_subparsers = upload_parser.add_subparsers(dest='upload_type', help='Upload types')
+
+    # Upload album subcommand
+    album_parser = upload_subparsers.add_parser('album', help='Upload an album from a folder')
+    album_parser.add_argument('folder', help='Path to the album folder')
+
     # Parse arguments
     if len(sys.argv) == 1:
         parser.print_help()
@@ -118,6 +144,12 @@ Examples:
     elif args.command == 'get-art':
         success = get_art_command(args.file)
         sys.exit(0 if success else 1)
+    elif args.command == 'upload':
+        if args.upload_type == 'album':
+            success = upload_album_command(args.folder)
+            sys.exit(0 if success else 1)
+        else:
+            upload_parser.print_help()
     else:
         parser.print_help()
 
