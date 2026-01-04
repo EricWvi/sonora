@@ -62,3 +62,37 @@ Each model follows identical structure:
 4. The database columns use snake_case while the JSON API uses camelCase.
 
 **Note**: All list operations return `<Model>View` structs that include the id field for frontend operations, while excluding database timestamps and internal fields from API responses.
+
+## Coding Guidelines
+
+1. use `model.WhereMap` instead of `gin.H`, and name variables of `model.WhereMap` and `model.WhereExpr` simply as `m`.
+
+## Testing Considerations
+
+When writing tests for handlers, be aware of the following requirements:
+
+### 1. Init Stage
+- Tests must call `config.Init()` before using database or storage services
+- Tests should use `config.TestRouter()` to get router.
+
+### 2. Action Middleware for Tests
+- **Issue**: The handler dispatch system requires the `Action` parameter to be set in the gin context via `c.Set("Action", action)`
+- **Production**: The `middleware.Logging()` middleware extracts Action from query parameters and sets it
+- **Test Solution**: Add a simple middleware to test routers:
+```go
+router.Use(func(c *gin.Context) {
+    action := c.Request.URL.Query().Get("Action")
+    if action != "" {
+        c.Set("Action", action)
+    }
+    c.Next()
+})
+```
+
+### 3. Test Structure for Operations
+- always create new records to test update/delete
+
+### 4. Database Access in Tests
+- Use `config.DB()` to get the database instance in tests
+- The database is shared across test runs - ensure proper cleanup or use unique test data
+- Tests use soft deletes (GORM), so deleted records have `deleted_at` timestamp set

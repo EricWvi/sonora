@@ -81,3 +81,8 @@ func openDB(host, port, username, password, name string) *gorm.DB {
 
 	return db
 }
+
+// DB returns the database instance for use in tests
+func DB() *gorm.DB {
+	return db
+}

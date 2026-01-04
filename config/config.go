@@ -2,6 +2,7 @@ package config
 
 import (
 	"log/slog"
+	"os"
 
 	"github.com/EricWvi/sonora/log"
 	"github.com/gin-gonic/gin"
@@ -27,6 +28,13 @@ func Init() {
 func LoadCfg() error {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
+
+	// If CONFIG_PATH is set, use it as the primary config path
+	if configPath := os.Getenv("CONFIG_PATH"); configPath != "" {
+		viper.AddConfigPath(configPath)
+	}
+
+	// Default search paths (still used if CONFIG_PATH is not set or file not found there)
 	viper.AddConfigPath("config")
 	viper.AddConfigPath(".")
 	if err := viper.ReadInConfig(); err != nil {

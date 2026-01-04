@@ -11,15 +11,34 @@ import (
 )
 
 func (b Base) DeleteMedia(c *gin.Context, req *DeleteMediaRequest) *DeleteMediaResponse {
-	deleted := []uuid.UUID{}
-	client, err := service.InitLocalStorageService()
+	deleted, err := DeleteObjects(c, req.Ids)
 	if err != nil {
 		handler.Errorf(c, "%s", err.Error())
 		return nil
 	}
-	for _, id := range req.Ids {
+
+	return &DeleteMediaResponse{
+		Ids: deleted,
+	}
+}
+
+type DeleteMediaRequest struct {
+	Ids []uuid.UUID `json:"ids"`
+}
+
+type DeleteMediaResponse struct {
+	Ids []uuid.UUID `json:"ids"`
+}
+
+func DeleteObjects(c *gin.Context, mediaUUIDs []uuid.UUID) ([]uuid.UUID, error) {
+	deleted := []uuid.UUID{}
+	client, err := service.InitLocalStorageService()
+	if err != nil {
+		return nil, err
+	}
+	for _, id := range mediaUUIDs {
 		m := &model.Media{}
-		err := m.Get(config.ContextDB(c), gin.H{
+		err := m.Get(config.ContextDB(c), model.WhereMap{
 			model.Media_Link: id,
 		})
 		if err != nil {
@@ -38,16 +57,5 @@ func (b Base) DeleteMedia(c *gin.Context, req *DeleteMediaRequest) *DeleteMediaR
 		log.Infof(c, "Object %s deleted successfully", m.Key)
 		deleted = append(deleted, id)
 	}
-
-	return &DeleteMediaResponse{
-		Ids: deleted,
-	}
-}
-
-type DeleteMediaRequest struct {
-	Ids []uuid.UUID `json:"ids"`
-}
-
-type DeleteMediaResponse struct {
-	Ids []uuid.UUID `json:"ids"`
+	return deleted, nil
 }

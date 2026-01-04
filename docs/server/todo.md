@@ -1,6 +1,6 @@
-## TODO: delete media when deleting track
+## TODO: delete media when deleting track and album
 
-Status: not implemented
+Status: ✅ **COMPLETED** (2026-01-04)
 
 ## Goal
 - also delete media's record and local storage when deleting a track
@@ -9,20 +9,18 @@ Status: not implemented
 
 ### Plan
 
-- [ ] Update `model/track.go`
-- [ ] Update `model/album.go`
-- [ ] Update `config/db.go`: func for setting up test env
-- [ ] Create `model/track_test.go`
-- [ ] Create `model/album_test.go`
+- [x] Update `handler/track/DeleteTrack.go`
+- [x] Update `handler/album/DeleteAlbum.go`
+- [x] Create `tests/integration/track/DeleteTrack_test.go`
+- [x] Create `tests/integration/album/DeleteAlbum_test.go`
+- [x] Create `tests/api/album.go`
+- [x] Create `tests/api/media.go`
+- [x] Create `tests/api/track.go`
 
+### Implementation Summary
+All tasks completed successfully. Cascade deletion now properly removes:
+- Track/Album database records
+- Associated media database records
+- Physical files from local storage
 
-## Review
-
-### Summary of Changes
-
-
-### Files Changed
-
-| File | Action |
-|------|--------|
-| | |
+See `docs/server/dev-log.md` for detailed implementation notes.
