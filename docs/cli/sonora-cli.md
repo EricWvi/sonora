@@ -2,10 +2,12 @@
 Python CLI tool for audio file operations located in `cli/`.
 
 ### Structure
-- **app.py** - Main CLI application with argparse interface
-- **audio_metadata.py** - Audio metadata extraction module with AudioMetadata dataclass
-- **config.py** - Configuration for database, paths, and application settings
-- **upload.py** - Album upload functionality with API integration
+
+cli
+├── app.py - Main CLI application with argparse interface
+├── audio_metadata.py - Audio metadata extraction module with AudioMetadata dataclass
+├── config.py - Configuration for database, paths, and application settings
+└── upload.py - Album upload functionality with API integration
 
 ### AudioMetadata Class
 ```python

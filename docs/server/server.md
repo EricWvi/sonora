@@ -4,7 +4,86 @@ The backend is designed around models and actions on the models. Database tables
 
 The overall HTTP interface is through a `base` handler and using `Action` query and reflection to choose method on `base`. For each group of handlers, say `singer`, we will register it in `router.go`, using `GET` and `POST`. The corresponding handlers for actions of a specific model, say `singer`, are defined in `handler/<model>`, say `handler/singer`.
 
-The current development is in admin part.
+## Structure
+
+config                              # Configuration management
+├── config.go                       # Config loading and initialization
+└── db.go                           # Database connection setup
+handler                             # HTTP request handlers
+├── album                           # Album-related handlers
+│   ├── CreateAlbum.go              # Create new album
+│   ├── DeleteAlbum.go              # Delete album by ID
+│   ├── GetAlbum.go                 # Get single album by ID
+│   ├── ListAlbums.go               # List albums with pagination
+│   ├── ListAllAlbums.go            # List all albums without pagination
+│   ├── SearchAlbum.go              # Search albums by name
+│   ├── UpdateAlbum.go              # Update album by ID
+│   └── base.go                     # Album handler base struct
+├── handler.go                      # Common handler utilities
+├── media                           # Media file management
+│   ├── DeleteMedia.go              # Delete media file
+│   ├── media.go                    # Media handler base
+│   ├── serve.go                    # Serve media files
+│   └── upload.go                   # Upload media files
+├── ping.go                         # Health check endpoint
+├── singer                          # Singer-related handlers
+│   ├── CreateSinger.go             # Create new singer
+│   ├── DeleteSinger.go             # Delete singer by ID
+│   ├── GetSinger.go                # Get single singer by ID
+│   ├── ListAllSingers.go           # List all singers without pagination
+│   ├── ListSingers.go              # List singers with pagination
+│   ├── SearchSinger.go             # Search singers by name
+│   ├── UpdateSinger.go             # Update singer by ID
+│   └── base.go                     # Singer handler base struct
+└── track                           # Track-related handlers
+    ├── CreateLyric.go              # Create lyrics for a track
+    ├── CreateTrack.go              # Create new track
+    ├── DeleteTrack.go              # Delete track by ID
+    ├── GetLyric.go                 # Get lyrics for a track
+    ├── GetTrack.go                 # Get single track by ID
+    ├── ListAlbumTracks.go          # List tracks for an album
+    ├── ListSingles.go              # List single tracks (no album)
+    ├── ListTracks.go               # List tracks with pagination
+    ├── SearchTrack.go              # Search tracks by name
+    ├── UpdateLyric.go              # Update lyrics for a track
+    ├── UpdateTrack.go              # Update track by ID
+    └── base.go                     # Track handler base struct
+log                                 # Logging utilities
+└── logger.go                       # Logger setup and configuration
+middleware                          # HTTP middleware
+├── bodywriter.go                   # Response body writer for logging
+├── idempotency.go                  # Idempotency key handling
+├── jwt.go                          # JWT authentication
+└── logging.go                      # Request/response logging
+migration                           # Database migrations
+├── helpers.go                      # Migration helper functions
+├── migration.go                    # Migration runner
+└── migrations.go                   # Database schema definitions
+model                               # Data models
+├── album.go                        # Album model and operations
+├── lyric.go                        # Lyric model and operations
+├── media.go                        # Media model and operations
+├── model.go                        # Common model utilities
+├── singer.go                       # Singer model and operations
+├── track.go                        # Track model and operations
+└── user.go                         # User model and operations
+service                             # Business logic services
+├── storage.go                      # File storage service
+└── worker.go                       # Background worker service
+tests                               # Test suites
+├── api                             # API test helpers
+│   ├── album.go                    # Album API test utilities
+│   ├── media.go                    # Media API test utilities
+│   └── track.go                    # Track API test utilities
+├── integration                     # Integration tests
+│   ├── album                       # Album integration tests
+│   │   ├── DeleteAlbum_test.go     # Test album deletion
+│   └── track                       # Track integration tests
+│       └── DeleteTrack_test.go     # Test track deletion
+└── tests.go                        # Test utilities and setup
+config.yaml                         # Application configuration
+main.go                             # Application entry point
+router.go                           # Route definitions and setup
 
 ## Database Schema (from migration/migrations.go)
 

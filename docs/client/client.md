@@ -2,6 +2,35 @@
 Client side code are in `client`. `index.html` is for music player and `admin.html` is for admin management.
 
 ### Architecture
+
+src                                 # Source code directory
+├── AdminBoard.tsx                  # Main admin dashboard component
+├── App.tsx                         # Main music player app component
+├── admin.css                       # Admin-specific styles
+├── admin.tsx                       # Admin app entry point
+├── components                      # Reusable UI components
+│   └── admin                       # Admin panel components
+│       ├── album.tsx               # Album CRUD management UI
+│       ├── singer.tsx              # Singer CRUD management UI
+│       └── track.tsx               # Track CRUD management UI
+├── hooks                           # Custom React hooks
+│   ├── use-albums.ts               # Album data fetching and mutations
+│   ├── use-singers.ts              # Singer data fetching and mutations
+│   └── use-tracks.ts               # Track data fetching and mutations
+├── index.css                       # Global styles and Tailwind directives
+├── lib                             # Utility libraries
+│   ├── fileUpload.ts               # File upload utilities
+│   ├── queryClient.ts              # TanStack Query configuration
+│   └── utils.ts                    # Common utility functions (cn, etc.)
+├── main.tsx                        # Player app entry point
+└── vite-env.d.ts                   # Vite TypeScript declarations
+admin.html                          # Admin panel HTML entry
+eslint.config.js                    # ESLint configuration
+index.html                          # Music player HTML entry
+vite.config.ts                      # Vite build configuration
+
+
+### Architecture
 - **React + TypeScript** with Vite build system
 - **TanStack Query** for API state management and caching
 - **Tailwind CSS** for styling with dark mode support

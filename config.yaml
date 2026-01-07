@@ -13,4 +13,4 @@ db:
   username: onlyquant
 storage:
   local:
-    dir: "cli/output"
+    dir: "/workspaces/sonora/cli/output"
