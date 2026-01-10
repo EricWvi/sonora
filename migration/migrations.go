@@ -55,7 +55,93 @@ func GetAllMigrations() []MigrationStep {
 			Up:      RemoveGenreIndex,
 			Down:    RestoreGenreIndex,
 		},
+		{
+			Version: "v0.10.0",
+			Name:    "Create change log table and triggers for sync",
+			Up:      CreateChangeLogAndTriggers,
+			Down:    DropChangeLogAndTriggers,
+		},
 	}
+}
+
+// ------------------- v0.10.0 -------------------
+func CreateChangeLogAndTriggers(db *gorm.DB) error {
+	return db.Exec(`
+		-- Create change log table for tracking all modifications
+		CREATE TABLE public.d_change_log (
+			id SERIAL PRIMARY KEY,
+			table_name VARCHAR(50) NOT NULL,
+			record_id INTEGER NOT NULL,
+			operation VARCHAR(10) NOT NULL,
+			changed_at BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000)::BIGINT
+		);
+
+		-- Create index on changed_at for efficient time-based queries
+		CREATE INDEX idx_change_log_changed_at ON public.d_change_log (changed_at);
+
+		-- Create trigger function to log all changes
+		-- Handles both hard deletes and GORM soft deletes (deleted_at changes)
+		CREATE OR REPLACE FUNCTION log_table_changes()
+		RETURNS TRIGGER AS $$
+		BEGIN
+			IF (TG_OP = 'DELETE') THEN
+				INSERT INTO public.d_change_log(table_name, record_id, operation)
+				VALUES (TG_TABLE_NAME, OLD.id, 'DELETE');
+				RETURN OLD;
+			ELSIF (TG_OP = 'UPDATE') THEN
+				-- Check if this is a soft delete (deleted_at changed from NULL to timestamp)
+				IF (OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL) THEN
+					INSERT INTO public.d_change_log(table_name, record_id, operation)
+					VALUES (TG_TABLE_NAME, NEW.id, 'DELETE');
+				ELSE
+					INSERT INTO public.d_change_log(table_name, record_id, operation)
+					VALUES (TG_TABLE_NAME, NEW.id, 'UPDATE');
+				END IF;
+				RETURN NEW;
+			ELSIF (TG_OP = 'INSERT') THEN
+				INSERT INTO public.d_change_log(table_name, record_id, operation)
+				VALUES (TG_TABLE_NAME, NEW.id, 'INSERT');
+				RETURN NEW;
+			END IF;
+		END;
+		$$ LANGUAGE plpgsql;
+
+		-- Create triggers for d_album
+		CREATE TRIGGER trigger_log_album_changes
+		AFTER INSERT OR UPDATE OR DELETE ON public.d_album
+		FOR EACH ROW EXECUTE FUNCTION log_table_changes();
+
+		-- Create triggers for d_lyric
+		CREATE TRIGGER trigger_log_lyric_changes
+		AFTER INSERT OR UPDATE OR DELETE ON public.d_lyric
+		FOR EACH ROW EXECUTE FUNCTION log_table_changes();
+
+		-- Create triggers for d_singer
+		CREATE TRIGGER trigger_log_singer_changes
+		AFTER INSERT OR UPDATE OR DELETE ON public.d_singer
+		FOR EACH ROW EXECUTE FUNCTION log_table_changes();
+
+		-- Create triggers for d_track
+		CREATE TRIGGER trigger_log_track_changes
+		AFTER INSERT OR UPDATE OR DELETE ON public.d_track
+		FOR EACH ROW EXECUTE FUNCTION log_table_changes();
+	`).Error
+}
+
+func DropChangeLogAndTriggers(db *gorm.DB) error {
+	return db.Exec(`
+		-- Drop triggers
+		DROP TRIGGER IF EXISTS trigger_log_album_changes ON public.d_album;
+		DROP TRIGGER IF EXISTS trigger_log_lyric_changes ON public.d_lyric;
+		DROP TRIGGER IF EXISTS trigger_log_singer_changes ON public.d_singer;
+		DROP TRIGGER IF EXISTS trigger_log_track_changes ON public.d_track;
+
+		-- Drop trigger function
+		DROP FUNCTION IF EXISTS log_table_changes();
+
+		-- Drop change log table
+		DROP TABLE IF EXISTS public.d_change_log CASCADE;
+	`).Error
 }
 
 // ------------------- v0.9.0 -------------------

@@ -5,9 +5,6 @@ import (
 	"time"
 
 	"github.com/EricWvi/sonora/config"
-	"github.com/EricWvi/sonora/handler/album"
-	"github.com/EricWvi/sonora/handler/media"
-	"github.com/EricWvi/sonora/handler/track"
 	"github.com/EricWvi/sonora/model"
 	"github.com/EricWvi/sonora/service"
 	"github.com/EricWvi/sonora/tests"
@@ -21,11 +18,6 @@ func TestDeleteAlbum(t *testing.T) {
 	// Setup test router
 	router := tests.TestRouter()
 
-	// Register handlers
-	router.POST("/upload", media.Upload)
-	router.POST("/album", album.DefaultHandler)
-	router.POST("/track", track.DefaultHandler)
-
 	// Step 1: Upload media files
 	albumCoverUUID := api.CreateTestMedia(t, router)
 	track1AudioUUID := api.CreateTestMedia(t, router)
@@ -36,6 +28,7 @@ func TestDeleteAlbum(t *testing.T) {
 		Cover: albumCoverUUID.String(),
 		Year:  2024,
 	})
+	defer api.DeleteTestAlbum(t, router, albumID)
 
 	// Step 3: Create tracks for the album
 	track1ID := api.CreateTestTrack(t, router, model.TrackField{

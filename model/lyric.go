@@ -49,3 +49,15 @@ func (l *Lyric) Create(db *gorm.DB) error {
 func (l *Lyric) Update(db *gorm.DB, where map[string]any) error {
 	return db.Where(where).Updates(l).Error
 }
+
+func ListAllLyrics(db *gorm.DB, where WhereExpr) ([]LyricView, error) {
+	lyrics := []LyricView{}
+	for i := range where {
+		db = db.Where(where[i])
+	}
+	rst := db.Table(Lyric_Table).Omit("created_at", "updated_at", "deleted_at").Find(&lyrics)
+	if rst.Error != nil {
+		return nil, rst.Error
+	}
+	return lyrics, nil
+}

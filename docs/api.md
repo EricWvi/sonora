@@ -540,3 +540,66 @@ Response:
 ```
 
 Only successfully deleted IDs are returned in the response.
+
+---
+
+### Sync
+
+The sync endpoints support client-side caching with incremental updates. All changes to `d_album`, `d_lyric`, `d_singer`, and `d_track` tables are automatically tracked via database triggers.
+
+#### GetFullSync
+Get all data for initial cache population
+
+GET /api/sync?Action=GetFullSync
+
+Response:
+```json
+{
+    "requestId": "uuid",
+    "code": 200,
+    "message": {
+        "data": {
+            "albums": [...],
+            "lyrics": [...],
+            "singers": [...],
+            "tracks": [...],
+            "timestamp": 1768054202
+        }
+    }
+}
+```
+
+#### GetUpdates
+Get incremental updates since a specific timestamp. If last sync happened 28 days ago, use `GetFullSync` instead.
+
+GET /api/sync?Action=GetUpdates&since=1768054202873
+
+Response:
+```json
+{
+    "requestId": "uuid",
+    "code": 200,
+    "message": {
+        "data": {
+            "changes": [
+                {
+                    "tableName": "d_album",
+                    "recordId": 123,
+                    "operation": "UPDATE"
+                },
+                {
+                    "tableName": "d_track",
+                    "recordId": 456,
+                    "operation": "DELETE"
+                }
+            ],
+            "timestamp": 1768054204
+        }
+    }
+}
+```
+
+**Notes:**
+- For each record, only the **latest operation** is returned if multiple changes occurred.
+- `operation` values: `INSERT`, `UPDATE`, `DELETE`
+- Use the returned `timestamp` as the `since` parameter for the next sync request

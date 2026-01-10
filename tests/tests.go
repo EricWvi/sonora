@@ -4,6 +4,10 @@ import (
 	"bytes"
 	"net/http/httptest"
 
+	"github.com/EricWvi/sonora/handler/album"
+	"github.com/EricWvi/sonora/handler/media"
+	"github.com/EricWvi/sonora/handler/sync"
+	"github.com/EricWvi/sonora/handler/track"
 	"github.com/gin-gonic/gin"
 )
 
@@ -19,6 +23,12 @@ func TestRouter() *gin.Engine {
 		}
 		c.Next()
 	})
+
+	router.POST("/upload", media.Upload)
+	router.POST("/album", album.DefaultHandler)
+	router.POST("/track", track.DefaultHandler)
+	router.GET("/sync", sync.DefaultHandler)
+
 	return router
 }
 

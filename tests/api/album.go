@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/EricWvi/sonora/config"
 	"github.com/EricWvi/sonora/handler/album"
 	"github.com/EricWvi/sonora/model"
 	"github.com/EricWvi/sonora/tests"
@@ -30,11 +31,36 @@ func CreateTestAlbum(t *testing.T, router *gin.Engine, albumField model.AlbumFie
 	return resp.Message.Id
 }
 
+func UpdateTestAlbum(t *testing.T, router *gin.Engine, id uint, albumField model.AlbumField) {
+	updateReq := album.UpdateAlbumRequest{
+		Id:         id,
+		AlbumField: albumField,
+	}
+	reqBody, _ := json.Marshal(updateReq)
+	code, respBody := tests.ServeJSON(router, http.MethodPost, "/album?Action=UpdateAlbum", reqBody)
+	assert.Equal(t, http.StatusOK, code)
+
+	var resp struct {
+		Message album.UpdateAlbumResponse `json:"message"`
+	}
+	err := json.Unmarshal(respBody, &resp)
+	assert.NoError(t, err)
+}
+
 func DeleteTestAlbum(t *testing.T, router *gin.Engine, id uint) {
-	createReq := album.DeleteAlbumRequest{
+	// Check if album still exists first
+	db := config.DB()
+	var count int64
+	db.Model(&model.Album{}).Where("id = ? AND deleted_at IS NULL", id).Count(&count)
+	if count == 0 {
+		// Album already deleted, skip
+		return
+	}
+
+	deleteReq := album.DeleteAlbumRequest{
 		Id: id,
 	}
-	reqBody, _ := json.Marshal(createReq)
+	reqBody, _ := json.Marshal(deleteReq)
 	code, respBody := tests.ServeJSON(router, http.MethodPost, "/album?Action=DeleteAlbum", reqBody)
 	assert.Equal(t, http.StatusOK, code)
 

@@ -36,18 +36,22 @@ handler                             # HTTP request handlers
 │   ├── UpdateSinger.go             # Update singer by ID
 │   └── base.go                     # Singer handler base struct
 └── track                           # Track-related handlers
-    ├── CreateLyric.go              # Create lyrics for a track
-    ├── CreateTrack.go              # Create new track
-    ├── DeleteTrack.go              # Delete track by ID
-    ├── GetLyric.go                 # Get lyrics for a track
-    ├── GetTrack.go                 # Get single track by ID
-    ├── ListAlbumTracks.go          # List tracks for an album
-    ├── ListSingles.go              # List single tracks (no album)
-    ├── ListTracks.go               # List tracks with pagination
-    ├── SearchTrack.go              # Search tracks by name
-    ├── UpdateLyric.go              # Update lyrics for a track
-    ├── UpdateTrack.go              # Update track by ID
-    └── base.go                     # Track handler base struct
+│   ├── CreateLyric.go              # Create lyrics for a track
+│   ├── CreateTrack.go              # Create new track
+│   ├── DeleteTrack.go              # Delete track by ID
+│   ├── GetLyric.go                 # Get lyrics for a track
+│   ├── GetTrack.go                 # Get single track by ID
+│   ├── ListAlbumTracks.go          # List tracks for an album
+│   ├── ListSingles.go              # List single tracks (no album)
+│   ├── ListTracks.go               # List tracks with pagination
+│   ├── SearchTrack.go              # Search tracks by name
+│   ├── UpdateLyric.go              # Update lyrics for a track
+│   ├── UpdateTrack.go              # Update track by ID
+│   └── base.go                     # Track handler base struct
+└── sync                            # Client sync handlers
+    ├── GetFullSync.go              # Full data sync for initial cache
+    ├── GetUpdates.go               # Incremental updates since timestamp
+    └── base.go                     # Sync handler base struct
 log                                 # Logging utilities
 └── logger.go                       # Logger setup and configuration
 middleware                          # HTTP middleware
@@ -61,6 +65,7 @@ migration                           # Database migrations
 └── migrations.go                   # Database schema definitions
 model                               # Data models
 ├── album.go                        # Album model and operations
+├── changelog.go                    # ChangeLog model for sync
 ├── lyric.go                        # Lyric model and operations
 ├── media.go                        # Media model and operations
 ├── model.go                        # Common model utilities
@@ -77,7 +82,11 @@ tests                               # Test suites
 │   └── track.go                    # Track API test utilities
 ├── integration                     # Integration tests
 │   ├── album                       # Album integration tests
-│   │   ├── DeleteAlbum_test.go     # Test album deletion
+│   │   └── DeleteAlbum_test.go     # Test album deletion
+│   ├── sync                        # Sync integration tests
+│   │   ├── ChangeLog_test.go       # Test change log triggers
+│   │   ├── FullSync_test.go        # Test full sync endpoint
+│   │   └── IncrementalSync_test.go # Test incremental sync endpoint
 │   └── track                       # Track integration tests
 │       └── DeleteTrack_test.go     # Test track deletion
 └── tests.go                        # Test utilities and setup
@@ -93,11 +102,15 @@ router.go                           # Route definitions and setup
 - **d_user**: id, email, avatar, username, language, timestamps
 - **d_media**: id, link (UUID), key, timestamps
 - **d_lyric**: id, content, timestamps
+- **d_change_log**: id, table_name, record_id, operation, changed_at
 
 notes:
-- **Database Triggers**: Automatically updates `album_text` or `cover` in tracks when album name or cover changes
+- **Database Triggers**: 
+  - Automatically updates `album_text` or `cover` in tracks when album name or cover changes
+  - Logs all INSERT/UPDATE/DELETE operations on d_album, d_lyric, d_singer, d_track to d_change_log
 - **Performance Indexes**:
   - `idx_media_link` - Index on d_media.link for UUID lookups
+  - `idx_change_log_changed_at` - Index on d_change_log.changed_at for efficient time-based queries
   - `idx_track_singer_trgm` - Trigram GIN index on d_track.singer for fuzzy search
   - `idx_track_album` - Index on d_track.album for joins/filtering
   - `idx_track_name_trgm`, `idx_singer_name_trgm`, `idx_album_name_trgm` - Trigram indexes for search
@@ -114,6 +127,7 @@ notes:
 - `/singer` (GET/POST) → singer.DefaultHandler
 - `/album` (GET/POST) → album.DefaultHandler
 - `/track` (GET/POST) → track.DefaultHandler
+- `/sync` (GET) → sync.DefaultHandler
 
 ### Search Endpoints
 - `/album?Action=SearchAlbum&query=<search_term>` - Search albums by name
@@ -146,32 +160,3 @@ Each model follows identical structure:
 
 1. use `model.WhereMap` instead of `gin.H`, and name variables of `model.WhereMap` and `model.WhereExpr` simply as `m`.
 
-## Testing Considerations
-
-When writing tests for handlers, be aware of the following requirements:
-
-### 1. Init Stage
-- Tests must call `config.Init()` before using database or storage services
-- Tests should use `config.TestRouter()` to get router.
-
-### 2. Action Middleware for Tests
-- **Issue**: The handler dispatch system requires the `Action` parameter to be set in the gin context via `c.Set("Action", action)`
-- **Production**: The `middleware.Logging()` middleware extracts Action from query parameters and sets it
-- **Test Solution**: Add a simple middleware to test routers:
-```go
-router.Use(func(c *gin.Context) {
-    action := c.Request.URL.Query().Get("Action")
-    if action != "" {
-        c.Set("Action", action)
-    }
-    c.Next()
-})
-```
-
-### 3. Test Structure for Operations
-- always create new records to test update/delete
-
-### 4. Database Access in Tests
-- Use `config.DB()` to get the database instance in tests
-- The database is shared across test runs - ensure proper cleanup or use unique test data
-- Tests use soft deletes (GORM), so deleted records have `deleted_at` timestamp set

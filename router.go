@@ -9,6 +9,7 @@ import (
 	"github.com/EricWvi/sonora/handler/album"
 	"github.com/EricWvi/sonora/handler/media"
 	"github.com/EricWvi/sonora/handler/singer"
+	"github.com/EricWvi/sonora/handler/sync"
 	"github.com/EricWvi/sonora/handler/track"
 	"github.com/EricWvi/sonora/log"
 	"github.com/EricWvi/sonora/middleware"
@@ -72,6 +73,8 @@ func Load(g *gin.Engine, mw ...gin.HandlerFunc) *gin.Engine {
 
 	back.GET("/track", track.DefaultHandler)
 	back.POST("/track", track.DefaultHandler)
+
+	back.GET("/sync", sync.DefaultHandler)
 
 	// Handle 404 for all unmatched routes
 	g.NoRoute(func(c *gin.Context) {

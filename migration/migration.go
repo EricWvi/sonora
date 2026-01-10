@@ -307,3 +307,89 @@ type MigrationStatus struct {
 	Applied   bool
 	AppliedAt *time.Time
 }
+
+// RunOne runs a specific migration version up or down
+func (m *Migrator) RunOne(version string, up bool) error {
+	// Initialize migration table
+	if err := m.InitMigrationTable(); err != nil {
+		return fmt.Errorf("failed to initialize migration table: %w", err)
+	}
+
+	// Find the migration
+	var targetMigration *MigrationStep
+	for _, migration := range m.migrations {
+		if migration.Version == version {
+			targetMigration = &migration
+			break
+		}
+	}
+
+	if targetMigration == nil {
+		return fmt.Errorf("migration %s not found", version)
+	}
+
+	// Check if migration is already applied
+	applied, err := m.GetAppliedMigrations()
+	if err != nil {
+		return fmt.Errorf("failed to get applied migrations: %w", err)
+	}
+
+	isApplied := applied[version]
+
+	// Validate action
+	if up && isApplied {
+		log.Warnf(log.WorkerCtx, "Migration %s is already applied", version)
+		return nil
+	}
+
+	if !up && !isApplied {
+		log.Warnf(log.WorkerCtx, "Migration %s is not applied, cannot roll back", version)
+		return nil
+	}
+
+	// Run the migration
+	tx := m.db.Begin()
+	if tx.Error != nil {
+		return fmt.Errorf("failed to start transaction: %w", tx.Error)
+	}
+
+	if up {
+		// Run up migration
+		log.Infof(log.WorkerCtx, "Applying migration %s: %s", version, targetMigration.Name)
+		if err := targetMigration.Up(tx); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("migration %s up failed: %w", version, err)
+		}
+
+		// Record the migration
+		migrationRecord := Migration{
+			Version:   version,
+			Name:      targetMigration.Name,
+			AppliedAt: time.Now(),
+		}
+		if err := tx.Create(&migrationRecord).Error; err != nil {
+			tx.Rollback()
+			return fmt.Errorf("failed to record migration %s: %w", version, err)
+		}
+	} else {
+		// Run down migration
+		log.Infof(log.WorkerCtx, "Rolling back migration %s: %s", version, targetMigration.Name)
+		if err := targetMigration.Down(tx); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("migration %s down failed: %w", version, err)
+		}
+
+		// Remove the migration record
+		if err := tx.Where("version = ?", version).Delete(&Migration{}).Error; err != nil {
+			tx.Rollback()
+			return fmt.Errorf("failed to remove migration record %s: %w", version, err)
+		}
+	}
+
+	// Commit the transaction
+	if err := tx.Commit().Error; err != nil {
+		return fmt.Errorf("failed to commit migration %s: %w", version, err)
+	}
+
+	return nil
+}

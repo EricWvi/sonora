@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"flag"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -17,10 +19,28 @@ import (
 )
 
 func main() {
+	// Parse command-line flags
+	migrateCmd := flag.NewFlagSet("migrate", flag.ExitOnError)
+	migrateVersion := migrateCmd.String("version", "", "Migration version to run")
+	migrateAction := migrateCmd.String("action", "up", "Migration action: up or down")
+
 	// init
 	config.Init()
 
-	// Run migrations
+	// Check if we're running a migration command
+	if len(os.Args) > 1 && os.Args[1] == "migrate" {
+		migrateCmd.Parse(os.Args[2:])
+		if *migrateVersion == "" {
+			log.Fatal(log.WorkerCtx, "Migration version is required. Use --version flag")
+		}
+		if err := runMigration(*migrateVersion, *migrateAction); err != nil {
+			log.Fatalf(log.WorkerCtx, "Failed to run migration: %v", err)
+		}
+		log.Infof(log.WorkerCtx, "Migration %s %s completed successfully", *migrateVersion, *migrateAction)
+		return
+	}
+
+	// Run all migrations (normal startup)
 	if err := runMigrations(); err != nil {
 		log.Fatalf(log.WorkerCtx, "Failed to run migrations: %v", err)
 	}
@@ -92,4 +112,39 @@ func runMigrations() error {
 	}
 
 	return nil
+}
+
+func runMigration(version string, action string) error {
+	migrator := migration.NewMigrator(config.ContextDB(log.WorkerCtx))
+
+	// Add all migrations
+	migrations := migration.GetAllMigrations()
+	for _, m := range migrations {
+		migrator.AddMigration(m)
+	}
+
+	// Find the specific migration
+	var targetMigration *migration.MigrationStep
+	for _, m := range migrations {
+		if m.Version == version {
+			targetMigration = &m
+			break
+		}
+	}
+
+	if targetMigration == nil {
+		return fmt.Errorf("migration version %s not found", version)
+	}
+
+	// Run the migration action
+	switch action {
+	case "up":
+		log.Infof(log.WorkerCtx, "Running migration %s up: %s", version, targetMigration.Name)
+		return migrator.RunOne(version, true)
+	case "down":
+		log.Infof(log.WorkerCtx, "Running migration %s down: %s", version, targetMigration.Name)
+		return migrator.RunOne(version, false)
+	default:
+		return fmt.Errorf("invalid action: %s. Use 'up' or 'down'", action)
+	}
 }

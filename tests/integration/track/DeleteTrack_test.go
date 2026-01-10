@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"github.com/EricWvi/sonora/config"
-	"github.com/EricWvi/sonora/handler/media"
-	"github.com/EricWvi/sonora/handler/track"
 	"github.com/EricWvi/sonora/model"
 	"github.com/EricWvi/sonora/service"
 	"github.com/EricWvi/sonora/tests"
@@ -19,10 +17,6 @@ func TestDeleteTrack(t *testing.T) {
 
 	// Setup test router
 	router := tests.TestRouter()
-
-	// Register handlers
-	router.POST("/upload", media.Upload)
-	router.POST("/track", track.DefaultHandler)
 
 	// Step 1: Upload two media files (cover and audio)
 	coverUUID := api.CreateTestMedia(t, router)
@@ -39,6 +33,7 @@ func TestDeleteTrack(t *testing.T) {
 		Year:     2024,
 		Genre:    "Test",
 	})
+	defer api.DeleteTestTrack(t, router, trackID)
 
 	// Step 3: Verify media files exist
 	storage, err := service.InitLocalStorageService()
