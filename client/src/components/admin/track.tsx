@@ -11,6 +11,69 @@ import {
 } from "@/hooks/use-tracks";
 import { fileUpload } from "@/lib/fileUpload";
 import { formatMediaUrl } from "@/lib/utils";
+import { usePlayer } from "@/hooks/use-miniplayer";
+
+function TrackItemWithPlay({
+  track,
+  onEdit,
+  onDelete,
+  deleteTrack,
+  formatDuration,
+}: {
+  track: Track;
+  onEdit: (track: Track) => void;
+  onDelete: (id: number, name: string) => void;
+  deleteTrack: any;
+  formatDuration: (seconds: number) => string;
+}) {
+  const { play } = usePlayer();
+
+  const handlePlay = () => {
+    play(track);
+  };
+
+  return (
+    <div className="flex items-center justify-between py-2 border-b border-dotted border-gray-300 dark:border-gray-600">
+      <div className="flex items-center space-x-2">
+        {track.cover && (
+          <img
+            src={formatMediaUrl(track.cover)}
+            alt={track.name}
+            className="w-8 h-8 rounded object-cover"
+          />
+        )}
+        <div>
+          <div className="font-medium text-sm">{track.name}</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            {track.singer} • {track.albumText && <>{track.albumText} • </>}
+            {track.year} • {track.genre} • {formatDuration(track.duration)}
+          </div>
+        </div>
+      </div>
+      <div className="flex space-x-2 text-xs">
+        <button
+          onClick={handlePlay}
+          className="text-green-600 dark:text-green-400 hover:underline"
+        >
+          Play
+        </button>
+        <button
+          onClick={() => onEdit(track)}
+          className="text-blue-600 dark:text-blue-400 hover:underline"
+        >
+          Edit
+        </button>
+        <button
+          onClick={() => onDelete(track.id, track.name)}
+          disabled={deleteTrack.isPending}
+          className="text-red-600 dark:text-red-400 hover:underline disabled:opacity-50"
+        >
+          {deleteTrack.isPending ? "Deleting..." : "Delete"}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export function TrackAdmin() {
   const [showForm, setShowForm] = useState(false);
@@ -478,44 +541,14 @@ export function TrackAdmin() {
           </div>
         ) : (
           paginatedTracks.map((track: Track) => (
-            <div
+            <TrackItemWithPlay
               key={track.id}
-              className="flex items-center justify-between py-2 border-b border-dotted border-gray-300 dark:border-gray-600"
-            >
-              <div className="flex items-center space-x-2">
-                {track.cover && (
-                  <img
-                    src={formatMediaUrl(track.cover)}
-                    alt={track.name}
-                    className="w-8 h-8 rounded object-cover"
-                  />
-                )}
-                <div>
-                  <div className="font-medium text-sm">{track.name}</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    {track.singer} •{" "}
-                    {track.albumText && <>{track.albumText} • </>}
-                    {track.year} • {track.genre} •{" "}
-                    {formatDuration(track.duration)}
-                  </div>
-                </div>
-              </div>
-              <div className="flex space-x-2 text-xs">
-                <button
-                  onClick={() => handleEdit(track)}
-                  className="text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDelete(track.id, track.name)}
-                  disabled={deleteTrack.isPending}
-                  className="text-red-600 dark:text-red-400 hover:underline disabled:opacity-50"
-                >
-                  {deleteTrack.isPending ? "Deleting..." : "Delete"}
-                </button>
-              </div>
-            </div>
+              track={track}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              deleteTrack={deleteTrack}
+              formatDuration={formatDuration}
+            />
           ))
         )}
 

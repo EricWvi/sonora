@@ -18,6 +18,63 @@ import {
 } from "@/hooks/use-tracks";
 import { fileUpload } from "@/lib/fileUpload";
 import { formatMediaUrl } from "@/lib/utils";
+import { usePlayer } from "@/hooks/use-miniplayer";
+
+function TrackItemWithPlay({
+  track,
+  onEditTrack,
+  onDeleteTrack,
+  albumId,
+  formatDuration,
+}: {
+  track: Track;
+  onEditTrack: (track: Track) => void;
+  onDeleteTrack: (trackId: number, trackName: string, albumId: number) => void;
+  albumId: number;
+  formatDuration: (seconds: number) => string;
+}) {
+  const { play } = usePlayer();
+
+  const handlePlay = () => {
+    play(track);
+  };
+
+  return (
+    <div className="flex items-center justify-between py-2 px-2 border border-gray-200 dark:border-gray-600 rounded bg-white dark:bg-gray-800">
+      <div className="flex items-center space-x-2">
+        <span className="text-xs text-gray-500 dark:text-gray-400 w-6">
+          #{track.trackNumber}
+        </span>
+        <div>
+          <div className="font-medium text-sm">{track.name}</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            {track.singer} • {formatDuration(track.duration)}
+          </div>
+        </div>
+      </div>
+      <div className="flex space-x-2 text-xs">
+        <button
+          onClick={handlePlay}
+          className="text-green-600 dark:text-green-400 hover:underline"
+        >
+          Play
+        </button>
+        <button
+          onClick={() => onEditTrack(track)}
+          className="text-blue-600 dark:text-blue-400 hover:underline"
+        >
+          Edit
+        </button>
+        <button
+          onClick={() => onDeleteTrack(track.id, track.name, albumId)}
+          className="text-red-600 dark:text-red-400 hover:underline"
+        >
+          Delete
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function AlbumWithTracks({
   album,
@@ -260,38 +317,14 @@ function AlbumWithTracks({
               tracks
                 .sort((a, b) => a.trackNumber - b.trackNumber)
                 .map((track) => (
-                  <div
+                  <TrackItemWithPlay
                     key={track.id}
-                    className="flex items-center justify-between py-2 px-2 border border-gray-200 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs text-gray-500 dark:text-gray-400 w-6">
-                        #{track.trackNumber}
-                      </span>
-                      <div>
-                        <div className="font-medium text-sm">{track.name}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {track.singer} • {formatDuration(track.duration)}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex space-x-2 text-xs">
-                      <button
-                        onClick={() => onEditTrack(track)}
-                        className="text-blue-600 dark:text-blue-400 hover:underline"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() =>
-                          onDeleteTrack(track.id, track.name, album.id)
-                        }
-                        className="text-red-600 dark:text-red-400 hover:underline"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
+                    track={track}
+                    onEditTrack={onEditTrack}
+                    onDeleteTrack={onDeleteTrack}
+                    albumId={album.id}
+                    formatDuration={formatDuration}
+                  />
                 ))
             )}
           </div>

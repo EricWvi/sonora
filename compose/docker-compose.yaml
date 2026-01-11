@@ -31,3 +31,15 @@ services:
       - POSTGRES_PASSWORD=123456
       - POSTGRES_USER=onlyquant
       - POSTGRES_DB=sonora
+  frps:
+    image: snowdreamtech/frps:0.62.1
+    container_name: frps
+    restart: unless-stopped
+    network_mode: "host"
+    volumes:
+      - /workspaces/sonora/compose/frps.toml:/frp/frps.toml
+    logging:
+      options:
+        max-size: 10m
+        max-file: 1
+    command: -c /frp/frps.toml

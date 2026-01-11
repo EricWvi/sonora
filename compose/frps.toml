@@ -1,0 +1,7 @@
+bindPort = 59253
+log.to = "/workspaces/frps.log"
+log.level = "info"
+log.maxDays = 3
+auth.token = "6OC9vTq4laspHXwCRhSwIydduT5Xxf2PiSS8+gzR+HeTpu500jabvfz7bAI2idwf"
+vhostHTTPPort=80
+vhostHTTPSPort=443

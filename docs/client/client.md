@@ -9,12 +9,15 @@ src                                 # Source code directory
 ├── admin.css                       # Admin-specific styles
 ├── admin.tsx                       # Admin app entry point
 ├── components                      # Reusable UI components
-│   └── admin                       # Admin panel components
-│       ├── album.tsx               # Album CRUD management UI
-│       ├── singer.tsx              # Singer CRUD management UI
-│       └── track.tsx               # Track CRUD management UI
+│   ├── admin                       # Admin panel components
+│   │   ├── album.tsx               # Album CRUD management UI
+│   │   ├── singer.tsx              # Singer CRUD management UI
+│   │   ├── track.tsx               # Track CRUD management UI
+│   │   └── MiniPlayer.tsx          # Mini player at bottom-right
+│   └── player                      # Player components
 ├── hooks                           # Custom React hooks
 │   ├── use-albums.ts               # Album data fetching and mutations
+│   ├── use-miniplayer.ts           # Audio player state management for admin panel
 │   ├── use-singers.ts              # Singer data fetching and mutations
 │   └── use-tracks.ts               # Track data fetching and mutations
 ├── index.css                       # Global styles and Tailwind directives

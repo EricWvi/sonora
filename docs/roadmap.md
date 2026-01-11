@@ -6,17 +6,19 @@ Build a beautiful, performant music player that rivals Apple Music in aesthetics
 ## Current Focus
 
 **Next Immediate Steps:**
-1. Create Layout.tsx with Sidebar + MainContent + MiniPlayer slots
-2. Build Sidebar with navigation items
-3. Implement basic song list view
-4. Create mini player with basic controls
-5. Set up audio playback hook with HTML5 Audio
+1. Create comprehensive Layout.tsx with Sidebar + MainContent + Player slots
+2. Build Sidebar with navigation items for user-facing player
+3. Implement playlist/queue management
+4. Add keyboard shortcuts (Space = play/pause, arrow keys = seek)
+5. Create full player view (expand from mini player)
 
 **Success Criteria:**
 - User can browse list of songs
 - User can click a song to play
 - Mini player shows currently playing track
 - Play/pause/next/previous controls work
+- User do not need to control volume (user just need to concern about system's volume)
+- User can create and manage playlists
 - Beautiful, responsive UI that works on mobile and desktop
 
 ## Design System
