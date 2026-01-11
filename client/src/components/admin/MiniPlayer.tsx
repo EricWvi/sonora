@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { usePlayer } from "@/hooks/use-miniplayer";
+import { usePlayer } from "@/hooks/admin/use-miniplayer";
 import { formatMediaUrl } from "@/lib/utils";
 import { X, Play, Pause } from "lucide-react";
 

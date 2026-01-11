@@ -5,9 +5,26 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatMediaUrl(url: string): string {
-  if (url.startsWith("/api/m/")) {
-    return url;
+// Detect if running in Tauri environment
+const isTauri = () => {
+  return typeof window !== "undefined" && "__TAURI__" in window;
+};
+
+/**
+ * Format media URL based on runtime environment
+ * @param mediaId - UUID of the media file
+ * @returns Formatted URL for accessing the media
+ */
+export function formatMediaUrl(mediaId: string): string {
+  if (mediaId.startsWith("/api/m/")) {
+    return mediaId;
   }
-  return `/api/m/${url}`;
+  if (isTauri()) {
+    // Tauri: Use file system path
+    // TODO: Implement Tauri-specific path resolution when Tauri support is added
+    return `tauri://media/${mediaId}`;
+  }
+
+  // Web: Use server endpoint
+  return `/api/m/${mediaId}`;
 }

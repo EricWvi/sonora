@@ -5,7 +5,7 @@ import {
   useUpdateSinger,
   useDeleteSinger,
   type Singer,
-} from "@/hooks/use-singers";
+} from "@/hooks/admin/use-singers";
 import { fileUpload } from "@/lib/fileUpload";
 import { formatMediaUrl } from "@/lib/utils";
 

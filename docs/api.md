@@ -580,21 +580,14 @@ Response:
     "requestId": "uuid",
     "code": 200,
     "message": {
-        "data": {
-            "changes": [
-                {
-                    "tableName": "d_album",
-                    "recordId": 123,
-                    "operation": "UPDATE"
-                },
-                {
-                    "tableName": "d_track",
-                    "recordId": 456,
-                    "operation": "DELETE"
-                }
-            ],
-            "timestamp": 1768054204
-        }
+        "entries": [
+            {
+                "tableName": "d_track",
+                "stale": [1, 2, 3],
+                "deleted": [4, 5, 6]
+            }
+        ],
+        "timestamp": 1768120438034
     }
 }
 ```

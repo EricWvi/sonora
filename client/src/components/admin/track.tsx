@@ -8,10 +8,10 @@ import {
   createLyric,
   updateLyric,
   type Track,
-} from "@/hooks/use-tracks";
+} from "@/hooks/admin/use-tracks";
 import { fileUpload } from "@/lib/fileUpload";
 import { formatMediaUrl } from "@/lib/utils";
-import { usePlayer } from "@/hooks/use-miniplayer";
+import { usePlayer } from "@/hooks/admin/use-miniplayer";
 
 function TrackItemWithPlay({
   track,

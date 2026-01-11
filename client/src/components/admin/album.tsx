@@ -5,7 +5,7 @@ import {
   useUpdateAlbum,
   useDeleteAlbum,
   type Album,
-} from "@/hooks/use-albums";
+} from "@/hooks/admin/use-albums";
 import {
   useTracks,
   useCreateTrack,
@@ -15,10 +15,10 @@ import {
   createLyric,
   updateLyric,
   type Track,
-} from "@/hooks/use-tracks";
+} from "@/hooks/admin/use-tracks";
 import { fileUpload } from "@/lib/fileUpload";
 import { formatMediaUrl } from "@/lib/utils";
-import { usePlayer } from "@/hooks/use-miniplayer";
+import { usePlayer } from "@/hooks/admin/use-miniplayer";
 
 function TrackItemWithPlay({
   track,

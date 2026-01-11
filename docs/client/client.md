@@ -1,7 +1,7 @@
 ## Client
-Client side code are in `client`. `index.html` is for music player and `admin.html` is for admin management.
+Client side code are in `client`. `index.html` is for main site music player and `admin.html` is for admin management.
 
-### Architecture
+### Structure
 
 src                                 # Source code directory
 ├── AdminBoard.tsx                  # Main admin dashboard component
@@ -14,15 +14,23 @@ src                                 # Source code directory
 │   │   ├── singer.tsx              # Singer CRUD management UI
 │   │   ├── track.tsx               # Track CRUD management UI
 │   │   └── MiniPlayer.tsx          # Mini player at bottom-right
-│   └── player                      # Player components
+│   └── player                      # Main site components
+│       ├── Layout.tsx              # Main layout with sidebar and content area
+│       └── Sidebar.tsx             # Responsive navigation sidebar
 ├── hooks                           # Custom React hooks
-│   ├── use-albums.ts               # Album data fetching and mutations
-│   ├── use-miniplayer.ts           # Audio player state management for admin panel
-│   ├── use-singers.ts              # Singer data fetching and mutations
-│   └── use-tracks.ts               # Track data fetching and mutations
+│   ├── admin                       # Admin hooks (server-fetched data)
+│   │   ├── use-albums.ts           # Album data fetching and mutations
+│   │   ├── use-miniplayer.ts       # Audio player state management for admin panel
+│   │   ├── use-singers.ts          # Singer data fetching and mutations
+│   │   └── use-tracks.ts           # Track data fetching and mutations
+│   └── player                      # Player hooks (cached data)
+│       ├── use-albums.ts           # Album hooks using local cache
+│       ├── use-singers.ts          # Singer hooks using local cache
+│       └── use-tracks.ts           # Track hooks using local cache
 ├── index.css                       # Global styles and Tailwind directives
 ├── lib                             # Utility libraries
 │   ├── fileUpload.ts               # File upload utilities
+│   ├── localCache.ts               # Dexie database and sync manager
 │   ├── queryClient.ts              # TanStack Query configuration
 │   └── utils.ts                    # Common utility functions (cn, etc.)
 ├── main.tsx                        # Player app entry point
@@ -36,8 +44,21 @@ vite.config.ts                      # Vite build configuration
 ### Architecture
 - **React + TypeScript** with Vite build system
 - **TanStack Query** for API state management and caching
+- **Dexie.js** for IndexedDB-based client-side caching (main site)
 - **Tailwind CSS** for styling with dark mode support
-- **API hooks** in `client/src/hooks/` - one file per model (`use-singers.ts`, `use-albums.ts`, `use-tracks.ts`)
+- **Dual data strategy**:
+  - Admin hooks: Direct server queries with cache invalidation
+  - Player hooks: Local IndexedDB cache with sync manager
+
+### Client-Side Caching (Main Site)
+The main site uses Dexie.js for offline-capable data storage:
+- **Database**: SonoraDB with tables for albums, singers, tracks, lyrics, and sync metadata
+- **Sync Strategy**:
+  - Full sync on first load or if last sync was 28+ days ago
+  - Incremental sync for regular updates (fetches only changed records)
+  - Sync happens on app initialization, non-blocking for incremental updates
+- **Indexes**: Optimized for album lookup, genre filtering, and name-based search
+- **Query Client**: Separate from admin panel's queryClient, uses dbClient for data access
 
 ### API Hooks Pattern
 Each model follows identical hook structure:
@@ -48,13 +69,20 @@ Each model follows identical hook structure:
 - `useDelete<Model>()` - delete mutation
 - `list<Model>(page, conditions)` - paginated fetch function (uses List<Model> endpoint)
 
-### Admin
-#### Admin Components
-Located in `client/src/components/admin/`:
-- **singer.tsx** - Singer management with CRUD operations
-- **album.tsx** - Album management with CRUD operations
-- **track.tsx** - Track management with CRUD operations
+### Main Site
+#### Features
 
+#### UI Design
+- **Modern, immersive layout**: Edge-to-edge album art, glassmorphism overlays, and smooth transitions for a premium feel.
+- **Dynamic theming**: Auto light/dark mode, main Body: pure white (light mode) or #1E1E1E (dark mode). Use vibrant accent colors based on album art, and animated backgrounds in the full size player.
+- **Responsive grid**: Adaptive album/song grid with hover effects, optimized for desktop and mobile.
+- **Sticky player**: Persistent bottom music bar with queue, and mini-player popout.
+- **Rich search**: Instant, fuzzy search and category tabs (songs, albums, artists).
+- **Detail pages**: Full-bleed album/artist pages with hero images, tracklists, and related content.
+- **Microinteractions**: Animated play/pause, loading skeletons, and subtle feedback for all actions.
+
+
+### Admin
 #### Admin Features
 - **CRUD Operations**: Create, Read, Update, Delete for all models
 - **Search**: Client-side filtering by model name (triggered on Enter key)
