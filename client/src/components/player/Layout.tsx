@@ -5,6 +5,8 @@ import { Loader2 } from "lucide-react";
 
 interface LayoutProps {
   children: ReactNode;
+  currentView?: string;
+  onNavigate?: (path: string) => void;
 }
 
 const i18nText = {
@@ -12,7 +14,11 @@ const i18nText = {
   initialSync: "Syncing for the first time, this may take a moment...",
 };
 
-export default function Layout({ children }: LayoutProps) {
+export default function Layout({
+  children,
+  currentView,
+  onNavigate,
+}: LayoutProps) {
   const [isInitializing, setIsInitializing] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,7 +66,7 @@ export default function Layout({ children }: LayoutProps) {
   return (
     <div className="flex h-screen overflow-hidden bg-white dark:bg-[#1E1E1E]">
       {/* Sidebar */}
-      <Sidebar />
+      <Sidebar currentView={currentView} onNavigate={onNavigate} />
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto">

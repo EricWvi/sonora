@@ -15,8 +15,15 @@ src                                 # Source code directory
 │   │   ├── track.tsx               # Track CRUD management UI
 │   │   └── MiniPlayer.tsx          # Mini player at bottom-right
 │   └── player                      # Main site components
+│       ├── AlbumDetail.tsx         # Album detail view with hero and tracklist
+│       ├── AlbumGrid.tsx           # Responsive grid of album covers
 │       ├── Layout.tsx              # Main layout with sidebar and content area
-│       └── Sidebar.tsx             # Responsive navigation sidebar
+│       ├── SearchBar.tsx           # Debounced search input with keyboard shortcuts
+│       ├── SearchResults.tsx       # Grouped search results (artists/albums/songs)
+│       ├── Sidebar.tsx             # Responsive navigation sidebar
+│       ├── SingerDetail.tsx        # Artist profile with singles and albums
+│       ├── SingerList.tsx          # Grid of all singers/artists
+│       └── SongList.tsx            # Table view of all tracks
 ├── hooks                           # Custom React hooks
 │   ├── admin                       # Admin hooks (server-fetched data)
 │   │   ├── use-albums.ts           # Album data fetching and mutations
@@ -71,6 +78,15 @@ Each model follows identical hook structure:
 
 ### Main Site
 #### Features
+- **Home Dashboard**: Stats overview with clickable cards for Tracks, Albums, Artists
+- **Global Search**: Debounced search bar (300ms) with keyboard shortcut ("/" to focus)
+- **Search Results**: Grouped results showing Artists, Albums, and Songs with navigation
+- **Song List View**: Scrollable table of all tracks with play on click
+- **Album Grid View**: Responsive grid of album covers with hover effects
+- **Album Detail View**: Full album page with tracklist and playback controls
+- **Singer List View**: Grid of all artists with avatars and fallback gradients
+- **Singer Detail View**: Artist profile with singles collection and albums grid
+- **View Navigation**: Seamless switching between all views via sidebar or clicks
 
 #### UI Design
 - **Modern, immersive layout**: Edge-to-edge album art, glassmorphism overlays, and smooth transitions for a premium feel.

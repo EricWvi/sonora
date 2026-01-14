@@ -36,6 +36,7 @@ export function useAlbum(id: number) {
     },
     staleTime: Infinity,
     gcTime: Infinity,
+    enabled: id > 0,
   });
 }
 

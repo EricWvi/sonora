@@ -19,9 +19,13 @@ const navItems = [
   { icon: Users, label: i18nText.nav.singers, href: "/artists" },
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+  currentView?: string;
+  onNavigate?: (path: string) => void;
+}
+
+export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeItem, setActiveItem] = useState("/");
 
   const toggleSidebar = () => setIsOpen(!isOpen);
 
@@ -70,7 +74,13 @@ export default function Sidebar() {
           <nav className="flex-1 space-y-2 p-6">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = activeItem === item.href;
+              const viewMap: Record<string, string> = {
+                "/": "home",
+                "/tracks": "songs",
+                "/albums": "albums",
+                "/artists": "singers",
+              };
+              const isActive = currentView === viewMap[item.href];
 
               return (
                 <a
@@ -78,7 +88,7 @@ export default function Sidebar() {
                   href={item.href}
                   onClick={(e) => {
                     e.preventDefault();
-                    setActiveItem(item.href);
+                    onNavigate?.(item.href);
                     setIsOpen(false);
                   }}
                   className={cn(
