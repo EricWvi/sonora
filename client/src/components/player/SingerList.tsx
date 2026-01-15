@@ -22,7 +22,7 @@ function SingerCard({ singerId, onSelect }: SingerCardProps) {
       onClick={() => onSelect(singerId)}
       className="group cursor-pointer animate-in fade-in slide-in-from-bottom-4"
     >
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-2xl dark:from-gray-800 dark:to-gray-900">
+      <div className="relative overflow-hidden rounded-full bg-gradient-to-br from-gray-100 to-gray-200 shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-2xl dark:from-gray-800 dark:to-gray-900">
         {/* Singer Avatar */}
         <div className="aspect-square overflow-hidden">
           {singer.avatar ? (

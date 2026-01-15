@@ -1,8 +1,10 @@
 import { useSearchSingers, useSinger } from "@/hooks/player/use-singers";
 import { useSearchAlbums, useAlbum } from "@/hooks/player/use-albums";
 import { useSearchTracks, useTrack } from "@/hooks/player/use-tracks";
+import { useAudioControls } from "@/lib/AudioContext";
+import { dbClient } from "@/lib/localCache";
 import { formatMediaUrl } from "@/lib/utils";
-import { Users, Disc, Music, Clock } from "lucide-react";
+import { Users, Disc, Music, Clock, Play } from "lucide-react";
 
 const i18nText = {
   singers: "Artists",
@@ -107,8 +109,9 @@ function TrackResult({ trackId, onClick }: TrackResultProps) {
       onClick={() => onClick(trackId)}
       className="group flex cursor-pointer items-center gap-4 rounded-lg border border-transparent px-4 py-3 transition-all duration-200 hover:border-gray-200/50 hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-cyan-50/50 hover:shadow-md dark:hover:border-gray-700/50 dark:hover:from-blue-900/10 dark:hover:to-cyan-900/10"
     >
-      <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500">
-        <Music className="h-6 w-6 text-white" />
+      <div className="relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500">
+        <Music className="h-6 w-6 text-white group-hover:hidden" />
+        <Play className="hidden h-6 w-6 fill-white text-white group-hover:block" />
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate font-semibold text-gray-900 dark:text-white">
@@ -130,18 +133,24 @@ interface SearchResultsProps {
   query: string;
   onSelectSinger?: (singerId: number) => void;
   onSelectAlbum?: (albumId: number) => void;
-  onSelectTrack?: (trackId: number) => void;
 }
 
 export default function SearchResults({
   query,
   onSelectSinger,
   onSelectAlbum,
-  onSelectTrack,
 }: SearchResultsProps) {
   const { data: singerIds = [] } = useSearchSingers(query);
   const { data: albumIds = [] } = useSearchAlbums(query);
   const { data: trackIds = [] } = useSearchTracks(query);
+  const { playTrack } = useAudioControls();
+
+  const handlePlayTrack = async (trackId: number) => {
+    const track = await dbClient.getTrack(trackId);
+    if (track) {
+      playTrack(track);
+    }
+  };
 
   const hasResults =
     singerIds.length > 0 || albumIds.length > 0 || trackIds.length > 0;
@@ -233,11 +242,7 @@ export default function SearchResults({
           </h2>
           <div className="space-y-2">
             {trackIds.slice(0, maxResults).map((id) => (
-              <TrackResult
-                key={id}
-                trackId={id}
-                onClick={(id) => onSelectTrack?.(id)}
-              />
+              <TrackResult key={id} trackId={id} onClick={handlePlayTrack} />
             ))}
           </div>
           {trackIds.length > maxResults && (

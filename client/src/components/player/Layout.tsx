@@ -1,6 +1,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { syncManager } from "@/lib/localCache";
+import { useAudioState } from "@/lib/AudioContext";
 import Sidebar from "./Sidebar";
+import MiniPlayer from "./MiniPlayer";
+import FullPlayer from "./FullPlayer";
 import { Loader2 } from "lucide-react";
 
 interface LayoutProps {
@@ -21,6 +24,7 @@ export default function Layout({
 }: LayoutProps) {
   const [isInitializing, setIsInitializing] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { currentTrack } = useAudioState();
 
   useEffect(() => {
     const initialize = async () => {
@@ -63,6 +67,9 @@ export default function Layout({
     );
   }
 
+  // Determine if mini player is visible (when there's a current track)
+  const hasMiniPlayer = !!currentTrack;
+
   return (
     <div className="flex h-screen overflow-hidden bg-white dark:bg-[#1E1E1E]">
       {/* Sidebar */}
@@ -70,10 +77,18 @@ export default function Layout({
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-7xl px-6 py-8 md:px-8 lg:px-12">
+        <div
+          className={`mx-auto max-w-7xl px-6 py-8 md:px-8 lg:px-12 ${hasMiniPlayer ? "pb-28" : ""}`}
+        >
           {children}
         </div>
       </main>
+
+      {/* Mini Player */}
+      <MiniPlayer />
+
+      {/* Full Player */}
+      <FullPlayer />
     </div>
   );
 }

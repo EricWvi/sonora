@@ -1,7 +1,9 @@
 import { useAlbum } from "@/hooks/player/use-albums";
 import { useAlbumTracks, useTrack } from "@/hooks/player/use-tracks";
-import { formatMediaUrl } from "@/lib/utils";
-import { Play, Shuffle, Clock, ArrowLeft, Disc } from "lucide-react";
+import { useAudioState, useAudioControls } from "@/lib/AudioContext";
+import { dbClient } from "@/lib/localCache";
+import { formatMediaUrl, cn } from "@/lib/utils";
+import { Play, Pause, Shuffle, Clock, ArrowLeft, Disc } from "lucide-react";
 
 const i18nText = {
   playAll: "Play All",
@@ -22,10 +24,18 @@ function formatDuration(seconds: number): string {
 interface TrackRowProps {
   trackId: number;
   index: number;
+  isCurrentTrack: boolean;
+  isPlaying: boolean;
   onPlay: (trackId: number) => void;
 }
 
-function TrackRow({ trackId, index, onPlay }: TrackRowProps) {
+function TrackRow({
+  trackId,
+  index,
+  isCurrentTrack,
+  isPlaying,
+  onPlay,
+}: TrackRowProps) {
   const { data: track } = useTrack(trackId);
 
   if (!track) return null;
@@ -33,19 +43,52 @@ function TrackRow({ trackId, index, onPlay }: TrackRowProps) {
   return (
     <div
       onClick={() => onPlay(trackId)}
-      className="group grid grid-cols-[auto_1fr_auto] gap-4 rounded-lg border border-transparent px-4 py-3 transition-all duration-200 hover:border-gray-200/50 hover:bg-gradient-to-r hover:from-purple-50/50 hover:to-pink-50/50 hover:shadow-md dark:hover:border-gray-700/50 dark:hover:from-purple-900/10 dark:hover:to-pink-900/10"
+      className={cn(
+        "group grid grid-cols-[auto_1fr_auto] gap-4 rounded-lg border border-transparent px-4 py-3 transition-all duration-200",
+        isCurrentTrack
+          ? "border-purple-200/50 bg-gradient-to-r from-purple-50 to-pink-50 shadow-md dark:border-purple-700/50 dark:from-purple-900/20 dark:to-pink-900/20"
+          : "hover:border-gray-200/50 hover:bg-gradient-to-r hover:from-purple-50/50 hover:to-pink-50/50 hover:shadow-md dark:hover:border-gray-700/50 dark:hover:from-purple-900/10 dark:hover:to-pink-900/10"
+      )}
     >
-      {/* Track Number / Play Button */}
+      {/* Track Number / Play Button / Playing Indicator */}
       <div className="flex w-8 items-center justify-center text-sm font-medium text-gray-500 dark:text-gray-400">
-        <span className="group-hover:hidden">
-          {track.trackNumber || index + 1}
-        </span>
-        <Play className="hidden h-4 w-4 fill-purple-600 text-purple-600 group-hover:block dark:fill-purple-400 dark:text-purple-400" />
+        {isCurrentTrack && isPlaying ? (
+          <div className="flex gap-0.5">
+            <span
+              className="h-3 w-0.5 animate-pulse rounded-full bg-purple-600 dark:bg-purple-400"
+              style={{ animationDelay: "0ms" }}
+            />
+            <span
+              className="h-4 w-0.5 animate-pulse rounded-full bg-purple-600 dark:bg-purple-400"
+              style={{ animationDelay: "150ms" }}
+            />
+            <span
+              className="h-2 w-0.5 animate-pulse rounded-full bg-purple-600 dark:bg-purple-400"
+              style={{ animationDelay: "300ms" }}
+            />
+          </div>
+        ) : isCurrentTrack ? (
+          <Pause className="h-4 w-4 fill-purple-600 text-purple-600 dark:fill-purple-400 dark:text-purple-400" />
+        ) : (
+          <>
+            <span className="group-hover:hidden">
+              {track.trackNumber || index + 1}
+            </span>
+            <Play className="hidden h-4 w-4 fill-purple-600 text-purple-600 group-hover:block dark:fill-purple-400 dark:text-purple-400" />
+          </>
+        )}
       </div>
 
       {/* Track Name */}
       <div className="min-w-0">
-        <p className="truncate font-semibold text-gray-900 dark:text-white">
+        <p
+          className={cn(
+            "truncate font-semibold",
+            isCurrentTrack
+              ? "text-purple-600 dark:text-purple-400"
+              : "text-gray-900 dark:text-white"
+          )}
+        >
           {track.name}
         </p>
         <p className="truncate text-sm text-gray-600 dark:text-gray-400">
@@ -65,34 +108,51 @@ function TrackRow({ trackId, index, onPlay }: TrackRowProps) {
 interface AlbumDetailProps {
   albumId: number;
   onBack?: () => void;
-  onPlayTrack?: (trackId: number) => void;
-  onPlayAll?: (albumId: number) => void;
-  onShuffle?: (albumId: number) => void;
 }
 
-export default function AlbumDetail({
-  albumId,
-  onBack,
-  onPlayTrack,
-  onPlayAll,
-  onShuffle,
-}: AlbumDetailProps) {
+export default function AlbumDetail({ albumId, onBack }: AlbumDetailProps) {
   const { data: album } = useAlbum(albumId);
   const { data: trackIds = [], isLoading } = useAlbumTracks(albumId);
+  const { currentTrack, isPlaying, isShuffled } = useAudioState();
+  const { playTracks, togglePlay, toggleShuffle } = useAudioControls();
 
-  const handlePlayTrack = (trackId: number) => {
-    console.log("Playing track:", trackId);
-    onPlayTrack?.(trackId);
+  const handlePlayTrack = async (trackId: number) => {
+    // If clicking the current track, toggle play/pause
+    if (currentTrack?.id === trackId) {
+      togglePlay();
+      return;
+    }
+
+    // Get album tracks and play from the selected index
+    const tracks = await dbClient.getTracksByAlbum(albumId);
+    const index = tracks.findIndex((t) => t.id === trackId);
+    if (index !== -1) {
+      playTracks(tracks, index);
+    }
   };
 
-  const handlePlayAll = () => {
-    console.log("Playing all tracks from album:", albumId);
-    onPlayAll?.(albumId);
+  const handlePlayAll = async () => {
+    const tracks = await dbClient.getTracksByAlbum(albumId);
+    if (tracks.length > 0) {
+      // If shuffle is on, turn it off for Play All
+      if (isShuffled) {
+        toggleShuffle();
+      }
+      playTracks(tracks, 0);
+    }
   };
 
-  const handleShuffle = () => {
-    console.log("Shuffling album:", albumId);
-    onShuffle?.(albumId);
+  const handleShuffle = async () => {
+    const tracks = await dbClient.getTracksByAlbum(albumId);
+    if (tracks.length > 0) {
+      // Shuffle the tracks array
+      const shuffled = [...tracks];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      playTracks(shuffled, 0);
+    }
   };
 
   if (!album) {
@@ -196,6 +256,8 @@ export default function AlbumDetail({
                 key={id}
                 trackId={id}
                 index={index}
+                isCurrentTrack={currentTrack?.id === id}
+                isPlaying={isPlaying && currentTrack?.id === id}
                 onPlay={handlePlayTrack}
               />
             ))}

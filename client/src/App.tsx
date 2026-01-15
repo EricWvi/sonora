@@ -10,6 +10,7 @@ import SearchResults from "./components/player/SearchResults";
 import { useAlbums } from "./hooks/player/use-albums";
 import { useTracks } from "./hooks/player/use-tracks";
 import { useSingers } from "./hooks/player/use-singers";
+import { useKeyboardShortcuts } from "./hooks/player/use-keyboard-shortcuts";
 import { Music, Disc, Users } from "lucide-react";
 
 const i18nText = {
@@ -40,6 +41,9 @@ function App() {
   const [selectedAlbumId, setSelectedAlbumId] = useState<number | null>(null);
   const [selectedSingerId, setSelectedSingerId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Enable keyboard shortcuts
+  useKeyboardShortcuts();
 
   const { data: albums = [], isLoading: albumsLoading } = useAlbums();
   const { data: tracks = [], isLoading: tracksLoading } = useTracks();
@@ -325,7 +329,6 @@ function App() {
               query={searchQuery}
               onSelectSinger={handleSelectSinger}
               onSelectAlbum={handleSelectAlbum}
-              onSelectTrack={(trackId) => console.log("Play track:", trackId)}
             />
           </div>
         )}

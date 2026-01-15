@@ -12,10 +12,10 @@ Build a beautiful, performant music player that rivals Apple Music in aesthetics
 4. ✅ Create song list view components
 5. ✅ Build album grid view
 6. ✅ Create album detail view
-7. Add mini player component for playback control
-8. Implement playlist/queue management
-9. Add keyboard shortcuts (Space = play/pause, arrow keys = seek)
-10. Create full player view (expand from mini player)
+7. ✅ Add mini player component for playback control
+8. ✅ Implement playlist/queue management
+9. ✅ Add keyboard shortcuts (Space = play/pause, arrow keys = seek)
+10. ✅ Create full player view (expand from mini player)
 
 **Success Criteria:**
 - ✅ Data syncs from server to IndexedDB
@@ -24,12 +24,12 @@ Build a beautiful, performant music player that rivals Apple Music in aesthetics
 - ✅ User can browse list of songs
 - ✅ User can browse album grid
 - ✅ User can view album details with tracklist
-- User can click a song to play (playback integration needed)
-- Mini player shows currently playing track
-- Play/pause/next/previous controls work
-- User do not need to control volume (user just need to concern about system's volume)
-- User can create and manage playlists
-- Beautiful, responsive UI that works on mobile and desktop
+- ✅ User can click a song to play (playback integration complete)
+- ✅ Mini player shows currently playing track
+- ✅ Play/pause/next/previous controls work
+- ✅ User do not need to control volume (user just need to concern about system's volume)
+- [ ] User can create and manage playlists
+- ✅ Beautiful, responsive UI that works on mobile and desktop
 
 ## Design System
 
@@ -193,70 +193,69 @@ Build reusable components following Apple Music aesthetics:
 
 ---
 
-## Phase 3: Audio Player
+## Phase 3: Audio Player ✅
 
-### 3.1 Mini Player
-- [ ] `MiniPlayer.tsx` - Bottom floating player
+### 3.1 Mini Player ✅
+- [x] `MiniPlayer.tsx` - Bottom floating player
   - **Left section:** Cover thumbnail (48x48), track title, artist name
   - **Center section:** Play/Pause, Previous, Next, Progress bar, Time display
-  - **Right section:** Volume control, Queue button, Expand button
+  - **Right section:** Queue button, Expand button
   - Fixed position: `fixed bottom-0 left-0 right-0 h-20`
   - Backdrop blur effect: `backdrop-blur-lg bg-white/80 dark:bg-black/80`
   
-### 3.2 Full Player
-- [ ] `FullPlayer.tsx` - Expanded player view
+### 3.2 Full Player ✅
+- [x] `FullPlayer.tsx` - Expanded player view
   - Modal/overlay that covers entire screen
   - Large album art (70% of screen height)
   - Track metadata (title, artist, album)
   - Full playback controls
   - Seekbar with timestamp
-  - Volume slider
-  - Queue/lyrics toggle
+  - Queue toggle
   - Close/minimize button
   - Gesture support: swipe down to minimize (mobile)
 
-### 3.3 Playback Controls
-- [ ] `PlaybackControls.tsx` - Reusable control component
+### 3.3 Playback Controls ✅
+- [x] `PlaybackControls.tsx` - Reusable control component
   - Previous track
   - Play/Pause toggle
   - Next track
   - Shuffle toggle
   - Repeat mode (off/all/one)
   
-- [ ] `ProgressBar.tsx` - Seekable progress bar
+- [x] `ProgressBar.tsx` - Seekable progress bar
   - Click to seek
   - Drag to scrub
   - Show buffered range
   - Display current time / total duration
 
-### 3.4 Audio Engine
-- [ ] `useAudioPlayer.ts` - Core audio playback hook
-  - HTML5 Audio API integration
-  - Play, pause, seek, volume control
+### 3.4 Audio Engine ✅
+- [x] `useAudioPlayer.ts` - Core audio playback hook
+  - Uses `howler.js` for audio playback
+  - Play, pause, seek
   - Track queue management
   - Auto-advance to next track
   - Shuffle and repeat logic
   - Media session API for system controls
   - Error handling and recovery
   
-- [ ] `AudioContext.tsx` - Global audio state provider
+- [x] `AudioContext.tsx` - Global audio state provider
   - Current track
   - Playback state (playing, paused, loading)
   - Queue state
-  - Volume and mute state
   - Progress tracking
+  - Provides useAudio, useAudioState, useAudioControls hooks
 
 ---
 
 ## Phase 4: Advanced Features
 
-### 4.1 Queue Management
-- [ ] `Queue.tsx` - View and manage playback queue
+### 4.1 Queue Management ✅
+- [x] `Queue.tsx` - View and manage playback queue
   - Current track highlight
   - Drag to reorder
   - Remove from queue
   - Clear queue
-  - Save queue as playlist
+  - Click to jump to track
   
 ### 4.2 Lyrics Display
 - [ ] `Lyrics.tsx` - Scrolling lyrics view
@@ -274,12 +273,12 @@ Build reusable components following Apple Music aesthetics:
   - Share link
   - Delete (admin mode)
 
-### 4.4 Keyboard Shortcuts
-- [ ] Implement global keyboard shortcuts
+### 4.4 Keyboard Shortcuts ✅
+- [x] Implement global keyboard shortcuts
   - `Space` - Play/Pause
-  - `←/→` - Previous/Next track
-  - `↑/↓` - Volume up/down
-  - `M` - Mute toggle
+  - `←/→` - Seek backward/forward 5 seconds
+  - `Shift+←/→` - Previous/Next track
+  - `Escape` - Close full player
   - `S` - Shuffle toggle
   - `R` - Repeat cycle
   - `/` - Focus search
