@@ -47,15 +47,14 @@ func TestFullSync(t *testing.T) {
 
 	// Step 3: Verify response structure
 	assert.NotNil(t, fullSyncResp)
-	assert.NotNil(t, fullSyncResp.Data.Albums)
-	assert.NotNil(t, fullSyncResp.Data.Tracks)
-	assert.NotNil(t, fullSyncResp.Data.Singers)
-	assert.NotNil(t, fullSyncResp.Data.Lyrics)
-	assert.NotZero(t, fullSyncResp.Data.Timestamp)
-
+	assert.NotNil(t, fullSyncResp.Albums)
+	assert.NotNil(t, fullSyncResp.Tracks)
+	assert.NotNil(t, fullSyncResp.Singers)
+	assert.NotNil(t, fullSyncResp.Lyrics)
+	assert.NotZero(t, fullSyncResp.Timestamp)
 	// Step 4: Verify our test data is included
 	var foundAlbum bool
-	for _, album := range fullSyncResp.Data.Albums {
+	for _, album := range fullSyncResp.Albums {
 		if album.ID == albumID {
 			foundAlbum = true
 			assert.Equal(t, "Full Sync Test Album", album.Name)
@@ -67,7 +66,7 @@ func TestFullSync(t *testing.T) {
 	assert.True(t, foundAlbum, "created album should be in full sync response")
 
 	var foundTrack bool
-	for _, track := range fullSyncResp.Data.Tracks {
+	for _, track := range fullSyncResp.Tracks {
 		if track.ID == trackID {
 			foundTrack = true
 			assert.Equal(t, "Full Sync Test Track", track.Name)

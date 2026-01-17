@@ -116,7 +116,12 @@ class SyncManager {
       if (shouldFullSync) {
         await this.performFullSync();
       } else {
-        await this.performIncrementalSync(metadata.lastSyncTimestamp);
+        try {
+          await this.performIncrementalSync(metadata.lastSyncTimestamp);
+        } catch (error) {
+          // Incremental sync failures should not block initialization
+          console.warn("Incremental sync failed, will retry later:", error);
+        }
       }
     } catch (error) {
       console.error("Sync failed:", error);
@@ -131,7 +136,7 @@ class SyncManager {
     console.log("Performing full sync...");
 
     const response = (await getRequest(
-      "/api/sync?Action=GetFullSync"
+      "/api/sync?Action=GetFullSync",
     )) as FullSyncResponse;
     const { albums, singers, tracks, lyrics, timestamp } = response;
 
@@ -157,7 +162,7 @@ class SyncManager {
           lastSyncTimestamp: timestamp,
           createdAt: Date.now(),
         });
-      }
+      },
     );
 
     console.log("Full sync completed:", {
@@ -171,8 +176,10 @@ class SyncManager {
   private async performIncrementalSync(since: number): Promise<void> {
     console.log("Performing incremental sync since:", since);
 
+    // do not retry on failure
     const response = (await getRequest(
-      `/api/sync?Action=GetUpdates&since=${since}`
+      `/api/sync?Action=GetUpdates&since=${since}`,
+      1,
     )) as UpdatesResponse;
     const { entries, timestamp } = response;
 
@@ -203,13 +210,13 @@ class SyncManager {
           lastSyncTimestamp: timestamp,
           createdAt: Date.now(),
         });
-      }
+      },
     );
 
     console.log(
       "Incremental sync completed:",
       entries.length,
-      "table(s) changed"
+      "table(s) changed",
     );
   }
 
@@ -258,7 +265,7 @@ class SyncManager {
         try {
           if (tableName === "d_lyric") {
             const response = await getRequest(
-              `/api/${apiEndpoint}?Action=GetLyric&id=${recordId}`
+              `/api/${apiEndpoint}?Action=GetLyric&id=${recordId}`,
             );
             result.lyrics.toUpdate.push({
               id: recordId,
@@ -266,21 +273,21 @@ class SyncManager {
             });
           } else if (tableName === "d_album") {
             const response = await getRequest(
-              `/api/${apiEndpoint}?Action=GetAlbum&id=${recordId}`
+              `/api/${apiEndpoint}?Action=GetAlbum&id=${recordId}`,
             );
             if (response.album) {
               result.albums.toUpdate.push(response.album);
             }
           } else if (tableName === "d_singer") {
             const response = await getRequest(
-              `/api/${apiEndpoint}?Action=GetSinger&id=${recordId}`
+              `/api/${apiEndpoint}?Action=GetSinger&id=${recordId}`,
             );
             if (response.singer) {
               result.singers.toUpdate.push(response.singer);
             }
           } else if (tableName === "d_track") {
             const response = await getRequest(
-              `/api/${apiEndpoint}?Action=GetTrack&id=${recordId}`
+              `/api/${apiEndpoint}?Action=GetTrack&id=${recordId}`,
             );
             if (response.track) {
               result.tracks.toUpdate.push(response.track);
@@ -289,7 +296,7 @@ class SyncManager {
         } catch (error) {
           console.error(
             `Failed to fetch ${tableName} record ${recordId}:`,
-            error
+            error,
           );
         }
       }
@@ -393,7 +400,7 @@ export const dbClient = {
       .filter(
         (track) =>
           track.name.toLowerCase().includes(lowerQuery) ||
-          track.singer.toLowerCase().includes(lowerQuery)
+          track.singer.toLowerCase().includes(lowerQuery),
       )
       .toArray();
   },

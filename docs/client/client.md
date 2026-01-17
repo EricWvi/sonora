@@ -20,7 +20,7 @@ src                                 # Source code directory
 │       ├── Layout.tsx              # Main layout with sidebar and content area
 │       ├── SearchBar.tsx           # Debounced search input with keyboard shortcuts
 │       ├── SearchResults.tsx       # Grouped search results (artists/albums/songs)
-│       ├── Sidebar.tsx             # Responsive navigation sidebar
+│       ├── Sidebar.tsx             # Responsive navigation sidebar with integrated search
 │       ├── SingerDetail.tsx        # Artist profile with singles and albums
 │       ├── SingerList.tsx          # Grid of all singers/artists
 │       └── SongList.tsx            # Table view of all tracks
@@ -79,7 +79,7 @@ Each model follows identical hook structure:
 ### Main Site
 #### Features
 - **Home Dashboard**: Stats overview with clickable cards for Tracks, Albums, Artists
-- **Global Search**: Debounced search bar (300ms) with keyboard shortcut ("/" to focus)
+- **Integrated Search**: Persistent search bar in sidebar accessible from all views with debouncing (300ms)
 - **Search Results**: Grouped results showing Artists, Albums, and Songs with navigation
 - **Song List View**: Scrollable table of all tracks with play on click
 - **Album Grid View**: Responsive grid of album covers with hover effects

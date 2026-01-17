@@ -1,5 +1,26 @@
 ## Client Development Log
 
+### 2026-01-17: UI Improvement - SearchBar moved to sidebar
+
+**Changes:**
+- Moved SearchBar from App.tsx content area to Sidebar component
+- SearchBar now positioned permanently under logo brand in sidebar
+- Search functionality accessible from all views
+- Removed duplicate SearchBar instances from home and other views
+
+**Modified Components:**
+- `/client/src/App.tsx` - Removed SearchBar component and usage, passed search props to Layout
+- `/client/src/components/player/Layout.tsx` - Added search props interface, passed to Sidebar
+- `/client/src/components/player/Sidebar.tsx` - Integrated SearchBar below logo brand section
+
+**Benefits:**
+- Consistent search access across all views
+- Cleaner main content area
+- Better space utilization in sidebar
+- Improved user experience with always-visible search
+
+---
+
 ### 2026-01-14: Phase 3 completion - Audio playback system
 
 **Changes:**

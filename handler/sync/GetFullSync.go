@@ -42,13 +42,11 @@ func (b Base) GetFullSync(c *gin.Context, req *GetFullSyncRequest) *GetFullSyncR
 	}
 
 	return &GetFullSyncResponse{
-		Data: model.FullSyncResponse{
-			Albums:    albums,
-			Lyrics:    lyrics,
-			Singers:   singers,
-			Tracks:    tracks,
-			Timestamp: time.Now().UnixMilli(),
-		},
+		Albums:    albums,
+		Lyrics:    lyrics,
+		Singers:   singers,
+		Tracks:    tracks,
+		Timestamp: time.Now().UnixMilli(),
 	}
 }
 
@@ -56,5 +54,9 @@ type GetFullSyncRequest struct {
 }
 
 type GetFullSyncResponse struct {
-	Data model.FullSyncResponse `json:"data"`
+	Albums    []model.AlbumView  `json:"albums"`
+	Lyrics    []model.LyricView  `json:"lyrics"`
+	Singers   []model.SingerView `json:"singers"`
+	Tracks    []model.TrackView  `json:"tracks"`
+	Timestamp int64              `json:"timestamp"`
 }

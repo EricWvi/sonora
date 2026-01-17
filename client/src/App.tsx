@@ -5,7 +5,6 @@ import AlbumGrid from "./components/player/AlbumGrid";
 import AlbumDetail from "./components/player/AlbumDetail";
 import SingerList from "./components/player/SingerList";
 import SingerDetail from "./components/player/SingerDetail";
-import SearchBar from "./components/player/SearchBar";
 import SearchResults from "./components/player/SearchResults";
 import { useAlbums } from "./hooks/player/use-albums";
 import { useTracks } from "./hooks/player/use-tracks";
@@ -138,28 +137,17 @@ function App() {
   };
 
   return (
-    <Layout currentView={currentView} onNavigate={handleNavigate}>
+    <Layout 
+      currentView={currentView} 
+      onNavigate={handleNavigate}
+      searchQuery={searchQuery}
+      onSearchChange={handleSearchChange}
+      onSearchClear={handleSearchClear}
+    >
       <div className="space-y-10">
-        {/* Search Bar - Always visible except on home */}
-        {currentView !== "home" && (
-          <SearchBar
-            value={searchQuery}
-            onChange={handleSearchChange}
-            onClear={handleSearchClear}
-          />
-        )}
-
         {/* Home View */}
         {currentView === "home" && (
           <>
-            {/* Search Bar on Home */}
-            <div className="animate-in fade-in slide-in-from-top-4 duration-500">
-              <SearchBar
-                value={searchQuery}
-                onChange={handleSearchChange}
-                onClear={handleSearchClear}
-              />
-            </div>
 
             {/* Welcome Section */}
             <div

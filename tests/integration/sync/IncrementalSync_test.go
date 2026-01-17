@@ -17,7 +17,7 @@ func TestIncrementalSync_InsertAndUpdate(t *testing.T) {
 
 	// Step 1: Get initial sync timestamp
 	initialSync := api.GetFullSync(t, router)
-	syncTimestamp := initialSync.Data.Timestamp
+	syncTimestamp := initialSync.Timestamp
 
 	// Wait a moment to ensure timestamp difference
 	time.Sleep(100 * time.Millisecond)
@@ -68,7 +68,7 @@ func TestIncrementalSync_InsertUpdateAndDelete(t *testing.T) {
 
 	// Step 1: Get initial sync timestamp
 	initialSync := api.GetFullSync(t, router)
-	syncTimestamp := initialSync.Data.Timestamp
+	syncTimestamp := initialSync.Timestamp
 
 	// Wait a moment to ensure timestamp difference
 	time.Sleep(100 * time.Millisecond)
@@ -123,7 +123,7 @@ func TestIncrementalSync_MultipleRecords(t *testing.T) {
 
 	// Step 1: Get initial sync timestamp
 	initialSync := api.GetFullSync(t, router)
-	syncTimestamp := initialSync.Data.Timestamp
+	syncTimestamp := initialSync.Timestamp
 
 	// Wait a moment to ensure timestamp difference
 	time.Sleep(100 * time.Millisecond)
@@ -206,7 +206,7 @@ func TestIncrementalSync_NoChanges(t *testing.T) {
 
 	// Step 1: Get initial sync timestamp
 	initialSync := api.GetFullSync(t, router)
-	syncTimestamp := initialSync.Data.Timestamp
+	syncTimestamp := initialSync.Timestamp
 
 	// Step 2: Immediately get updates without making any changes
 	updatesResp := api.GetUpdates(t, router, syncTimestamp)

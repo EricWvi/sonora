@@ -4,12 +4,15 @@ import { useAudioState } from "@/lib/AudioContext";
 import Sidebar from "./Sidebar";
 import MiniPlayer from "./MiniPlayer";
 import FullPlayer from "./FullPlayer";
-import { Loader2 } from "lucide-react";
+import { AppleMusic } from "./icons";
 
 interface LayoutProps {
   children: ReactNode;
   currentView?: string;
   onNavigate?: (path: string) => void;
+  searchQuery?: string;
+  onSearchChange?: (value: string) => void;
+  onSearchClear?: () => void;
 }
 
 const i18nText = {
@@ -21,6 +24,9 @@ export default function Layout({
   children,
   currentView,
   onNavigate,
+  searchQuery = "",
+  onSearchChange,
+  onSearchClear,
 }: LayoutProps) {
   const [isInitializing, setIsInitializing] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,12 +34,21 @@ export default function Layout({
 
   useEffect(() => {
     const initialize = async () => {
+      const startTime = Date.now();
+      const MIN_LOADING_TIME = 1000; // 1 second minimum
+
       try {
         await syncManager.initialize();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to initialize");
       } finally {
-        setIsInitializing(false);
+        // Ensure loading scene shows for at least 1 second
+        const elapsed = Date.now() - startTime;
+        const remainingTime = Math.max(0, MIN_LOADING_TIME - elapsed);
+        
+        setTimeout(() => {
+          setIsInitializing(false);
+        }, remainingTime);
       }
     };
 
@@ -42,13 +57,9 @@ export default function Layout({
 
   if (isInitializing) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-purple-500 via-pink-500 to-blue-500 dark:from-purple-900 dark:via-pink-900 dark:to-blue-900">
-        <div className="flex flex-col items-center gap-6">
-          <Loader2 className="h-16 w-16 animate-spin text-white drop-shadow-lg" />
-          <p className="text-xl font-semibold text-white drop-shadow-md">
-            {i18nText.loading}
-          </p>
-          <p className="text-sm text-white/80">{i18nText.initialSync}</p>
+      <div className="flex min-h-screen items-center justify-center bg-white dark:bg-[#282828]">
+        <div className="size-24 sm:size-36">
+          <AppleMusic />
         </div>
       </div>
     );
@@ -73,7 +84,13 @@ export default function Layout({
   return (
     <div className="flex h-screen overflow-hidden bg-white dark:bg-[#1E1E1E]">
       {/* Sidebar */}
-      <Sidebar currentView={currentView} onNavigate={onNavigate} />
+      <Sidebar 
+        currentView={currentView} 
+        onNavigate={onNavigate}
+        searchQuery={searchQuery}
+        onSearchChange={onSearchChange}
+        onSearchClear={onSearchClear}
+      />
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto">

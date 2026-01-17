@@ -558,13 +558,11 @@ Response:
     "requestId": "uuid",
     "code": 200,
     "message": {
-        "data": {
-            "albums": [...],
-            "lyrics": [...],
-            "singers": [...],
-            "tracks": [...],
-            "timestamp": 1768054202
-        }
+        "albums": [...],
+        "lyrics": [...],
+        "singers": [...],
+        "tracks": [...],
+        "timestamp": 1768054202
     }
 }
 ```

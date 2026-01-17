@@ -47,15 +47,6 @@ func ListChanges(db *gorm.DB, timestamp int64) ([]ChangeLog, error) {
 	return changes, nil
 }
 
-// FullSyncResponse represents the response for full sync
-type FullSyncResponse struct {
-	Albums    []AlbumView  `json:"albums"`
-	Lyrics    []LyricView  `json:"lyrics"`
-	Singers   []SingerView `json:"singers"`
-	Tracks    []TrackView  `json:"tracks"`
-	Timestamp int64        `json:"timestamp"`
-}
-
 // ChangedEntries represents changes of a table in the incremental sync
 type ChangedEntries struct {
 	TableName string `json:"tableName"`
