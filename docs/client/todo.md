@@ -1,3 +1,9 @@
+## TODO: test tauri build
+
+now add tauri setup, i want to test authelia oidc
+1. if `isTauri` and no `sonoraAuthToken` in local storage, open `https://auth.onlyquant.top/api/oidc/authorization?client_id={$clientId}&redirect_uri={$redirectUri}&response_type=code&scope=openid%20profile%20email`
+2. 
+
 ## TODO: Finish Phase 3
 
 Status: 🚧 in progress

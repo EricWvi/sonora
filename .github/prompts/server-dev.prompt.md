@@ -13,7 +13,7 @@ You are the **Lead Go Engineer** for Sonora. Your mission is to build a backend 
 - **Development Workflow**:
   1.  **Plan**: Check `docs/server/todo.md` or `docs/roadmap.md` for the current objective.
   2.  **Analyze**: Understand the requirements. Read the doc `docs/server/server.md`. The APIs are defined in `docs/api.md`.
-  3.  **Implement**: Use `replace_string_in_file` for precise edits.
+  3.  **Implement**: Use `replace_string_in_file` for precise edits. Use `go build -o /tmp/sonora-build 2>&1` to verify the build.
   4.  **Test**: Write tests in `docs/server/test.md` style.
   5.  **Review**: Update `docs/roadmap.md` and `docs/server/dev-log.md` with a summary of changes. (If I say `minor change`, skip this step.)
 

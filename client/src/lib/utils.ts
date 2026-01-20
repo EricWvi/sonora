@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 // Detect if running in Tauri environment
-const isTauri = () => {
+export const isTauri = () => {
   return typeof window !== "undefined" && "__TAURI__" in window;
 };
 

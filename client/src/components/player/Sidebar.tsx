@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Home, Music, Disc, Users, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SearchBar from "./SearchBar";
+import { AppleMusicIcon, SearchIcon } from "./icons";
 
 const i18nText = {
   appName: "Sonora",
@@ -65,30 +66,36 @@ export default function Sidebar({
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 w-64 transform border-r border-[#c2c2c2] bg-[#e6e6e7] backdrop-blur-xl transition-transform duration-300 ease-in-out md:relative md:translate-x-0 dark:border-[#020000] dark:bg-[#282727]/95",
+          "fixed inset-y-0 left-0 z-40 w-65 transform border-r border-[rgba(0,0,0,.15)] bg-[#f9f9f9] backdrop-blur-xl transition-transform duration-300 ease-in-out md:relative md:translate-x-0 dark:border-[hsla(0,0%,100%,.1)] dark:bg-[#282727]/95",
           isOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
         <div className="flex h-full flex-col">
           {/* Logo/Brand */}
-          <div className="px-6 py-8">
-            <h1 className="bg-gradient-to-r from-purple-600 via-pink-500 to-blue-600 bg-clip-text text-3xl font-black tracking-tight text-transparent">
-              {i18nText.appName}
-            </h1>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Your music, everywhere
-            </p>
+          <div className="h-[55px] px-[30px] pt-[17px]">
+            <div className="h-5 w-fit text-[#1e1e1e] dark:text-[#eeeeee]">
+              <AppleMusicIcon />
+            </div>
           </div>
 
           {/* Search Bar */}
-          <div className="px-6 pb-4">
+          <div className="mx-[25px] mb-4 flex h-14 flex-col justify-center">
+            <div className="relative">
+              <div className="text-sidebar-icon absolute inset-y-[10px] start-[10px] size-3">
+                <SearchIcon />
+              </div>
+              <input className="focus-glow border-searchbar-border bg-background text-primary h-8 w-full rounded-sm border pe-[5px] pt-[6px] pb-[5px] pl-7 text-xs leading-[1.25] font-normal tracking-normal focus:shadow-[0_0_0_4px_rgb(var(--keyColor))] focus:outline-none" />
+            </div>
+          </div>
+
+          {/* <div className="px-6 pb-4">
             <SearchBar
               value={searchQuery}
               onChange={(value) => onSearchChange?.(value)}
               onClear={onSearchClear}
               className="shadow-md"
             />
-          </div>
+          </div> */}
 
           {/* Navigation */}
           <nav className="flex-1 space-y-2 p-6">

@@ -1,5 +1,10 @@
 # Server Development Log
 
+## 2026-01-31: GetUserInfo Handler Implementation
+
+### Summary
+Implemented `/api/user?Action=GetUserInfo` endpoint to retrieve authenticated user's information. The handler returns user profile data including ID, email, username, avatar, and language preference.
+
 ## 2026-01-11: Sync API Integration Tests - Part 3
 
 ### Summary

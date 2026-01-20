@@ -7,10 +7,12 @@ import (
 
 	"github.com/EricWvi/sonora/handler"
 	"github.com/EricWvi/sonora/handler/album"
+	"github.com/EricWvi/sonora/handler/auth"
 	"github.com/EricWvi/sonora/handler/media"
 	"github.com/EricWvi/sonora/handler/singer"
 	"github.com/EricWvi/sonora/handler/sync"
 	"github.com/EricWvi/sonora/handler/track"
+	"github.com/EricWvi/sonora/handler/user"
 	"github.com/EricWvi/sonora/log"
 	"github.com/EricWvi/sonora/middleware"
 	"github.com/gin-contrib/gzip"
@@ -64,6 +66,10 @@ func Load(g *gin.Engine, mw ...gin.HandlerFunc) *gin.Engine {
 	back := g.Group(viper.GetString("route.back.base"))
 	// middleware.Logging logs request and response
 	back.Use(middleware.Logging())
+
+	back.GET("/auth", auth.DefaultHandler)
+
+	back.GET("/user", user.DefaultHandler)
 
 	back.GET("/singer", singer.DefaultHandler)
 	back.POST("/singer", singer.DefaultHandler)

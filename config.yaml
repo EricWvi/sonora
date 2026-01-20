@@ -14,3 +14,8 @@ db:
 storage:
   local:
     dir: "/workspaces/sonora/cli/output"
+oidc:
+  token_endpoint: "https://auth.onlyquant.top/api/oidc/token"
+  userinfo_endpoint: "https://auth.onlyquant.top/api/oidc/userinfo"
+  client_id: "LLqB1P0_~7FUf57JtZ1L0Qh5NK6hXldn3DL4c6Z1deDioYDVIpyjzUHJudA7gjEappeaUFKR"
+  redirect_uri: "https://sonora.onlyquant.top/oidc/callback"

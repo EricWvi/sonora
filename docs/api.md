@@ -27,6 +27,29 @@ GET /api/ping
 
 ---
 
+### User
+
+#### GetUserInfo
+Get authenticated user's information
+
+GET /api/user?Action=GetUserInfo
+
+Response:
+```json
+{
+    "requestId": "uuid",
+    "code": 200,
+    "message": {
+        "email": "user@example.com",
+        "avatar": "link-of-avatar",
+        "username": "User Name",
+        "language": "zh-CN"
+    }
+}
+```
+
+---
+
 ### Album
 
 #### CreateAlbum
@@ -594,3 +617,16 @@ Response:
 - For each record, only the **latest operation** is returned if multiple changes occurred.
 - `operation` values: `INSERT`, `UPDATE`, `DELETE`
 - Use the returned `timestamp` as the `since` parameter for the next sync request
+
+### OIDC
+
+GET /api/auth?Code=abcdefg
+
+Response:
+```json
+{
+    "requestId": "uuid",
+    "code": 200,
+    "token": "hijklmn"
+}
+```

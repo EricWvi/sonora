@@ -1,12 +1,37 @@
 @import "tailwindcss";
 
+@theme inline {
+  --color-background: var(--pageBG);
+  --color-searchbar-border: var(--searchBarBorderColor);
+  --color-primary: var(--systemPrimary-vibrant);
+  --color-sidebar-icon: var(--sidebar-icon);
+}
+
+:root {
+  --pageBG: #ffffff;
+  --searchBarBorderColor: rgba(0, 0, 0, 0.15);
+  --systemPrimary-vibrant: #1d1d1f;
+  --keyColor: 247, 148, 142;
+  --sidebar-icon: #d70016;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pageBG: #1f1f1f;
+    --searchBarBorderColor: hsla(0, 0%, 100%, 0.15);
+    --systemPrimary-vibrant: #f5f5f7;
+    --keyColor: 166, 69, 80;
+    --sidebar-icon: #fa596a;
+  }
+}
+
 @layer base {
   html {
     @apply scroll-smooth;
   }
 
   body {
-    @apply bg-white text-gray-900 antialiased dark:bg-[#1E1E1E] dark:text-white;
+    @apply bg-white text-gray-900 antialiased dark:bg-[#1f1f1f] dark:text-white;
     font-feature-settings:
       "rlig" 1,
       "calt" 1;
@@ -32,6 +57,10 @@
     animation-name: slideInFromBottom;
     animation-duration: 0.5s;
   }
+}
+
+.focus-glow:focus {
+  animation: focusGlow 0.2s linear;
 }
 
 @keyframes fadeIn {
@@ -62,5 +91,14 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes focusGlow {
+  from {
+    box-shadow: 0 0 0 20px rgba(var(--keyColor), 0);
+  }
+  to {
+    box-shadow: 0 0 0 4px rgba(var(--keyColor), 1);
   }
 }
