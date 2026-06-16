@@ -13,7 +13,7 @@ fn default_catalog_contains_expected_migrations() {
             .iter()
             .copied()
             .collect::<Vec<_>>(),
-        vec!["v0.1.0", "v2.7.0", "v2.8.0", "v2.10.0"]
+        vec!["v0.1.0", "v0.2.0"]
     );
 }
 
@@ -37,12 +37,12 @@ fn rejects_duplicate_migration_versions() {
 fn rejects_target_versions_that_diverge_from_catalog_prefix() {
     let migrations = vec![
         Migration::new("v0.1.0", &[], &[]),
-        Migration::new("v2.7.0", &[], &[]),
-        Migration::new("v2.8.0", &[], &[]),
+        Migration::new("v0.2.0", &[], &[]),
+        Migration::new("v0.3.0", &[], &[]),
     ];
 
     let error =
-        MigrationCatalog::with_target_versions(migrations, vec!["v0.1.0", "v2.8.0"]).unwrap_err();
+        MigrationCatalog::with_target_versions(migrations, vec!["v0.1.0", "v0.3.0"]).unwrap_err();
 
     assert_eq!(
         matches!(
@@ -51,7 +51,7 @@ fn rejects_target_versions_that_diverge_from_catalog_prefix() {
                 position: 1,
                 ref expected,
                 ref found,
-            } if expected == "v2.7.0" && found == "v2.8.0"
+            } if expected == "v0.2.0" && found == "v0.3.0"
         ),
         true
     );

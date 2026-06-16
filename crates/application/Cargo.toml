@@ -11,5 +11,8 @@ path = "src/lib.rs"
 workspace = true
 
 [dependencies]
+sonora-contracts = { workspace = true }
+sonora-db = { workspace = true }
 sonora-domain = { workspace = true }
 thiserror = { workspace = true }
+uuid = { workspace = true }

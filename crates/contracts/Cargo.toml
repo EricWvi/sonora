@@ -1,0 +1,15 @@
+[package]
+name = "sonora-contracts"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "sonora_contracts"
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true }
+ts-rs = { workspace = true }

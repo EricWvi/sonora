@@ -4,17 +4,15 @@ version.workspace = true
 edition.workspace = true
 
 [lib]
-name = "sonora_db_server"
+name = "sonora_db"
 path = "src/lib.rs"
 
 [lints]
 workspace = true
 
 [dependencies]
-sonora-application = { workspace = true }
-sonora-domain = { workspace = true }
+sonora-domain = { workspace = true, features = ["sqlx"] }
 sonora-logging = { workspace = true }
-serde_json = { workspace = true }
 sqlx = { workspace = true }
 thiserror = { workspace = true }
 time = { workspace = true }
@@ -26,4 +24,4 @@ uuid = { workspace = true }
 pretty_assertions = { workspace = true }
 testcontainers = { workspace = true }
 testcontainers-modules = { workspace = true }
-time = { workspace = true }
+tokio = { workspace = true }

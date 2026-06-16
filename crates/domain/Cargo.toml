@@ -1,0 +1,20 @@
+[package]
+name = "sonora-domain"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "sonora_domain"
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[features]
+serde = ["dep:serde", "uuid/serde"]
+sqlx = ["dep:sqlx"]
+
+[dependencies]
+serde = { workspace = true, optional = true }
+sqlx = { workspace = true, optional = true }
+uuid = { workspace = true }

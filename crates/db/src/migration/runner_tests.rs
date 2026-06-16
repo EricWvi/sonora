@@ -1,5 +1,5 @@
-use sonora_logging::set_trace_logging;
 use pretty_assertions::assert_eq;
+use sonora_logging::set_trace_logging;
 use sqlx::{Pool, Postgres};
 use testcontainers::ImageExt;
 use testcontainers::runners::AsyncRunner;
@@ -27,8 +27,8 @@ async fn start_postgres() -> (
         .expect("postgres port not available");
     let url = format!("postgres://postgres:postgres@127.0.0.1:{port}/postgres");
 
-    // pgcrypto provides gen_random_uuid() used by schema_v0001;
-    // pg_trgm provides gin trigram operators used by schema_v0002.
+    // pgcrypto provides gen_random_uuid();
+    // pg_trgm provides gin trigram operators.
     let pool = Pool::<Postgres>::connect(&url)
         .await
         .expect("failed to connect for extension setup");
@@ -75,10 +75,7 @@ async fn fresh_database_applies_all_migrations() {
         .await
         .expect("bootstrap failed");
 
-    assert_eq!(
-        applied_versions(&location).await,
-        vec!["v0.1.0", "v2.7.0", "v2.8.0", "v2.10.0"]
-    );
+    assert_eq!(applied_versions(&location).await, vec!["v0.1.0", "v0.2.0"]);
 }
 
 /// Verifies that running bootstrap twice against an already-migrated database is a no-op.
@@ -98,10 +95,7 @@ async fn reconcile_is_idempotent() {
         .await
         .expect("second bootstrap failed");
 
-    assert_eq!(
-        applied_versions(&location).await,
-        vec!["v0.1.0", "v2.7.0", "v2.8.0", "v2.10.0"]
-    );
+    assert_eq!(applied_versions(&location).await, vec!["v0.1.0", "v0.2.0"]);
 }
 
 /// Verifies that narrowing the target prefix causes trailing migrations to be rolled back.
@@ -130,15 +124,14 @@ async fn rollback_removes_trailing_migrations() {
                 .clone()
         })
         .collect();
-    let partial_catalog =
-        MigrationCatalog::with_target_versions(all_migrations, vec!["v0.1.0", "v2.7.0"])
-            .expect("partial catalog build failed");
+    let partial_catalog = MigrationCatalog::with_target_versions(all_migrations, vec!["v0.1.0"])
+        .expect("partial catalog build failed");
 
     bs.bootstrap(&location, &partial_catalog)
         .await
         .expect("rollback bootstrap failed");
 
-    assert_eq!(applied_versions(&location).await, vec!["v0.1.0", "v2.7.0"]);
+    assert_eq!(applied_versions(&location).await, vec!["v0.1.0"]);
 }
 
 /// Verifies that reconciling against a database whose applied history diverges from the

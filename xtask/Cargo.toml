@@ -1,0 +1,22 @@
+[package]
+name = "sonora-xtask"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "sonora_xtask"
+path = "src/lib.rs"
+
+[[bin]]
+name = "xtask"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+sonora-contracts = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }
+tempfile = { workspace = true }

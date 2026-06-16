@@ -53,12 +53,18 @@ tasks:
     cmds:
       - cargo fmt --all
       - cargo clippy --workspace -- -D warnings
+  
+  export-contracts:
+    desc: Regenerate TypeScript contracts and the frontend SDK package
+    cmds:
+      - cargo xtask export-contracts
 
   test:
     desc: Run Rust tests (set RUN_TESTCONTAINERS=1 to include container tests)
     silent: true
     cmds:
       - task: lint
+      - task: export-contracts
       - |
         if [ "${RUN_TESTCONTAINERS:-0}" = "1" ]; then
           cargo test --workspace -- --include-ignored

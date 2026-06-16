@@ -9,8 +9,7 @@ pub enum NodeKind {
 
 /// A single entry in the virtual file system, representing either a directory or a file.
 ///
-/// `parent_id = None` means the node is a direct child of the implicit library root
-/// (`sonora-library`). The root itself is not stored as a Node.
+/// `parent_id = None` means the node sits at the VFS root. There is no root node itself.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Node {
     pub id: NodeId,
