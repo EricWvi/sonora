@@ -1,0 +1,67 @@
+version: "3"
+
+tasks:
+  default:
+    cmds:
+      - task: list
+
+  list:
+    desc: List all tasks in the current project
+    cmds:
+      - task --list
+
+  ###################################################
+  ############## Install Dependencies ###############
+  ###################################################
+
+  install:
+    desc: Install all dependencies for the project
+    cmds:
+      - task: install:frontend
+      - task: install:backend
+
+  install:frontend:
+    desc: Install dependencies for the frontend packages
+    cmds:
+      - pnpm install
+
+  install:backend:
+    desc: Install dependencies for the Rust backend
+    cmds:
+      - cargo fetch
+
+  ###################################################
+  ############## Clean and Build Tasks ##############
+  ###################################################
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -rf node_modules
+      - |
+        {{if eq OS "windows"}}
+        pnpm -r exec -- powershell -NoProfile -Command "if (Test-Path node_modules) { Remove-Item -Recurse -Force node_modules }"
+        {{else}}
+        pnpm -r exec -- rm -rf node_modules
+        {{end}}
+      - pnpm store prune
+      - cargo clean
+
+  lint:
+    desc: Run linters on all crates
+    silent: true
+    cmds:
+      - cargo fmt --all
+      - cargo clippy --workspace -- -D warnings
+
+  test:
+    desc: Run Rust tests (set RUN_TESTCONTAINERS=1 to include container tests)
+    silent: true
+    cmds:
+      - task: lint
+      - |
+        if [ "${RUN_TESTCONTAINERS:-0}" = "1" ]; then
+          cargo test --workspace -- --include-ignored
+        else
+          cargo test --workspace
+        fi

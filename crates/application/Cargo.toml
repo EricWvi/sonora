@@ -1,0 +1,15 @@
+[package]
+name = "sonora-application"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "sonora_application"
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+sonora-domain = { workspace = true }
+thiserror = { workspace = true }
