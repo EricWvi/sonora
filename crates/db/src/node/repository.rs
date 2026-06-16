@@ -274,15 +274,19 @@ impl<T: TimestampSource + Send + Sync> NodeRepository for PostgresNodeRepository
 
 /// Splits a virtual path into its component names.
 ///
-/// Returns `Err(InvalidPath)` when the path is empty.
+/// Both `/` and `\` are accepted as separators. Leading, trailing, and repeated
+/// separators are ignored. Returns `Err(InvalidPath)` when the path produces no
+/// components.
 fn parse_path(path: &str) -> Result<Vec<&str>, NodeRepositoryError> {
-    if path.is_empty() {
+    let components: Vec<&str> = path.split(['/', '\\']).filter(|s| !s.is_empty()).collect();
+
+    if components.is_empty() {
         return Err(NodeRepositoryError::InvalidPath(
             "path must not be empty".to_string(),
         ));
     }
 
-    Ok(path.split('/').collect())
+    Ok(components)
 }
 
 /// Converts a unique-constraint violation from sqlx into a user-facing NameConflict error;

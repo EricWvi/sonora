@@ -15,7 +15,6 @@ pub struct NodeView {
     pub mime_type: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
-    pub server_version: i64,
 }
 
 /// Fields required to create a new directory node.

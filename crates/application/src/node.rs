@@ -49,7 +49,6 @@ fn map_node(n: Node) -> NodeView {
         mime_type: n.mime_type,
         created_at: n.created_at,
         updated_at: n.updated_at,
-        server_version: n.server_version,
     }
 }
 

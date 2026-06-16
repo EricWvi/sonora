@@ -38,12 +38,12 @@ async fn make_repo(location: &DatabaseLocation) -> PostgresNodeRepository<System
     PostgresNodeRepository::new(db.into_pool(), SystemTimestampSource)
 }
 
-// ── create_dir ─────────────────────────────────────────────────────────────
+// ── CD — create_dir ────────────────────────────────────────────────────────
 
-/// Creates a root-level directory and verifies all fields are stored correctly.
+/// CD-01: root-level directory → all fields stored correctly.
 #[tokio::test]
 #[ignore = "requires RUN_TESTCONTAINERS=1"]
-async fn create_dir_at_root() {
+async fn cd_01_root_stores_all_fields() {
     let _guard = set_trace_logging();
     let (_container, location) = start_postgres().await;
     let repo = make_repo(&location).await;
@@ -61,10 +61,10 @@ async fn create_dir_at_root() {
     assert!(!node.is_deleted);
 }
 
-/// Creates a nested directory and verifies the parent link is set.
+/// CD-02: nested directory → parent link set correctly.
 #[tokio::test]
 #[ignore = "requires RUN_TESTCONTAINERS=1"]
-async fn create_dir_nested() {
+async fn cd_02_nested_sets_parent_link() {
     let _guard = set_trace_logging();
     let (_container, location) = start_postgres().await;
     let repo = make_repo(&location).await;
@@ -82,10 +82,10 @@ async fn create_dir_nested() {
     assert_eq!(child.name, "Classic Rock");
 }
 
-/// Two directories with the same name under the same parent must be rejected.
+/// CD-03: duplicate name under same parent → NameConflict.
 #[tokio::test]
 #[ignore = "requires RUN_TESTCONTAINERS=1"]
-async fn create_dir_duplicate_name_is_rejected() {
+async fn cd_03_duplicate_name_returns_conflict() {
     let _guard = set_trace_logging();
     let (_container, location) = start_postgres().await;
     let repo = make_repo(&location).await;
@@ -102,12 +102,12 @@ async fn create_dir_duplicate_name_is_rejected() {
     assert!(matches!(err, NodeRepositoryError::NameConflict { .. }));
 }
 
-// ── create_file ────────────────────────────────────────────────────────────
+// ── CF — create_file ───────────────────────────────────────────────────────
 
-/// Creates a file with size and MIME type and verifies the stored snapshot.
+/// CF-01: file with size and MIME type → all fields stored correctly.
 #[tokio::test]
 #[ignore = "requires RUN_TESTCONTAINERS=1"]
-async fn create_file_with_metadata() {
+async fn cf_01_with_metadata_stores_all_fields() {
     let _guard = set_trace_logging();
     let (_container, location) = start_postgres().await;
     let repo = make_repo(&location).await;
@@ -135,12 +135,12 @@ async fn create_file_with_metadata() {
     assert!(!file.is_deleted);
 }
 
-// ── get_node_by_id ─────────────────────────────────────────────────────────
+// ── GI — get_node_by_id ───────────────────────────────────────────────────
 
-/// Round-trips a node through the repository and compares the full struct.
+/// GI-01: existing id → full node returned.
 #[tokio::test]
 #[ignore = "requires RUN_TESTCONTAINERS=1"]
-async fn get_node_by_id_returns_stored_node() {
+async fn gi_01_existing_id_returns_node() {
     let _guard = set_trace_logging();
     let (_container, location) = start_postgres().await;
     let repo = make_repo(&location).await;
@@ -159,10 +159,10 @@ async fn get_node_by_id_returns_stored_node() {
     assert_eq!(created, fetched);
 }
 
-/// Returns `None` for an ID that was never inserted.
+/// GI-02: unknown id → None.
 #[tokio::test]
 #[ignore = "requires RUN_TESTCONTAINERS=1"]
-async fn get_node_by_id_returns_none_for_unknown_id() {
+async fn gi_02_unknown_id_returns_none() {
     let _guard = set_trace_logging();
     let (_container, location) = start_postgres().await;
     let repo = make_repo(&location).await;
@@ -175,12 +175,12 @@ async fn get_node_by_id_returns_none_for_unknown_id() {
     assert_eq!(result, None);
 }
 
-// ── get_node_by_path ───────────────────────────────────────────────────────
+// ── GP — get_node_by_path ─────────────────────────────────────────────────
 
-/// Resolves a three-level virtual path to the correct file node.
+/// GP-01: three-level path → correct file node returned.
 #[tokio::test]
 #[ignore = "requires RUN_TESTCONTAINERS=1"]
-async fn get_node_by_path_resolves_deep_path() {
+async fn gp_01_deep_path_returns_node() {
     let _guard = set_trace_logging();
     let (_container, location) = start_postgres().await;
     let repo = make_repo(&location).await;
@@ -212,10 +212,10 @@ async fn get_node_by_path_resolves_deep_path() {
     assert_eq!(track, found);
 }
 
-/// Returns `None` when a path component is missing.
+/// GP-02: path with a missing component → None.
 #[tokio::test]
 #[ignore = "requires RUN_TESTCONTAINERS=1"]
-async fn get_node_by_path_returns_none_for_missing_component() {
+async fn gp_02_missing_component_returns_none() {
     let _guard = set_trace_logging();
     let (_container, location) = start_postgres().await;
     let repo = make_repo(&location).await;
@@ -228,12 +228,12 @@ async fn get_node_by_path_returns_none_for_missing_component() {
     assert_eq!(result, None);
 }
 
-//── list_children ──────────────────────────────────────────────────────────
+// ── LC — list_children ────────────────────────────────────────────────────
 
-/// Lists root-level children and verifies directories are returned before files.
+/// LC-01: root contains a directory and a file → directories returned before files.
 #[tokio::test]
 #[ignore = "requires RUN_TESTCONTAINERS=1"]
-async fn list_children_returns_directories_before_files() {
+async fn lc_01_dirs_returned_before_files() {
     let _guard = set_trace_logging();
     let (_container, location) = start_postgres().await;
     let repo = make_repo(&location).await;
@@ -262,10 +262,10 @@ async fn list_children_returns_directories_before_files() {
     assert_eq!(children[1].name, "compilation.flac");
 }
 
-/// Returns an empty vec when the directory has no children.
+/// LC-02: directory with no children → empty vec.
 #[tokio::test]
 #[ignore = "requires RUN_TESTCONTAINERS=1"]
-async fn list_children_returns_empty_for_leaf_dir() {
+async fn lc_02_empty_dir_returns_empty_vec() {
     let _guard = set_trace_logging();
     let (_container, location) = start_postgres().await;
     let repo = make_repo(&location).await;
@@ -283,12 +283,12 @@ async fn list_children_returns_empty_for_leaf_dir() {
     assert_eq!(children, Vec::<Node>::new());
 }
 
-// ── move_node ──────────────────────────────────────────────────────────────
+// ── MN — move_node ────────────────────────────────────────────────────────
 
-/// Renames a node in place (same parent, new name).
+/// MN-01: same parent, new name → node renamed in place.
 #[tokio::test]
 #[ignore = "requires RUN_TESTCONTAINERS=1"]
-async fn move_node_renames_in_place() {
+async fn mn_01_same_parent_renames_node() {
     let _guard = set_trace_logging();
     let (_container, location) = start_postgres().await;
     let repo = make_repo(&location).await;
@@ -308,10 +308,10 @@ async fn move_node_renames_in_place() {
     assert_eq!(renamed.parent_id, None);
 }
 
-/// Moves a node to a different parent directory.
+/// MN-02: different parent → parent_id updated.
 #[tokio::test]
 #[ignore = "requires RUN_TESTCONTAINERS=1"]
-async fn move_node_reparents_to_new_directory() {
+async fn mn_02_new_parent_updates_parent_id() {
     let _guard = set_trace_logging();
     let (_container, location) = start_postgres().await;
     let repo = make_repo(&location).await;
@@ -338,10 +338,10 @@ async fn move_node_reparents_to_new_directory() {
     assert_eq!(moved.name, "Child");
 }
 
-/// Returns `NotFound` when the node being moved does not exist.
+/// MN-03: unknown node id → NotFound.
 #[tokio::test]
 #[ignore = "requires RUN_TESTCONTAINERS=1"]
-async fn move_node_returns_not_found_for_unknown_id() {
+async fn mn_03_unknown_id_returns_not_found() {
     let _guard = set_trace_logging();
     let (_container, location) = start_postgres().await;
     let repo = make_repo(&location).await;
@@ -355,10 +355,10 @@ async fn move_node_returns_not_found_for_unknown_id() {
     assert!(matches!(err, NodeRepositoryError::NotFound(_)));
 }
 
-/// Moving a node to a destination where its name already exists returns NameConflict.
+/// MN-04: target name already taken at destination → NameConflict.
 #[tokio::test]
 #[ignore = "requires RUN_TESTCONTAINERS=1"]
-async fn move_node_returns_conflict_when_name_taken() {
+async fn mn_04_name_taken_returns_conflict() {
     let _guard = set_trace_logging();
     let (_container, location) = start_postgres().await;
     let repo = make_repo(&location).await;
@@ -380,12 +380,12 @@ async fn move_node_returns_conflict_when_name_taken() {
     assert!(matches!(err, NodeRepositoryError::NameConflict { .. }));
 }
 
-// ── delete_node ────────────────────────────────────────────────────────────
+// ── DN — delete_node ──────────────────────────────────────────────────────
 
-/// Soft-deletes a single file and verifies it no longer appears in queries.
+/// DN-01: file deleted → no longer visible via get_node_by_id.
 #[tokio::test]
 #[ignore = "requires RUN_TESTCONTAINERS=1"]
-async fn delete_node_removes_file() {
+async fn dn_01_file_no_longer_visible_after_delete() {
     let _guard = set_trace_logging();
     let (_container, location) = start_postgres().await;
     let repo = make_repo(&location).await;
@@ -407,10 +407,10 @@ async fn delete_node_removes_file() {
     assert_eq!(result, None);
 }
 
-/// Deleting a non-empty directory recursively soft-deletes the entire subtree.
+/// DN-02: directory with nested children deleted → entire subtree soft-deleted.
 #[tokio::test]
 #[ignore = "requires RUN_TESTCONTAINERS=1"]
-async fn delete_node_recursively_deletes_subtree() {
+async fn dn_02_directory_recursively_deletes_subtree() {
     let _guard = set_trace_logging();
     let (_container, location) = start_postgres().await;
     let repo = make_repo(&location).await;
@@ -442,10 +442,10 @@ async fn delete_node_recursively_deletes_subtree() {
     assert_eq!(repo.get_node_by_id(track.id).await.unwrap(), None);
 }
 
-/// Returns `NotFound` when deleting an ID that does not exist.
+/// DN-03: unknown id → NotFound.
 #[tokio::test]
 #[ignore = "requires RUN_TESTCONTAINERS=1"]
-async fn delete_node_returns_not_found_for_unknown_id() {
+async fn dn_03_unknown_id_returns_not_found() {
     let _guard = set_trace_logging();
     let (_container, location) = start_postgres().await;
     let repo = make_repo(&location).await;
@@ -458,10 +458,10 @@ async fn delete_node_returns_not_found_for_unknown_id() {
     assert!(matches!(err, NodeRepositoryError::NotFound(_)));
 }
 
-/// After soft-deleting a node, the same name can be reused under the same parent.
+/// DN-04: name reused after soft-delete → new node created with a different id.
 #[tokio::test]
 #[ignore = "requires RUN_TESTCONTAINERS=1"]
-async fn deleted_name_can_be_reused() {
+async fn dn_04_deleted_name_can_be_reused() {
     let _guard = set_trace_logging();
     let (_container, location) = start_postgres().await;
     let repo = make_repo(&location).await;
@@ -482,12 +482,12 @@ async fn deleted_name_can_be_reused() {
     assert_eq!(reused.name, "Funk");
 }
 
-// ── exists ─────────────────────────────────────────────────────────────────
+// ── EX — exists ───────────────────────────────────────────────────────────
 
-/// Returns `true` for a path that exists and `false` for one that does not.
+/// EX-01: known path → true; unknown path → false.
 #[tokio::test]
 #[ignore = "requires RUN_TESTCONTAINERS=1"]
-async fn exists_returns_true_for_known_path_and_false_for_missing() {
+async fn ex_01_known_path_true_unknown_path_false() {
     let _guard = set_trace_logging();
     let (_container, location) = start_postgres().await;
     let repo = make_repo(&location).await;
@@ -500,12 +500,12 @@ async fn exists_returns_true_for_known_path_and_false_for_missing() {
     assert!(!repo.exists("Classical").await.expect("exists failed"));
 }
 
-// ── get_path ───────────────────────────────────────────────────────────────
+// ── PT — get_path ─────────────────────────────────────────────────────────
 
-/// Resolves the full virtual path of a deeply nested node.
+/// PT-01: deeply nested node → full slash-separated path returned.
 #[tokio::test]
 #[ignore = "requires RUN_TESTCONTAINERS=1"]
-async fn get_path_resolves_nested_node() {
+async fn pt_01_nested_node_returns_full_path() {
     let _guard = set_trace_logging();
     let (_container, location) = start_postgres().await;
     let repo = make_repo(&location).await;
@@ -533,10 +533,10 @@ async fn get_path_resolves_nested_node() {
     assert_eq!(path, "Rock/Led Zeppelin IV/Stairway to Heaven.flac");
 }
 
-/// Returns the correct path for a root-level node.
+/// PT-02: root-level node → single name returned with no separator.
 #[tokio::test]
 #[ignore = "requires RUN_TESTCONTAINERS=1"]
-async fn get_path_of_root_level_node() {
+async fn pt_02_root_node_returns_single_name() {
     let _guard = set_trace_logging();
     let (_container, location) = start_postgres().await;
     let repo = make_repo(&location).await;
@@ -551,10 +551,10 @@ async fn get_path_of_root_level_node() {
     assert_eq!(path, "Folk");
 }
 
-/// Returns `NotFound` for a node ID that does not exist.
+/// PT-03: unknown id → NotFound.
 #[tokio::test]
 #[ignore = "requires RUN_TESTCONTAINERS=1"]
-async fn get_path_returns_not_found_for_unknown_id() {
+async fn pt_03_unknown_id_returns_not_found() {
     let _guard = set_trace_logging();
     let (_container, location) = start_postgres().await;
     let repo = make_repo(&location).await;
