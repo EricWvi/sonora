@@ -6,6 +6,10 @@
 
 ## Overview
 
+> **Note**: `apps/web/client` and `apps/web/server` are empty placeholders. No frontend code exists yet.
+> The TypeScript contract layer in `packages/contracts/` is generated — do not hand-edit those files.
+> Fill these spec files once the first frontend implementation is underway.
+
 This directory contains guidelines for frontend development. Fill in each file with your project's specific conventions.
 
 ---

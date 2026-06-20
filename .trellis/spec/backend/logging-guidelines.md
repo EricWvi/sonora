@@ -6,46 +6,95 @@
 
 ## Overview
 
-<!--
-Document your project's logging conventions here.
-
-Questions to answer:
-- What logging library do you use?
-- What are the log levels and when to use each?
-- What should be logged?
-- What should NOT be logged (PII, secrets)?
--->
-
-(To be filled by the team)
+All logging goes through the `sonora-logging` crate. Never call `tracing::` macros directly — use the `sonora_*!` wrappers which auto-attach the caller's `method` field.
 
 ---
 
-## Log Levels
+## Macros
 
-<!-- When to use each level: debug, info, warn, error -->
+```rust
+use sonora_logging::{sonora_debug, sonora_info, sonora_warn, sonora_error};
 
-(To be filled by the team)
+sonora_info!(
+    message = "opening database pool",
+    operation = "database_open"
+);
+
+sonora_error!(
+    message = "failed to open database pool",
+    operation = "database_open",
+    error.kind = "database_open",
+    error.message = error.to_string()
+);
+```
+
+Each macro transparently adds `method = <caller function name>` to the tracing event. The macro uses a sentinel inner function trick to capture the type name at compile time — do not replicate this; just use the macros.
 
 ---
 
-## Structured Logging
+## Field Naming Conventions
 
-<!-- Log format, required fields -->
+| Field | Type | Meaning |
+|-------|------|---------|
+| `message` | `&str` | Human-readable event description |
+| `operation` | `&str` | Machine-readable operation identifier (e.g. `"database_open"`) |
+| `method` | auto | Caller function name — injected by the macro |
+| `error.kind` | `&str` | Error category (e.g. `"database_open"`) |
+| `error.message` | `String` | `error.to_string()` |
 
-(To be filled by the team)
+Use `snake_case` for all field names. Group related sub-fields with a `.` prefix (e.g., `error.kind`, `error.message`).
 
 ---
 
-## What to Log
+## Correlation Spans
 
-<!-- Important events to log -->
+For request-scoped tracing, create spans with the helpers in `sonora-logging`:
 
-(To be filled by the team)
+```rust
+use sonora_logging::{runtime_span, span_with_trace_id, span_with_request_id};
+
+// Basic named span
+let _span = runtime_span("handle_request").entered();
+
+// Span with a stable trace-id from an upstream caller
+let _span = span_with_trace_id("handle_request", &trace_id).entered();
+
+// Span with a per-request id for fan-out tracing
+let _span = span_with_request_id("handle_request", &request_id).entered();
+```
+
+All three helpers attach `trace_id` and `request_id` as empty fields upfront so the `CorrelationLayer` can fill them in at event time.
+
+---
+
+## Clock
+
+Use `sonora_logging::clock::now_local()` instead of `OffsetDateTime::now_local()`.
+
+---
+
+## Test Logging
+
+Every async test that touches a repository or any tracing callsite must install a TRACE subscriber to avoid callsite-caching false negatives:
+
+```rust
+#[tokio::test]
+#[ignore = "requires RUN_TESTCONTAINERS=1"]
+async fn my_test() {
+    let _guard = set_trace_logging(); // must be first; held until test completes
+    // ...
+}
+```
+
+For synchronous tests use `with_trace_logging(|| { ... })`.
+
+For tests that assert on structured log events use `with_recorded_trace_logging(layer, || { ... })`.
 
 ---
 
 ## What NOT to Log
 
-<!-- Sensitive data, PII, secrets -->
-
-(To be filled by the team)
+- PII (user email, names, device info)
+- Secrets or tokens
+- File content (even on debug level)
+- Full SQL query results — log identifiers and counts only
