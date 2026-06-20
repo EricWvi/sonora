@@ -1,0 +1,28 @@
+[package]
+name = "sonora-web-server"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "sonora_web_server"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+sonora-application = { workspace = true }
+sonora-contracts = { workspace = true }
+sonora-db = { workspace = true }
+sonora-logging = { workspace = true }
+axum = { workspace = true }
+dotenvy = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }
+tracing = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }

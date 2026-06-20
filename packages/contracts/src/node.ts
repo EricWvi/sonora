@@ -26,6 +26,26 @@ export type CreateFileRequest = {
 export type CreateFileResponse = { node: NodeView };
 
 /**
+ * Frontend SDK request for soft-deleting a node.
+ */
+export type DeleteNodeRequest = { id: string };
+
+/**
+ * Frontend SDK request for fetching a single node by id.
+ */
+export type GetNodeByIdRequest = { id: string };
+
+/**
+ * Frontend SDK request for resolving a virtual path to a node.
+ */
+export type GetNodeByPathRequest = { path: string };
+
+/**
+ * Frontend SDK request for resolving the full virtual path of a node.
+ */
+export type GetNodePathRequest = { id: string };
+
+/**
  * Returns a single node looked up by id or path.
  */
 export type GetNodeResponse = { node: NodeView };
@@ -36,9 +56,19 @@ export type GetNodeResponse = { node: NodeView };
 export type GetPathResponse = { path: string };
 
 /**
+ * Frontend SDK request for listing the direct children of a directory.
+ */
+export type ListChildrenRequest = { id: string };
+
+/**
  * Returns the direct children of a directory.
  */
 export type ListChildrenResponse = { nodes: Array<NodeView> };
+
+/**
+ * Frontend SDK request for listing root-level nodes (no parameters required).
+ */
+export type ListRootChildrenRequest = Record<symbol, never>;
 
 /**
  * Fields required to move or rename a node.
@@ -49,6 +79,23 @@ export type MoveNodeRequest = { newParentId: string | null; newName: string };
  * Returns the node after a successful move or rename.
  */
 export type MoveNodeResponse = { node: NodeView };
+
+/**
+ * Frontend SDK request for move/rename: combines the path-level node id with the body fields.
+ *
+ * Defined separately from [`MoveNodeRequest`] so the SDK caller passes a single flat object
+ * instead of composing the id and body separately.
+ */
+export type MoveNodeWithIdRequest = {
+  id: string;
+  newParentId: string | null;
+  newName: string;
+};
+
+/**
+ * Frontend SDK request for checking whether a node exists at a virtual path.
+ */
+export type NodeExistsRequest = { path: string };
 
 /**
  * Public representation of a VFS node shared across all node responses.
@@ -65,5 +112,4 @@ export type NodeView = {
   mimeType: string | null;
   createdAt: bigint;
   updatedAt: bigint;
-  serverVersion: bigint;
 };

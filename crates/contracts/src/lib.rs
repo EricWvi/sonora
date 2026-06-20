@@ -3,8 +3,10 @@ mod node;
 
 pub use frontend::{FrontendEndpoint, FrontendHttpMethod, FrontendPathParam, frontend_endpoints};
 pub use node::{
-    CreateDirRequest, CreateDirResponse, CreateFileRequest, CreateFileResponse, GetNodeResponse,
-    GetPathResponse, ListChildrenResponse, MoveNodeRequest, MoveNodeResponse, NodeView,
+    CreateDirRequest, CreateDirResponse, CreateFileRequest, CreateFileResponse, DeleteNodeRequest,
+    GetNodeByIdRequest, GetNodeByPathRequest, GetNodePathRequest, GetNodeResponse, GetPathResponse,
+    ListChildrenRequest, ListChildrenResponse, ListRootChildrenRequest, MoveNodeRequest,
+    MoveNodeResponse, MoveNodeWithIdRequest, NodeExistsRequest, NodeView,
 };
 
 use std::path::Path;
@@ -25,6 +27,14 @@ pub fn export_typescript_bindings_to(
     ListChildrenResponse::export(&config)?;
     MoveNodeRequest::export(&config)?;
     MoveNodeResponse::export(&config)?;
+    MoveNodeWithIdRequest::export(&config)?;
+    GetNodeByIdRequest::export(&config)?;
+    ListChildrenRequest::export(&config)?;
+    GetNodePathRequest::export(&config)?;
+    DeleteNodeRequest::export(&config)?;
+    GetNodeByPathRequest::export(&config)?;
+    NodeExistsRequest::export(&config)?;
+    ListRootChildrenRequest::export(&config)?;
     GetPathResponse::export(&config)?;
 
     Ok(())

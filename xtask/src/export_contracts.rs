@@ -85,6 +85,7 @@ fn render_endpoints_module(endpoints: &[FrontendEndpoint]) -> String {
     source.push_str("  requestType: string;\n");
     source.push_str("  responseType: string;\n");
     source.push_str("  pathParams: readonly EndpointPathParam[];\n");
+    source.push_str("  queryParams: readonly EndpointPathParam[];\n");
     source.push_str("  hasJsonBody: boolean;\n");
     source.push_str("};\n\n");
     source.push_str("export type RequestByOperation = {\n");
@@ -132,7 +133,10 @@ fn render_endpoints_module(endpoints: &[FrontendEndpoint]) -> String {
         source.push_str(endpoint.response_type);
         source.push_str("\",\n");
         source.push_str("    pathParams: ");
-        source.push_str(&render_path_params(endpoint.path_params));
+        source.push_str(&render_param_array(endpoint.path_params));
+        source.push_str(",\n");
+        source.push_str("    queryParams: ");
+        source.push_str(&render_param_array(endpoint.query_params));
         source.push_str(",\n");
         source.push_str("    hasJsonBody: ");
         source.push_str(if endpoint.has_json_body {
@@ -234,8 +238,9 @@ fn render_client_module(endpoints: &[FrontendEndpoint]) -> String {
     source.push_str("  transport: ContractTransport,\n");
     source.push_str("): Promise<ResponseByOperation[Operation]> {\n");
     source.push_str("  const endpoint = endpoints[operation];\n");
-    source.push_str("  const path = buildPath(endpoint.pathTemplate, endpoint.pathParams, request as ClientRequestShape);\n");
-    source.push_str("  const body = buildJsonBody(endpoint.pathParams, endpoint.hasJsonBody, request as ClientRequestShape);\n");
+    source.push_str("  const queryString = buildQueryString(endpoint.queryParams, request as ClientRequestShape);\n");
+    source.push_str("  const path = buildPath(endpoint.pathTemplate, endpoint.pathParams, request as ClientRequestShape) + queryString;\n");
+    source.push_str("  const body = buildJsonBody(endpoint.pathParams, endpoint.queryParams, endpoint.hasJsonBody, request as ClientRequestShape);\n");
     source.push_str("  const transportRequest: ContractTransportRequest = {\n");
     source.push_str("    operationName: endpoint.operationName,\n");
     source.push_str("    method: endpoint.method,\n");
@@ -263,8 +268,27 @@ fn render_client_module(endpoints: &[FrontendEndpoint]) -> String {
     source.push_str("  }\n\n");
     source.push_str("  return path;\n");
     source.push_str("}\n\n");
+    source.push_str("function buildQueryString(\n");
+    source.push_str("  queryParams: readonly EndpointPathParam[],\n");
+    source.push_str("  request: ClientRequestShape,\n");
+    source.push_str("): string {\n");
+    source.push_str("  if (queryParams.length === 0) {\n");
+    source.push_str("    return \"\";\n");
+    source.push_str("  }\n\n");
+    source.push_str("  const requestRecord = request as Record<string, unknown>;\n");
+    source.push_str("  const params = new URLSearchParams();\n\n");
+    source.push_str("  for (const queryParam of queryParams) {\n");
+    source.push_str("    const value = requestRecord[queryParam.wireName];\n\n");
+    source.push_str("    if (value !== undefined && value !== null) {\n");
+    source.push_str("      params.set(queryParam.wireName, String(value));\n");
+    source.push_str("    }\n");
+    source.push_str("  }\n\n");
+    source.push_str("  const queryString = params.toString();\n");
+    source.push_str("  return queryString === \"\" ? \"\" : `?${queryString}`;\n");
+    source.push_str("}\n\n");
     source.push_str("function buildJsonBody(\n");
     source.push_str("  pathParams: readonly EndpointPathParam[],\n");
+    source.push_str("  queryParams: readonly EndpointPathParam[],\n");
     source.push_str("  hasJsonBody: boolean,\n");
     source.push_str("  request: ClientRequestShape,\n");
     source.push_str("): Record<string, unknown> | undefined {\n");
@@ -273,10 +297,10 @@ fn render_client_module(endpoints: &[FrontendEndpoint]) -> String {
     source.push_str("  }\n\n");
     source.push_str("  const requestRecord = request as Record<string, unknown>;\n");
     source.push_str(
-        "  const pathParamNames = new Set(pathParams.map((pathParam) => pathParam.wireName));\n\n",
+        "  const excludedNames = new Set([...pathParams, ...queryParams].map((p) => p.wireName));\n\n",
     );
     source.push_str("  return Object.fromEntries(\n");
-    source.push_str("    Object.entries(requestRecord).filter(([fieldName]) => !pathParamNames.has(fieldName)),\n");
+    source.push_str("    Object.entries(requestRecord).filter(([fieldName]) => !excludedNames.has(fieldName)),\n");
     source.push_str("  );\n");
     source.push_str("}\n\n");
     source.push_str("function buildHeaders(hasJsonBody: boolean): Record<string, string> {\n");
@@ -397,27 +421,37 @@ fn render_index_module() -> String {
 }
 
 /// Collects the TypeScript DTO imports needed by the generated endpoint manifest.
+///
+/// Inline types (e.g. `{ id: string }`) and primitives (`boolean`, `void`, `null`) return
+/// `None` from [`contract_module_for_type`] and are skipped — they need no import statement.
 fn collect_contract_type_imports(
     endpoints: &[FrontendEndpoint],
 ) -> BTreeMap<&'static str, BTreeSet<&'static str>> {
-    let mut imports = BTreeMap::new();
+    let mut imports: BTreeMap<&'static str, BTreeSet<&'static str>> = BTreeMap::new();
 
     for endpoint in endpoints {
-        imports
-            .entry(contract_module_for_type(endpoint.request_type))
-            .or_insert_with(BTreeSet::new)
-            .insert(endpoint.request_type);
-        imports
-            .entry(contract_module_for_type(endpoint.response_type))
-            .or_insert_with(BTreeSet::new)
-            .insert(endpoint.response_type);
+        if let Some(module) = contract_module_for_type(endpoint.request_type) {
+            imports
+                .entry(module)
+                .or_default()
+                .insert(endpoint.request_type);
+        }
+        if let Some(module) = contract_module_for_type(endpoint.response_type) {
+            imports
+                .entry(module)
+                .or_default()
+                .insert(endpoint.response_type);
+        }
     }
 
     imports
 }
 
 /// Maps one exported contract type name to the TypeScript module that contains it.
-fn contract_module_for_type(type_name: &str) -> &'static str {
+///
+/// Returns `None` for inline object types, primitive types, and utility types that need
+/// no import statement.
+fn contract_module_for_type(type_name: &str) -> Option<&'static str> {
     match type_name {
         "NodeView"
         | "CreateDirRequest"
@@ -428,8 +462,17 @@ fn contract_module_for_type(type_name: &str) -> &'static str {
         | "ListChildrenResponse"
         | "MoveNodeRequest"
         | "MoveNodeResponse"
-        | "GetPathResponse" => "node",
-        other => panic!("unknown contract type `{other}`"),
+        | "MoveNodeWithIdRequest"
+        | "GetPathResponse"
+        | "GetNodeByIdRequest"
+        | "ListChildrenRequest"
+        | "GetNodePathRequest"
+        | "DeleteNodeRequest"
+        | "GetNodeByPathRequest"
+        | "NodeExistsRequest"
+        | "ListRootChildrenRequest" => Some("node"),
+        // Primitive types and utility types need no import.
+        _ => None,
     }
 }
 
@@ -443,25 +486,25 @@ fn render_http_method(endpoint: &FrontendEndpoint) -> &'static str {
     }
 }
 
-/// Renders the endpoint path parameter metadata into a TypeScript array literal.
-fn render_path_params(path_params: &[FrontendPathParam]) -> String {
-    if path_params.is_empty() {
+/// Renders a path or query parameter array into a TypeScript array literal.
+fn render_param_array(params: &[FrontendPathParam]) -> String {
+    if params.is_empty() {
         return "[]".to_string();
     }
 
     let mut rendered = String::from("[");
 
-    for (index, path_param) in path_params.iter().enumerate() {
+    for (index, param) in params.iter().enumerate() {
         if index > 0 {
             rendered.push_str(", ");
         }
 
         rendered.push_str("{ ");
         rendered.push_str("rustFieldName: \"");
-        rendered.push_str(path_param.rust_field_name);
+        rendered.push_str(param.rust_field_name);
         rendered.push_str("\", ");
         rendered.push_str("wireName: \"");
-        rendered.push_str(path_param.wire_name);
+        rendered.push_str(param.wire_name);
         rendered.push_str("\" }");
     }
 
@@ -493,13 +536,61 @@ mod tests {
         assert!(!module.contains("authenticated"));
     }
 
-    /// Verifies the generated client strips path params from JSON request bodies.
+    /// Verifies all 10 node operations appear in the endpoint manifest.
     #[test]
-    fn renders_client_with_path_body_split_helper() {
+    fn renders_all_node_operations() {
+        let module = render_endpoints_module(frontend_endpoints());
+
+        for op in [
+            "createDir",
+            "createFile",
+            "getNodeByPath",
+            "nodeExists",
+            "listRootChildren",
+            "getNodeById",
+            "listChildren",
+            "getNodePath",
+            "moveNode",
+            "deleteNode",
+        ] {
+            assert!(module.contains(op), "missing operation `{op}`");
+        }
+    }
+
+    /// Verifies the endpoint type definition includes `queryParams`.
+    #[test]
+    fn renders_endpoint_definition_with_query_params_field() {
+        let module = render_endpoints_module(frontend_endpoints());
+
+        assert!(module.contains("queryParams: readonly EndpointPathParam[]"));
+    }
+
+    /// Verifies `getNodeByPath` and `nodeExists` have non-empty `queryParams`.
+    #[test]
+    fn renders_query_params_for_path_and_exists_operations() {
+        let module = render_endpoints_module(frontend_endpoints());
+
+        // Both operations have path: string as a query param
+        assert!(module.contains("wireName: \"path\""));
+    }
+
+    /// Verifies the generated client strips path params and query params from JSON request bodies.
+    #[test]
+    fn renders_client_with_path_and_query_body_split_helper() {
         let module = render_client_module(frontend_endpoints());
 
         assert!(module.contains("Object.entries(requestRecord).filter"));
         assert!(module.contains("missing path parameter"));
+        assert!(module.contains("excludedNames"));
+    }
+
+    /// Verifies `buildQueryString` is present in the generated client.
+    #[test]
+    fn renders_client_with_query_string_builder() {
+        let module = render_client_module(frontend_endpoints());
+
+        assert!(module.contains("buildQueryString"));
+        assert!(module.contains("URLSearchParams"));
     }
 
     /// Verifies the generated client does not include any auth header logic.

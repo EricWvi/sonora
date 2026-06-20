@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "apps/web/server",
     "crates/application",
     "crates/contracts",
     "crates/db",
@@ -22,8 +23,10 @@ sonora-domain = { path = "crates/domain" }
 sonora-logging = { path = "crates/logging" }
 
 # External
+axum = "0.8"
 chrono = "0.4"
 chrono-tz = "0.10"
+dotenvy = "0.15"
 pretty_assertions = "1"
 ts-rs = { version = "12.0", features = ["format"] }
 serde = { version = "1", features = ["derive"] }

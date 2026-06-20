@@ -10,6 +10,16 @@ export type ContractsClient = {
 
 export function createContractsClient(transport: ContractTransport): ContractsClient {
   return {
+    createDir: (request) => executeOperation("createDir", request, transport),
+    createFile: (request) => executeOperation("createFile", request, transport),
+    getNodeByPath: (request) => executeOperation("getNodeByPath", request, transport),
+    nodeExists: (request) => executeOperation("nodeExists", request, transport),
+    listRootChildren: (request) => executeOperation("listRootChildren", request, transport),
+    getNodeById: (request) => executeOperation("getNodeById", request, transport),
+    listChildren: (request) => executeOperation("listChildren", request, transport),
+    getNodePath: (request) => executeOperation("getNodePath", request, transport),
+    moveNode: (request) => executeOperation("moveNode", request, transport),
+    deleteNode: (request) => executeOperation("deleteNode", request, transport),
   };
 }
 
@@ -19,8 +29,9 @@ async function executeOperation<Operation extends EndpointOperation>(
   transport: ContractTransport,
 ): Promise<ResponseByOperation[Operation]> {
   const endpoint = endpoints[operation];
-  const path = buildPath(endpoint.pathTemplate, endpoint.pathParams, request as ClientRequestShape);
-  const body = buildJsonBody(endpoint.pathParams, endpoint.hasJsonBody, request as ClientRequestShape);
+  const queryString = buildQueryString(endpoint.queryParams, request as ClientRequestShape);
+  const path = buildPath(endpoint.pathTemplate, endpoint.pathParams, request as ClientRequestShape) + queryString;
+  const body = buildJsonBody(endpoint.pathParams, endpoint.queryParams, endpoint.hasJsonBody, request as ClientRequestShape);
   const transportRequest: ContractTransportRequest = {
     operationName: endpoint.operationName,
     method: endpoint.method,
@@ -53,8 +64,32 @@ function buildPath(
   return path;
 }
 
+function buildQueryString(
+  queryParams: readonly EndpointPathParam[],
+  request: ClientRequestShape,
+): string {
+  if (queryParams.length === 0) {
+    return "";
+  }
+
+  const requestRecord = request as Record<string, unknown>;
+  const params = new URLSearchParams();
+
+  for (const queryParam of queryParams) {
+    const value = requestRecord[queryParam.wireName];
+
+    if (value !== undefined && value !== null) {
+      params.set(queryParam.wireName, String(value));
+    }
+  }
+
+  const queryString = params.toString();
+  return queryString === "" ? "" : `?${queryString}`;
+}
+
 function buildJsonBody(
   pathParams: readonly EndpointPathParam[],
+  queryParams: readonly EndpointPathParam[],
   hasJsonBody: boolean,
   request: ClientRequestShape,
 ): Record<string, unknown> | undefined {
@@ -63,10 +98,10 @@ function buildJsonBody(
   }
 
   const requestRecord = request as Record<string, unknown>;
-  const pathParamNames = new Set(pathParams.map((pathParam) => pathParam.wireName));
+  const excludedNames = new Set([...pathParams, ...queryParams].map((p) => p.wireName));
 
   return Object.fromEntries(
-    Object.entries(requestRecord).filter(([fieldName]) => !pathParamNames.has(fieldName)),
+    Object.entries(requestRecord).filter(([fieldName]) => !excludedNames.has(fieldName)),
   );
 }
 

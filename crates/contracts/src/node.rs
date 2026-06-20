@@ -93,3 +93,70 @@ pub struct MoveNodeResponse {
 pub struct GetPathResponse {
     pub path: String,
 }
+
+/// Frontend SDK request for move/rename: combines the path-level node id with the body fields.
+///
+/// Defined separately from [`MoveNodeRequest`] so the SDK caller passes a single flat object
+/// instead of composing the id and body separately.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "node.ts")]
+pub struct MoveNodeWithIdRequest {
+    pub id: String,
+    pub new_parent_id: Option<String>,
+    pub new_name: String,
+}
+
+/// Frontend SDK request for fetching a single node by id.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "node.ts")]
+pub struct GetNodeByIdRequest {
+    pub id: String,
+}
+
+/// Frontend SDK request for listing the direct children of a directory.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "node.ts")]
+pub struct ListChildrenRequest {
+    pub id: String,
+}
+
+/// Frontend SDK request for resolving the full virtual path of a node.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "node.ts")]
+pub struct GetNodePathRequest {
+    pub id: String,
+}
+
+/// Frontend SDK request for soft-deleting a node.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "node.ts")]
+pub struct DeleteNodeRequest {
+    pub id: String,
+}
+
+/// Frontend SDK request for resolving a virtual path to a node.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "node.ts")]
+pub struct GetNodeByPathRequest {
+    pub path: String,
+}
+
+/// Frontend SDK request for checking whether a node exists at a virtual path.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "node.ts")]
+pub struct NodeExistsRequest {
+    pub path: String,
+}
+
+/// Frontend SDK request for listing root-level nodes (no parameters required).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "node.ts")]
+pub struct ListRootChildrenRequest {}
