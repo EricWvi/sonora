@@ -110,6 +110,14 @@ export type NodeView = {
   kind: string;
   size: bigint | null;
   mimeType: string | null;
+  /**
+   * MD5 hex digest of the latest file content; `null` until the first upload completes.
+   */
+  md5: string | null;
+  /**
+   * `"pending_upload"` or `"available"`.
+   */
+  storageStatus: string;
   createdAt: bigint;
   updatedAt: bigint;
 };

@@ -13,6 +13,10 @@ pub struct NodeView {
     pub kind: String,
     pub size: Option<i64>,
     pub mime_type: Option<String>,
+    /// MD5 hex digest of the latest file content; `null` until the first upload completes.
+    pub md5: Option<String>,
+    /// `"pending_upload"` or `"available"`.
+    pub storage_status: String,
     pub created_at: i64,
     pub updated_at: i64,
 }

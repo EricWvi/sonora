@@ -22,6 +22,8 @@ CREATE TABLE nodes (
     kind            TEXT         NOT NULL CHECK (kind IN ('directory', 'file')),
     size            BIGINT,
     mime_type       TEXT,
+    md5             VARCHAR(32),
+    storage_status  INT          NOT NULL DEFAULT 0,
     created_at      BIGINT       NOT NULL,
     updated_at      BIGINT       NOT NULL,
     server_version  BIGINT       NOT NULL,

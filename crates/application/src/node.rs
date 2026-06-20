@@ -3,7 +3,7 @@ use sonora_contracts::{
     GetPathResponse, ListChildrenResponse, MoveNodeRequest, MoveNodeResponse, NodeView,
 };
 use sonora_db::{NewFile, NodeRepository, NodeRepositoryError};
-use sonora_domain::{Node, NodeId, NodeKind};
+use sonora_domain::{Node, NodeId, NodeKind, StorageStatus};
 use thiserror::Error;
 
 /// Application-level errors for VFS node operations.
@@ -47,6 +47,11 @@ fn map_node(n: Node) -> NodeView {
         },
         size: n.size,
         mime_type: n.mime_type,
+        md5: n.md5,
+        storage_status: match n.storage_status {
+            StorageStatus::PendingUpload => "pending_upload".to_string(),
+            StorageStatus::Available => "available".to_string(),
+        },
         created_at: n.created_at,
         updated_at: n.updated_at,
     }

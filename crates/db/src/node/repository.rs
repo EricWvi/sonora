@@ -1,4 +1,4 @@
-use sonora_domain::{Node, NodeId, NodeKind};
+use sonora_domain::{Node, NodeId, NodeKind, StorageStatus};
 
 use crate::node::{NewFile, NodeRepository, NodeRepositoryError};
 use sqlx::{Pool, Postgres, Row};
@@ -35,7 +35,7 @@ impl<T: TimestampSource + Send + Sync> NodeRepository for PostgresNodeRepository
             INSERT INTO nodes (id, parent_id, name, kind, size, mime_type,
                                created_at, updated_at, is_deleted)
             VALUES ($1, $2, $3, 'directory', NULL, NULL, $4, $4, FALSE)
-            RETURNING id, parent_id, name, kind, size, mime_type,
+            RETURNING id, parent_id, name, kind, size, mime_type, md5, storage_status,
                       created_at, updated_at, server_version, is_deleted
             "#,
         )
@@ -59,7 +59,7 @@ impl<T: TimestampSource + Send + Sync> NodeRepository for PostgresNodeRepository
             INSERT INTO nodes (id, parent_id, name, kind, size, mime_type,
                                created_at, updated_at, is_deleted)
             VALUES ($1, $2, $3, 'file', $4, $5, $6, $6, FALSE)
-            RETURNING id, parent_id, name, kind, size, mime_type,
+            RETURNING id, parent_id, name, kind, size, mime_type, md5, storage_status,
                       created_at, updated_at, server_version, is_deleted
             "#,
         )
@@ -79,7 +79,7 @@ impl<T: TimestampSource + Send + Sync> NodeRepository for PostgresNodeRepository
     async fn get_node_by_id(&self, id: NodeId) -> Result<Option<Node>, NodeRepositoryError> {
         let row = sqlx::query(
             r#"
-            SELECT id, parent_id, name, kind, size, mime_type,
+            SELECT id, parent_id, name, kind, size, mime_type, md5, storage_status,
                    created_at, updated_at, server_version, is_deleted
             FROM nodes
             WHERE id = $1 AND is_deleted = FALSE
@@ -103,7 +103,7 @@ impl<T: TimestampSource + Send + Sync> NodeRepository for PostgresNodeRepository
             let row = if let Some(parent_id) = current_parent {
                 sqlx::query(
                     r#"
-                    SELECT id, parent_id, name, kind, size, mime_type,
+                    SELECT id, parent_id, name, kind, size, mime_type, md5, storage_status,
                            created_at, updated_at, server_version, is_deleted
                     FROM nodes
                     WHERE parent_id = $1 AND name = $2 AND is_deleted = FALSE
@@ -116,7 +116,7 @@ impl<T: TimestampSource + Send + Sync> NodeRepository for PostgresNodeRepository
             } else {
                 sqlx::query(
                     r#"
-                    SELECT id, parent_id, name, kind, size, mime_type,
+                    SELECT id, parent_id, name, kind, size, mime_type, md5, storage_status,
                            created_at, updated_at, server_version, is_deleted
                     FROM nodes
                     WHERE parent_id IS NULL AND name = $1 AND is_deleted = FALSE
@@ -189,7 +189,7 @@ impl<T: TimestampSource + Send + Sync> NodeRepository for PostgresNodeRepository
             UPDATE nodes
             SET parent_id = $2, name = $3, updated_at = $4
             WHERE id = $1 AND is_deleted = FALSE
-            RETURNING id, parent_id, name, kind, size, mime_type,
+            RETURNING id, parent_id, name, kind, size, mime_type, md5, storage_status,
                       created_at, updated_at, server_version, is_deleted
             "#,
         )
@@ -323,6 +323,15 @@ fn row_to_node(row: &sqlx::postgres::PgRow) -> Result<Node, NodeRepositoryError>
     let mime_type: Option<String> = row
         .try_get("mime_type")
         .map_err(|e| NodeRepositoryError::OperationFailed(e.to_string()))?;
+    let md5: Option<String> = row
+        .try_get("md5")
+        .map_err(|e| NodeRepositoryError::OperationFailed(e.to_string()))?;
+    let storage_status_raw: i32 = row
+        .try_get("storage_status")
+        .map_err(|e| NodeRepositoryError::OperationFailed(e.to_string()))?;
+    let storage_status = StorageStatus::from_db(storage_status_raw).map_err(|v| {
+        NodeRepositoryError::OperationFailed(format!("unknown storage_status in database: {v}"))
+    })?;
     let created_at: i64 = row
         .try_get("created_at")
         .map_err(|e| NodeRepositoryError::OperationFailed(e.to_string()))?;
@@ -353,6 +362,8 @@ fn row_to_node(row: &sqlx::postgres::PgRow) -> Result<Node, NodeRepositoryError>
         kind,
         size,
         mime_type,
+        md5,
+        storage_status,
         created_at,
         updated_at,
         server_version,
