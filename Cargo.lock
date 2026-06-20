@@ -2591,8 +2591,11 @@ dependencies = [
  "sonora-db",
  "sonora-logging",
  "sqlx",
+ "testcontainers",
+ "testcontainers-modules",
  "thiserror",
  "tokio",
+ "tower",
  "tracing",
 ]
 

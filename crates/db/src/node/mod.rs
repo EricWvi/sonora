@@ -5,9 +5,6 @@ use thiserror::Error;
 
 mod repository;
 
-#[cfg(test)]
-mod repository_tests;
-
 pub use repository::PostgresNodeRepository;
 
 /// Metadata supplied when inserting a new file node.

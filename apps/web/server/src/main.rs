@@ -6,6 +6,9 @@ mod handlers;
 mod routes;
 mod service;
 
+#[cfg(test)]
+mod tests;
+
 use sonora_logging::{LogOutput, LoggingConfig, init_logging, sonora_info};
 
 #[tokio::main]
