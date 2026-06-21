@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "paths": {
+      "@sonora/contracts": ["../contracts/src/index.ts"],
+      "@sonora/ui": ["../ui/src/index.ts"],
+      "@sonora/features": ["../features/src/index.ts"]
+    }
+  },
+  "include": ["src"]
+}
