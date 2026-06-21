@@ -1,4 +1,3 @@
-import "./styles.css";
 import type { ContractsClient } from "@sonora/contracts";
 import { ClientContext, NodeDetail, NodeList, NodeTree } from "@sonora/features";
 import { QueryClientProvider } from "@tanstack/react-query";

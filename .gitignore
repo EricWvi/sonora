@@ -23,9 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 
-objects
-
 __pycache__
-input
-output
 target
+.env
