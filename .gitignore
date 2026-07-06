@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# TypeScript build info (tsc -b incremental cache)
+*.tsbuildinfo
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -23,9 +26,8 @@ dist-ssr
 *.sln
 *.sw?
 
-objects
-
 __pycache__
-input
-output
 target
+.env
+# heroui-agents-md
+.heroui-docs/

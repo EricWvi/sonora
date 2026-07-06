@@ -71,3 +71,52 @@ tasks:
         else
           cargo test --workspace
         fi
+
+  ###################################################
+  #################### Run Tasks ####################
+  ###################################################
+
+  ###################################################
+  #################### Database #####################
+  ###################################################
+
+  db:up:
+    desc: Start the PostgreSQL container (unless-stopped)
+    cmds:
+      - task: run:prepare
+      - docker compose up -d postgres
+
+  db:down:
+    desc: Stop the PostgreSQL container
+    cmds:
+      - docker compose down
+
+  db:logs:
+    desc: Tail PostgreSQL container logs
+    cmds:
+      - docker compose logs -f postgres
+
+  ###################################################
+  ############# Run Development Servers #############
+  ###################################################
+
+  run:prepare:
+    desc: Ensure the env file exists
+    cmds:
+      - |
+        if [ ! -f .env ]; then
+          echo "Creating .env file from .env.example"
+          cp .env.example .env
+        fi
+
+  run:admin:
+    desc: Run the admin panel in development mode
+    dir: apps/web/client
+    cmds:
+      - pnpm dev
+
+  run:web-backend:
+    desc: Run the web server backend in development mode
+    cmds:
+      - task: run:prepare
+      - cargo run --bin sonora_web_server

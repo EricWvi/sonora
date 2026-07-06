@@ -11,13 +11,20 @@ pub struct NodeView {
     pub name: String,
     /// `"directory"` or `"file"`.
     pub kind: String,
+    // The server serializes i64 as a JSON number (default serde), so the TS type is overridden to
+    // `number` to match the wire form exactly. This avoids a `bigint` client type that would
+    // require a `BigInt.prototype.toJSON` runtime patch. Precision is lost past 2^53, which is
+    // irrelevant for byte counts in this domain and millisecond timestamps.
+    #[ts(type = "number | null")]
     pub size: Option<i64>,
     pub mime_type: Option<String>,
     /// MD5 hex digest of the latest file content; `null` until the first upload completes.
     pub md5: Option<String>,
     /// `"pending_upload"` or `"available"`.
     pub storage_status: String,
+    #[ts(type = "number")]
     pub created_at: i64,
+    #[ts(type = "number")]
     pub updated_at: i64,
 }
 
@@ -45,6 +52,9 @@ pub struct CreateDirResponse {
 pub struct CreateFileRequest {
     pub parent_id: Option<String>,
     pub name: String,
+    // `number | null` matches the server's JSON-number wire form; see `NodeView::size` for the
+    // full rationale.
+    #[ts(type = "number | null")]
     pub size: Option<i64>,
     pub mime_type: Option<String>,
 }

@@ -1,0 +1,13 @@
+/* HeroUI v3 ships a precompiled Tailwind v4 stylesheet that itself imports
+   `tailwindcss` and `tw-animate-css`, plus every component style. One import
+   wires the whole design system. */
+@import "@heroui/styles/css";
+
+/* Tailwind v4's automatic content scan is scoped to this app's own source tree.
+   The admin panel ships from a sibling workspace package (`@sonora/admin`,
+   resolved to source via the `development` exports condition), so its classNames
+   live outside that tree and are invisible to the scanner — pulling them in
+   explicitly is what makes utilities like `min-h-screen` resolve in the admin
+   shell. Without this, no utility class authored in packages/admin/src emits
+   any CSS at all. */
+@source "node_modules/@sonora/admin/src";

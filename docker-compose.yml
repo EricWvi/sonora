@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${SONORA_DB_NAME:-sonora_test}
+      POSTGRES_USER: ${SONORA_DB_USERNAME:-sonora_user}
+      POSTGRES_PASSWORD: ${SONORA_DB_PASSWORD:-123456789}
+    ports:
+      - "${SONORA_DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

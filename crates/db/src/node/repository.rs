@@ -148,7 +148,7 @@ impl<T: TimestampSource + Send + Sync> NodeRepository for PostgresNodeRepository
         let rows = if let Some(pid) = parent_id {
             sqlx::query(
                 r#"
-                SELECT id, parent_id, name, kind, size, mime_type,
+                SELECT id, parent_id, name, kind, size, mime_type, md5, storage_status,
                        created_at, updated_at, server_version, is_deleted
                 FROM nodes
                 WHERE parent_id = $1 AND is_deleted = FALSE
@@ -161,7 +161,7 @@ impl<T: TimestampSource + Send + Sync> NodeRepository for PostgresNodeRepository
         } else {
             sqlx::query(
                 r#"
-                SELECT id, parent_id, name, kind, size, mime_type,
+                SELECT id, parent_id, name, kind, size, mime_type, md5, storage_status,
                        created_at, updated_at, server_version, is_deleted
                 FROM nodes
                 WHERE parent_id IS NULL AND is_deleted = FALSE
