@@ -68,7 +68,7 @@ RUN_TESTCONTAINERS=1 task test  # includes testcontainer tests
 
 ### Adding a new DTO
 
-1. Define the Rust struct in `crates/contracts/src/<domain>.rs` with `#[derive(TS)]` and `#[ts(export, export_to = "<domain>.ts")]`.
+1. Define the Rust struct in `crates/contracts/src/<domain>.rs` with `#[derive(TS)]` and `#[ts(export_to = "<domain>.ts")]`.
 2. Register it in `export_typescript_bindings_to()` in `crates/contracts/src/lib.rs`.
 3. Run `cargo xtask export-contracts` to regenerate `packages/contracts/src/`.
 4. Do not hand-edit files in `packages/contracts/src/` — they carry a "do not edit" header.

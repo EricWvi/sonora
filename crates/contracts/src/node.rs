@@ -4,7 +4,7 @@ use ts_rs::TS;
 /// Public representation of a VFS node shared across all node responses.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "node.ts")]
+#[ts(export_to = "node.ts")]
 pub struct NodeView {
     pub id: String,
     pub parent_id: Option<String>,
@@ -31,7 +31,7 @@ pub struct NodeView {
 /// Fields required to create a new directory node.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "node.ts")]
+#[ts(export_to = "node.ts")]
 pub struct CreateDirRequest {
     pub parent_id: Option<String>,
     pub name: String,
@@ -40,7 +40,7 @@ pub struct CreateDirRequest {
 /// Returns the newly created directory node.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "node.ts")]
+#[ts(export_to = "node.ts")]
 pub struct CreateDirResponse {
     pub node: NodeView,
 }
@@ -48,7 +48,7 @@ pub struct CreateDirResponse {
 /// Fields required to create a new file node.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "node.ts")]
+#[ts(export_to = "node.ts")]
 pub struct CreateFileRequest {
     pub parent_id: Option<String>,
     pub name: String,
@@ -62,7 +62,7 @@ pub struct CreateFileRequest {
 /// Returns the newly created file node.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "node.ts")]
+#[ts(export_to = "node.ts")]
 pub struct CreateFileResponse {
     pub node: NodeView,
 }
@@ -70,7 +70,7 @@ pub struct CreateFileResponse {
 /// Returns a single node looked up by id or path.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "node.ts")]
+#[ts(export_to = "node.ts")]
 pub struct GetNodeResponse {
     pub node: NodeView,
 }
@@ -78,7 +78,7 @@ pub struct GetNodeResponse {
 /// Returns the direct children of a directory.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "node.ts")]
+#[ts(export_to = "node.ts")]
 pub struct ListChildrenResponse {
     pub nodes: Vec<NodeView>,
 }
@@ -86,7 +86,7 @@ pub struct ListChildrenResponse {
 /// Fields required to move or rename a node.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "node.ts")]
+#[ts(export_to = "node.ts")]
 pub struct MoveNodeRequest {
     pub new_parent_id: Option<String>,
     pub new_name: String,
@@ -95,7 +95,7 @@ pub struct MoveNodeRequest {
 /// Returns the node after a successful move or rename.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "node.ts")]
+#[ts(export_to = "node.ts")]
 pub struct MoveNodeResponse {
     pub node: NodeView,
 }
@@ -103,7 +103,7 @@ pub struct MoveNodeResponse {
 /// Returns the virtual path of a node.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "node.ts")]
+#[ts(export_to = "node.ts")]
 pub struct GetPathResponse {
     pub path: String,
 }
@@ -114,7 +114,7 @@ pub struct GetPathResponse {
 /// instead of composing the id and body separately.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "node.ts")]
+#[ts(export_to = "node.ts")]
 pub struct MoveNodeWithIdRequest {
     pub id: String,
     pub new_parent_id: Option<String>,
@@ -124,7 +124,7 @@ pub struct MoveNodeWithIdRequest {
 /// Frontend SDK request for fetching a single node by id.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "node.ts")]
+#[ts(export_to = "node.ts")]
 pub struct GetNodeByIdRequest {
     pub id: String,
 }
@@ -132,7 +132,7 @@ pub struct GetNodeByIdRequest {
 /// Frontend SDK request for listing the direct children of a directory.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "node.ts")]
+#[ts(export_to = "node.ts")]
 pub struct ListChildrenRequest {
     pub id: String,
 }
@@ -140,7 +140,7 @@ pub struct ListChildrenRequest {
 /// Frontend SDK request for resolving the full virtual path of a node.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "node.ts")]
+#[ts(export_to = "node.ts")]
 pub struct GetNodePathRequest {
     pub id: String,
 }
@@ -148,7 +148,7 @@ pub struct GetNodePathRequest {
 /// Frontend SDK request for soft-deleting a node.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "node.ts")]
+#[ts(export_to = "node.ts")]
 pub struct DeleteNodeRequest {
     pub id: String,
 }
@@ -156,7 +156,7 @@ pub struct DeleteNodeRequest {
 /// Frontend SDK request for resolving a virtual path to a node.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "node.ts")]
+#[ts(export_to = "node.ts")]
 pub struct GetNodeByPathRequest {
     pub path: String,
 }
@@ -164,7 +164,7 @@ pub struct GetNodeByPathRequest {
 /// Frontend SDK request for checking whether a node exists at a virtual path.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "node.ts")]
+#[ts(export_to = "node.ts")]
 pub struct NodeExistsRequest {
     pub path: String,
 }
@@ -172,5 +172,5 @@ pub struct NodeExistsRequest {
 /// Frontend SDK request for listing root-level nodes (no parameters required).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "node.ts")]
+#[ts(export_to = "node.ts")]
 pub struct ListRootChildrenRequest {}

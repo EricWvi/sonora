@@ -43,7 +43,7 @@ Owns the authoritative data types — `Node`, `NodeKind`, `NodeId`. No database,
 One handler struct per use-case operation. Each is `Handler<R>` where `R: RepositoryTrait`. All handlers live in a single module (e.g., `node.rs`) until the file exceeds ~500 LoC.
 
 ### `sonora-contracts`
-- `node.rs` — request/response DTOs with `#[derive(TS)]` and `#[ts(export, export_to = "node.ts")]`
+- `node.rs` — request/response DTOs with `#[derive(TS)]` and `#[ts(export_to = "node.ts")]`
 - `frontend.rs` — `FrontendEndpoint` metadata structs; `FRONTEND_ENDPOINTS` slice drives TS codegen
 - `lib.rs` — re-exports and the `export_typescript_bindings_to()` function called by xtask
 
