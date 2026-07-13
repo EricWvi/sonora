@@ -1,6 +1,5 @@
 import {
   Button,
-  Chip,
   Dropdown,
   Spinner,
   Table,
@@ -75,7 +74,6 @@ export function NodeTable({
             <Table.Column id="size" className="text-right">
               Size
             </Table.Column>
-            <Table.Column id="status">Status</Table.Column>
             <Table.Column id="updated">Updated</Table.Column>
             <Table.Column id="actions">Actions</Table.Column>
           </Table.Header>
@@ -108,9 +106,6 @@ export function NodeTable({
                 </Table.Cell>
                 <Table.Cell className="whitespace-nowrap text-right tabular-nums text-muted">
                   {node.kind === "file" ? formatBytes(node.size) : "—"}
-                </Table.Cell>
-                <Table.Cell>
-                  <StorageStatusChip status={node.storageStatus} />
                 </Table.Cell>
                 <Table.Cell className="whitespace-nowrap text-muted">
                   {formatTimestamp(node.updatedAt)}
@@ -150,25 +145,4 @@ export function NodeTable({
       </Table.ScrollContainer>
     </Table>
   );
-}
-
-// Maps the backend storage_status enum to a colored chip so operators can spot
-// files that are still awaiting their first upload at a glance. The leading
-// icon makes the state legible without reading the label.
-function StorageStatusChip({ status }: { status: string }) {
-  if (status === "available") {
-    return (
-      <Chip color="success" variant="soft" size="sm">
-        available
-      </Chip>
-    );
-  }
-  if (status === "pending_upload") {
-    return (
-      <Chip color="warning" variant="soft" size="sm">
-        pending
-      </Chip>
-    );
-  }
-  return <Chip size="sm">{status}</Chip>;
 }

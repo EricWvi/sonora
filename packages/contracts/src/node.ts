@@ -114,10 +114,6 @@ export type NodeView = {
    * MD5 hex digest of the latest file content; `null` until the first upload completes.
    */
   md5: string | null;
-  /**
-   * `"pending_upload"` or `"available"`.
-   */
-  storageStatus: string;
   createdAt: number;
   updatedAt: number;
 };

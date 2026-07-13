@@ -1,28 +1,22 @@
 use crate::NodeId;
 
 /// Distinguishes whether a VFS entry represents a container or a leaf file.
+///
+/// Mapped to an integer in the database:
+/// - 0 = `Directory`
+/// - 1 = `File`
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum NodeKind {
     Directory,
     File,
 }
 
-/// Whether the server holds the physical bytes for a file node.
-///
-/// - `PendingUpload` (0): no file stored yet; a client must upload before others can download.
-/// - `Available` (1): bytes are on the server and any client may download.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum StorageStatus {
-    PendingUpload,
-    Available,
-}
-
-impl StorageStatus {
-    /// Converts the integer discriminant stored in the database to a `StorageStatus`.
+impl NodeKind {
+    /// Converts the integer discriminant stored in the database to a `NodeKind`.
     pub fn from_db(value: i32) -> Result<Self, i32> {
         match value {
-            0 => Ok(Self::PendingUpload),
-            1 => Ok(Self::Available),
+            0 => Ok(Self::Directory),
+            1 => Ok(Self::File),
             other => Err(other),
         }
     }
@@ -30,8 +24,8 @@ impl StorageStatus {
     /// Returns the integer discriminant used in the database column.
     pub fn as_db(self) -> i32 {
         match self {
-            Self::PendingUpload => 0,
-            Self::Available => 1,
+            Self::Directory => 0,
+            Self::File => 1,
         }
     }
 }
@@ -50,8 +44,6 @@ pub struct Node {
     pub mime_type: Option<String>,
     /// MD5 hex digest of the latest file content; `None` until the first upload completes.
     pub md5: Option<String>,
-    /// Whether the server holds the physical bytes for this node.
-    pub storage_status: StorageStatus,
     /// Unix timestamp in milliseconds.
     pub created_at: i64,
     /// Unix timestamp in milliseconds.
@@ -72,7 +64,6 @@ impl Node {
         size: Option<i64>,
         mime_type: Option<String>,
         md5: Option<String>,
-        storage_status: StorageStatus,
         created_at: i64,
         updated_at: i64,
         server_version: i64,
@@ -86,7 +77,6 @@ impl Node {
             size,
             mime_type,
             md5,
-            storage_status,
             created_at,
             updated_at,
             server_version,

@@ -20,8 +20,6 @@ pub struct NodeView {
     pub mime_type: Option<String>,
     /// MD5 hex digest of the latest file content; `null` until the first upload completes.
     pub md5: Option<String>,
-    /// `"pending_upload"` or `"available"`.
-    pub storage_status: String,
     #[ts(type = "number")]
     pub created_at: i64,
     #[ts(type = "number")]

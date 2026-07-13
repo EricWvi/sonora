@@ -1,4 +1,4 @@
-use sonora_domain::{Node, NodeId, NodeKind, StorageStatus};
+use sonora_domain::{Node, NodeId, NodeKind};
 
 use crate::node::{NewFile, NodeRepository, NodeRepositoryError};
 use sqlx::{Pool, Postgres, Row};
@@ -34,8 +34,8 @@ impl<T: TimestampSource + Send + Sync> NodeRepository for PostgresNodeRepository
             r#"
             INSERT INTO nodes (id, parent_id, name, kind, size, mime_type,
                                created_at, updated_at, is_deleted)
-            VALUES ($1, $2, $3, 'directory', NULL, NULL, $4, $4, FALSE)
-            RETURNING id, parent_id, name, kind, size, mime_type, md5, storage_status,
+            VALUES ($1, $2, $3, 0, NULL, NULL, $4, $4, FALSE)
+            RETURNING id, parent_id, name, kind, size, mime_type, md5,
                       created_at, updated_at, server_version, is_deleted
             "#,
         )
@@ -58,8 +58,8 @@ impl<T: TimestampSource + Send + Sync> NodeRepository for PostgresNodeRepository
             r#"
             INSERT INTO nodes (id, parent_id, name, kind, size, mime_type,
                                created_at, updated_at, is_deleted)
-            VALUES ($1, $2, $3, 'file', $4, $5, $6, $6, FALSE)
-            RETURNING id, parent_id, name, kind, size, mime_type, md5, storage_status,
+            VALUES ($1, $2, $3, 1, $4, $5, $6, $6, FALSE)
+            RETURNING id, parent_id, name, kind, size, mime_type, md5,
                       created_at, updated_at, server_version, is_deleted
             "#,
         )
@@ -79,7 +79,7 @@ impl<T: TimestampSource + Send + Sync> NodeRepository for PostgresNodeRepository
     async fn get_node_by_id(&self, id: NodeId) -> Result<Option<Node>, NodeRepositoryError> {
         let row = sqlx::query(
             r#"
-            SELECT id, parent_id, name, kind, size, mime_type, md5, storage_status,
+            SELECT id, parent_id, name, kind, size, mime_type, md5,
                    created_at, updated_at, server_version, is_deleted
             FROM nodes
             WHERE id = $1 AND is_deleted = FALSE
@@ -103,7 +103,7 @@ impl<T: TimestampSource + Send + Sync> NodeRepository for PostgresNodeRepository
             let row = if let Some(parent_id) = current_parent {
                 sqlx::query(
                     r#"
-                    SELECT id, parent_id, name, kind, size, mime_type, md5, storage_status,
+                    SELECT id, parent_id, name, kind, size, mime_type, md5,
                            created_at, updated_at, server_version, is_deleted
                     FROM nodes
                     WHERE parent_id = $1 AND name = $2 AND is_deleted = FALSE
@@ -116,7 +116,7 @@ impl<T: TimestampSource + Send + Sync> NodeRepository for PostgresNodeRepository
             } else {
                 sqlx::query(
                     r#"
-                    SELECT id, parent_id, name, kind, size, mime_type, md5, storage_status,
+                    SELECT id, parent_id, name, kind, size, mime_type, md5,
                            created_at, updated_at, server_version, is_deleted
                     FROM nodes
                     WHERE parent_id IS NULL AND name = $1 AND is_deleted = FALSE
@@ -148,7 +148,7 @@ impl<T: TimestampSource + Send + Sync> NodeRepository for PostgresNodeRepository
         let rows = if let Some(pid) = parent_id {
             sqlx::query(
                 r#"
-                SELECT id, parent_id, name, kind, size, mime_type, md5, storage_status,
+                SELECT id, parent_id, name, kind, size, mime_type, md5,
                        created_at, updated_at, server_version, is_deleted
                 FROM nodes
                 WHERE parent_id = $1 AND is_deleted = FALSE
@@ -161,7 +161,7 @@ impl<T: TimestampSource + Send + Sync> NodeRepository for PostgresNodeRepository
         } else {
             sqlx::query(
                 r#"
-                SELECT id, parent_id, name, kind, size, mime_type, md5, storage_status,
+                SELECT id, parent_id, name, kind, size, mime_type, md5,
                        created_at, updated_at, server_version, is_deleted
                 FROM nodes
                 WHERE parent_id IS NULL AND is_deleted = FALSE
@@ -189,7 +189,7 @@ impl<T: TimestampSource + Send + Sync> NodeRepository for PostgresNodeRepository
             UPDATE nodes
             SET parent_id = $2, name = $3, updated_at = $4
             WHERE id = $1 AND is_deleted = FALSE
-            RETURNING id, parent_id, name, kind, size, mime_type, md5, storage_status,
+            RETURNING id, parent_id, name, kind, size, mime_type, md5,
                       created_at, updated_at, server_version, is_deleted
             "#,
         )
@@ -314,7 +314,7 @@ fn row_to_node(row: &sqlx::postgres::PgRow) -> Result<Node, NodeRepositoryError>
     let name: String = row
         .try_get("name")
         .map_err(|e| NodeRepositoryError::OperationFailed(e.to_string()))?;
-    let kind_str: String = row
+    let kind_raw: i32 = row
         .try_get("kind")
         .map_err(|e| NodeRepositoryError::OperationFailed(e.to_string()))?;
     let size: Option<i64> = row
@@ -326,12 +326,6 @@ fn row_to_node(row: &sqlx::postgres::PgRow) -> Result<Node, NodeRepositoryError>
     let md5: Option<String> = row
         .try_get("md5")
         .map_err(|e| NodeRepositoryError::OperationFailed(e.to_string()))?;
-    let storage_status_raw: i32 = row
-        .try_get("storage_status")
-        .map_err(|e| NodeRepositoryError::OperationFailed(e.to_string()))?;
-    let storage_status = StorageStatus::from_db(storage_status_raw).map_err(|v| {
-        NodeRepositoryError::OperationFailed(format!("unknown storage_status in database: {v}"))
-    })?;
     let created_at: i64 = row
         .try_get("created_at")
         .map_err(|e| NodeRepositoryError::OperationFailed(e.to_string()))?;
@@ -345,15 +339,9 @@ fn row_to_node(row: &sqlx::postgres::PgRow) -> Result<Node, NodeRepositoryError>
         .try_get("is_deleted")
         .map_err(|e| NodeRepositoryError::OperationFailed(e.to_string()))?;
 
-    let kind = match kind_str.as_str() {
-        "directory" => NodeKind::Directory,
-        "file" => NodeKind::File,
-        other => {
-            return Err(NodeRepositoryError::OperationFailed(format!(
-                "unknown node kind in database: `{other}`"
-            )));
-        }
-    };
+    let kind = NodeKind::from_db(kind_raw).map_err(|v| {
+        NodeRepositoryError::OperationFailed(format!("unknown node kind in database: {v}"))
+    })?;
 
     Ok(Node::new(
         id,
@@ -363,7 +351,6 @@ fn row_to_node(row: &sqlx::postgres::PgRow) -> Result<Node, NodeRepositoryError>
         size,
         mime_type,
         md5,
-        storage_status,
         created_at,
         updated_at,
         server_version,
