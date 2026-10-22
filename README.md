@@ -4,14 +4,14 @@ Sonora 是以 SPlayer 为界面参照重新实现的音乐播放器。
 
 ## 开发
 
-使用 Node.js 22.12+ 和 pnpm 10.28.1；若本机没有 `pnpm` 命令，先运行 `corepack enable pnpm`。
+使用 Node.js 22.12+、pnpm 10.28.1 和 [Task](https://taskfile.dev/)；若本机没有 `pnpm` 命令，先运行 `corepack enable pnpm`。项目命令统一收录在 [Taskfile.yml](Taskfile.yml)，运行 `task --list` 查看。
 
 ```bash
-corepack pnpm install
-corepack pnpm dev
+task install
+task run:web
 ```
 
-浏览器访问地址为 `http://localhost:14559`。`corepack pnpm lint`、`corepack pnpm typecheck`、`corepack pnpm build` 分别检查代码、类型和 Web 构建。
+浏览器访问地址为 `http://localhost:14559`。`task format` 格式化前端，`task lint` 检查格式、ESLint 和类型，`task build` 生成 Web 构建，`task clean` 清理 `frontend/dist`。`task test` 执行当前全部检查和生产构建；目前尚无单元测试，后端占位目录也不执行 Go 检查。
 
 `frontend/` 使用 SPlayer 的 Web 前端技术栈：Vue 3、TypeScript、Naive UI、Pinia、Vue Router、VueUse、SCSS、Vite；包管理使用 pnpm。**明确舍弃 Electron，不继承原项目的桌面宿主、主进程、预加载、IPC 和打包行为。** 业务、原生音频模块和网易依赖未迁入。`backend/` 为 Go 自研音乐服务的占位目录，尚未初始化 Go 模块或接口。
 

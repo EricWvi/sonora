@@ -1,0 +1,73 @@
+version: "3"
+
+tasks:
+  default:
+    cmds:
+      - task: list
+
+  list:
+    desc: List all tasks in the current project
+    cmds:
+      - task --list
+
+  # Install dependencies
+  install:
+    desc: Install all project dependencies
+    cmds:
+      - task: install:frontend
+
+  install:frontend:
+    desc: Install locked frontend dependencies (Node 22.12+, pnpm 10.28.1)
+    cmds:
+      - pnpm install --frozen-lockfile
+
+  # Clean and build
+  build:
+    desc: Build the production Web frontend
+    cmds:
+      - task: build:frontend
+
+  build:frontend:
+    desc: Typecheck and build frontend/dist
+    cmds:
+      - pnpm build
+
+  clean:
+    desc: Remove the generated frontend dist
+    cmds:
+      - rm -rf frontend/dist
+
+  # Format and validate
+  format:
+    desc: Format frontend source and configuration
+    cmds:
+      - task: format:frontend
+
+  format:frontend:
+    desc: Format frontend files with Prettier
+    cmds:
+      - pnpm format
+
+  lint:
+    desc: Run all formatting, lint and type checks
+    cmds:
+      - task: lint:frontend
+
+  lint:frontend:
+    desc: Check frontend formatting, ESLint and TypeScript
+    cmds:
+      - pnpm format:check
+      - pnpm lint
+      - pnpm typecheck
+
+  test:
+    desc: Run all current checks and production build (no unit tests yet)
+    cmds:
+      - task: lint
+      - task: build
+
+  # Development server
+  run:web:
+    desc: Start the Vite development server (localhost:14559)
+    cmds:
+      - pnpm dev {{.CLI_ARGS}}
