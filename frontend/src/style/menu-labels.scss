@@ -1,0 +1,48 @@
+.user-liked {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  .n-button {
+    margin-left: 12px;
+    --n-height: 30px;
+    --n-padding: 0 16px;
+    --n-icon-size: 20px;
+  }
+}
+.user-list {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  .n-text {
+    font-size: 0.93em;
+  }
+  .n-button {
+    --n-height: 22px;
+    --n-padding: 0 12px;
+    --n-icon-size: 12px;
+  }
+}
+.pl-cover {
+  display: flex;
+  align-items: center;
+  .n-avatar {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    margin-right: 12px;
+    border-radius: 8px;
+  }
+}
+.roaming-label {
+  .n-button {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  &:hover {
+    .n-button {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
+}

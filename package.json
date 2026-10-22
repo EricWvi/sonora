@@ -1,0 +1,18 @@
+{
+  "name": "sonora",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.1",
+  "engines": {
+    "node": ">=22.12.0",
+    "pnpm": ">=10"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @sonora/frontend dev",
+    "typecheck": "pnpm --filter @sonora/frontend typecheck",
+    "lint": "pnpm --filter @sonora/frontend lint",
+    "format": "pnpm --filter @sonora/frontend format",
+    "format:check": "pnpm --filter @sonora/frontend format:check",
+    "build": "pnpm --filter @sonora/frontend build"
+  }
+}
