@@ -37,3 +37,4 @@ task run:web
 
 - [重写路线图](docs/roadmap.md)：架构方向、样式验收、分阶段计划和待确定事项。
 - [SPlayer 调研记录](docs/splayer-research.md)：原项目的源码证据、耦合点与重写风险。
+- [SPlayer 浏览器会话](docs/splayer-session.md)：本机凭据位置和无头浏览器的统一加载方式。
