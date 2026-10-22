@@ -1,0 +1,3 @@
+[submodule "reference/SPlayer"]
+	path = reference/SPlayer
+	url = https://github.com/SPlayer-Dev/SPlayer.git
