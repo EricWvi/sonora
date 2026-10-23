@@ -84,7 +84,7 @@
           >
             <template #header
               ><n-flex align="center" justify="center" class="aside-logo"
-                ><Logo /><n-text>SPlayer</n-text></n-flex
+                ><Logo /><n-text>Sonora</n-text></n-flex
               ></template
             >
             <SidebarMenu :collapsed="false" @navigate="showAside = false" />

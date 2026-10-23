@@ -20,7 +20,7 @@
             :class="['logo', { collapsed: appearance.menuCollapsed }]"
             @click="router.push('/')"
           >
-            <Logo /><n-text>SPlayer</n-text>
+            <Logo /><n-text>Sonora</n-text>
           </div>
           <n-scrollbar style="max-height: calc(100vh - 70px)"
             ><SidebarMenu :collapsed="appearance.menuCollapsed"
