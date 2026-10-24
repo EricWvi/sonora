@@ -106,11 +106,14 @@ const label = (a: Album) =>
 // --- editing ----------------------------------------------------------------
 
 const editing = ref<Album | null>(null);
+// Kept separate from `editing` so the content survives the leave transition.
+const showEdit = ref(false);
 const form = reactive({ title: "", artist: "", year: 0 });
 const saving = ref(false);
 
 function edit(a: Album) {
   editing.value = a;
+  showEdit.value = true;
   Object.assign(form, {
     title: a.title,
     artist: a.artist?.name ?? "",
@@ -162,7 +165,7 @@ function confirmDelete(a: Album) {
       try {
         await request("DELETE", `/albums/${a.id}`);
         message.success("已删除");
-        editing.value = null;
+        showEdit.value = false;
         selected.delete(a.id);
         checked.value = checked.value.filter((k) => k !== a.id);
         load();
@@ -295,11 +298,12 @@ const pagination = computed(() => ({
   </n-space>
 
   <n-modal
-    :show="editing != null"
+    :show="showEdit"
     preset="card"
     title="编辑专辑"
     style="width: 480px"
-    @update:show="(v: boolean) => !v && (editing = null)"
+    @update:show="(v: boolean) => (showEdit = v)"
+    @after-leave="editing = null"
   >
     <template v-if="editing">
       <n-form :model="form" @submit.prevent="save">

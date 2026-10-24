@@ -70,9 +70,10 @@ function fill(t: TrackDetail) {
 watch(
   () => props.id,
   async (id) => {
+    // Keep the last track on close so the drawer doesn't blank while sliding out.
+    if (id == null) return;
     track.value = null;
     loadError.value = "";
-    if (id == null) return;
     try {
       fill(await request<TrackDetail>("GET", `/tracks/${id}`));
     } catch (err) {
