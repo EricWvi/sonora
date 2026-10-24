@@ -24,9 +24,11 @@ import {
   formatDuration,
   request,
   type ApiError,
+  type Ref,
   type TrackDetail,
   type TrackInput,
 } from "../api";
+import ArtistsInput from "./ArtistsInput.vue";
 import CoverEditor from "./CoverEditor.vue";
 
 const props = defineProps<{ id: number | null }>();
@@ -38,9 +40,9 @@ const track = ref<TrackDetail | null>(null);
 const loadError = ref("");
 const form = reactive<TrackInput>({
   title: "",
-  artist: "",
+  artists: [],
   album: "",
-  albumArtist: "",
+  albumArtists: [],
   trackNo: 0,
   discNo: 0,
   year: 0,
@@ -50,16 +52,21 @@ const saving = ref(false);
 const savingLyrics = ref(false);
 const lyricsInput = ref<HTMLInputElement | null>(null);
 
+// Album identity ignores artist order, so this does too.
+const sameArtists = (a: Ref[], b: Ref[]) =>
+  a.length === b.length && a.every((x) => b.some((y) => y.id === x.id));
+
 function fill(t: TrackDetail) {
   track.value = t;
   Object.assign(form, {
     title: t.title,
-    artist: t.artist?.name ?? "",
+    artists: t.artists.map((a) => a.name),
     album: t.album?.title ?? "",
-    albumArtist:
-      t.album?.artist && t.album.artist.id !== t.artist?.id
-        ? t.album.artist.name
-        : "",
+    // Left empty while the album artists are the track's own.
+    albumArtists:
+      t.album && !sameArtists(t.album.artists, t.artists)
+        ? t.album.artists.map((a) => a.name)
+        : [],
     trackNo: t.trackNo,
     discNo: t.discNo,
     year: t.year,
@@ -183,22 +190,12 @@ function confirmDelete() {
           <n-form-item label="标题">
             <n-input v-model:value="form.title" />
           </n-form-item>
-          <n-grid :cols="2" :x-gap="12">
-            <n-gi>
-              <n-form-item label="艺术家">
-                <n-input v-model:value="form.artist" clearable />
-              </n-form-item>
-            </n-gi>
-            <n-gi>
-              <n-form-item label="专辑艺术家">
-                <n-input
-                  v-model:value="form.albumArtist"
-                  placeholder="同艺术家"
-                  clearable
-                />
-              </n-form-item>
-            </n-gi>
-          </n-grid>
+          <n-form-item label="艺术家">
+            <artists-input v-model="form.artists" />
+          </n-form-item>
+          <n-form-item label="专辑艺术家">
+            <artists-input v-model="form.albumArtists" empty-hint="同艺术家" />
+          </n-form-item>
           <n-form-item label="专辑">
             <n-input v-model:value="form.album" clearable />
           </n-form-item>

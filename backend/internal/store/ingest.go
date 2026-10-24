@@ -121,19 +121,19 @@ func (s *Store) Ingest(ctx context.Context, u *Upload, lyrics []byte) (IngestRes
 		}
 	}
 	in := TrackInput{
-		Title:       tags.Title,
-		Artist:      tags.Artist,
-		Album:       tags.Album,
-		AlbumArtist: tags.AlbumArtist,
-		TrackNo:     min(max(tags.Track, 0), 9999),
-		DiscNo:      min(max(tags.Disc, 0), 999),
-		Year:        tags.Year,
+		Title:        tags.Title,
+		Artists:      truncateAll(tags.Artists),
+		Album:        tags.Album,
+		AlbumArtists: truncateAll(tags.AlbumArtists),
+		TrackNo:      min(max(tags.Track, 0), 9999),
+		DiscNo:       min(max(tags.Disc, 0), 999),
+		Year:         tags.Year,
 	}
 	if in.Title == "" {
 		in.Title = strings.TrimSuffix(u.name, filepath.Ext(u.name))
 	}
 	in.Title = truncate(in.Title)
-	in.Artist, in.Album, in.AlbumArtist = truncate(in.Artist), truncate(in.Album), truncate(in.AlbumArtist)
+	in.Album = truncate(in.Album)
 	if err := in.normalize(); err != nil {
 		in.Title = "未命名"
 		if err := in.normalize(); err != nil {
@@ -144,7 +144,7 @@ func (s *Store) Ingest(ctx context.Context, u *Upload, lyrics []byte) (IngestRes
 
 	var d TrackDetail
 	err = s.inTx(ctx, func(tx *sql.Tx) error {
-		artist, album, err := resolveTrackRefs(ctx, tx, in)
+		artists, album, err := resolveTrackRefs(ctx, tx, in)
 		if err != nil {
 			return err
 		}
@@ -168,12 +168,15 @@ func (s *Store) Ingest(ctx context.Context, u *Upload, lyrics []byte) (IngestRes
 		}
 		var id int64
 		err = tx.QueryRowContext(ctx, `
-			INSERT INTO tracks (title, artist_id, album_id, track_no, disc_no, year, duration_ms, format, size,
+			INSERT INTO tracks (title, album_id, track_no, disc_no, year, duration_ms, format, size,
 				sha256, file, original_name, cover, lyrics)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
-			in.Title, artist, album, in.TrackNo, in.DiscNo, in.Year, u.info.Duration.Milliseconds(),
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+			in.Title, album, in.TrackNo, in.DiscNo, in.Year, u.info.Duration.Milliseconds(),
 			string(u.info.Format), u.size, u.sha256, rel, u.name, trackCover, text).Scan(&id)
 		if err != nil {
+			return err
+		}
+		if err := setArtists(ctx, tx, "track_artists", "track_id", id, artists); err != nil {
 			return err
 		}
 		d, err = s.track(ctx, tx, id)
@@ -223,6 +226,16 @@ func baseName(name string) string {
 		return ""
 	}
 	return truncate(name)
+}
+
+// truncateAll fits tag names within the limits normalize enforces, so odd
+// tags never reject an upload.
+func truncateAll(names []string) []string {
+	out := make([]string, 0, min(len(names), maxArtists))
+	for _, n := range names[:min(len(names), maxArtists)] {
+		out = append(out, truncate(n))
+	}
+	return out
 }
 
 func truncate(s string) string {

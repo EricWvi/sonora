@@ -64,19 +64,22 @@ type Info struct {
 // Tags are the metadata fields Sonora uses. Missing text fields are empty
 // and missing numbers are zero.
 type Tags struct {
-	Title       string
-	Artist      string
-	Album       string
-	AlbumArtist string
-	Track       int
-	Disc        int
-	Year        int
-	Lyrics      string
-	Picture     *Picture
+	Title string
+	// Artists and AlbumArtists keep the separate values of a multi-value
+	// field in tag order. A single value is never split on separators,
+	// since names like "AC/DC" contain them.
+	Artists      []string
+	Album        string
+	AlbumArtists []string
+	Track        int
+	Disc         int
+	Year         int
+	Lyrics       string
+	Picture      *Picture
 }
 
-// multiSeparator joins the values of a multi-value tag field, such as
-// two artists of one song.
+// multiSeparator joins the values of a multi-value title or album, which
+// unlike artists have nowhere to keep them apart.
 const multiSeparator = ", "
 
 // Picture is an embedded cover image.
@@ -137,15 +140,19 @@ func readTags(r io.ReadSeeker) (Tags, error) {
 		return Tags{}, fmt.Errorf("%w: 标签无法读取", ErrCorrupt)
 	}
 	t := Tags{
-		Title:       clean(m.Title()),
-		Artist:      clean(m.Artist()),
-		Album:       clean(m.Album()),
-		AlbumArtist: clean(m.AlbumArtist()),
-		Year:        m.Year(),
-		Lyrics:      clean(m.Lyrics()),
+		Title:  clean(m.Title()),
+		Album:  clean(m.Album()),
+		Year:   m.Year(),
+		Lyrics: clean(m.Lyrics()),
+	}
+	if a := clean(m.Artist()); a != "" {
+		t.Artists = []string{a}
+	}
+	if a := clean(m.AlbumArtist()); a != "" {
+		t.AlbumArtists = []string{a}
 	}
 	// The tag library flattens multi-value fields; reread those it would
-	// get wrong and join the values.
+	// get wrong.
 	var multi map[string][]string
 	var keys [4]string // title, artist, album, album artist
 	switch m.Format() {
@@ -156,10 +163,17 @@ func readTags(r io.ReadSeeker) (Tags, error) {
 		keys = [4]string{"title", "artist", "album", "albumartist"}
 		multi = vorbisValues(r)
 	}
-	for i, field := range []*string{&t.Title, &t.Artist, &t.Album, &t.AlbumArtist} {
-		if v := multi[keys[i]]; len(v) > 1 {
-			*field = strings.Join(v, multiSeparator)
-		}
+	if v := multi[keys[0]]; len(v) > 1 {
+		t.Title = strings.Join(v, multiSeparator)
+	}
+	if v := multi[keys[1]]; len(v) > 1 {
+		t.Artists = v
+	}
+	if v := multi[keys[2]]; len(v) > 1 {
+		t.Album = strings.Join(v, multiSeparator)
+	}
+	if v := multi[keys[3]]; len(v) > 1 {
+		t.AlbumArtists = v
 	}
 	t.Track, _ = m.Track()
 	t.Disc, _ = m.Disc()

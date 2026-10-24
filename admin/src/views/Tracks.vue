@@ -18,9 +18,11 @@ import {
   query,
   request,
   type ApiError,
+  type Artist,
   type Page,
   type Track,
 } from "../api";
+import ArtistLinks from "../components/ArtistLinks.vue";
 import TrackDrawer from "../components/TrackDrawer.vue";
 
 const PAGE_SIZE = 50;
@@ -68,12 +70,8 @@ async function load() {
       const a = data.value.items[0]?.album;
       scopeLabel.value = a ? `专辑：${a.title}` : "专辑";
     } else if (f.artistId) {
-      const t = data.value.items[0];
-      const name =
-        t?.artist?.id === f.artistId
-          ? t.artist.name
-          : (t?.album?.artist?.name ?? "");
-      scopeLabel.value = `艺术家：${name}`;
+      const a = await request<Artist>("GET", `/artists/${f.artistId}`);
+      scopeLabel.value = `艺术家：${a.name}`;
     }
   } catch (err) {
     error.value = (err as ApiError).message;
@@ -130,12 +128,11 @@ const columns: DataTableColumns<Track> = [
     key: "artist",
     ellipsis: { tooltip: true },
     render: (t) =>
-      t.artist
-        ? h(
-            RouterLink,
-            { to: `/tracks?artistId=${t.artist.id}` },
-            () => t.artist!.name,
-          )
+      t.artists.length
+        ? h(ArtistLinks, {
+            artists: t.artists,
+            to: (id: number) => `/tracks?artistId=${id}`,
+          })
         : h(
             NTag,
             { size: "small", type: "warning", bordered: false },

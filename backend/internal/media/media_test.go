@@ -6,6 +6,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -51,7 +53,7 @@ func TestProbeTaggedSamples(t *testing.T) {
 				t.Errorf("duration = %v, want %v", info.Duration, tt.duration)
 			}
 			tags := info.Tags
-			if tags.Title != "晴天" || tags.Artist != "周杰伦" || tags.Album != "叶惠美" {
+			if tags.Title != "晴天" || !slices.Equal(tags.Artists, []string{"周杰伦"}) || tags.Album != "叶惠美" {
 				t.Errorf("tags = %+v", tags)
 			}
 			if tags.Track != 3 || tags.Year != 2003 {
@@ -90,7 +92,7 @@ func TestProbeMP3Variants(t *testing.T) {
 	if diff := (plain.Duration - 3030167*time.Microsecond).Abs(); diff > 30*time.Millisecond {
 		t.Errorf("CBR duration = %v", plain.Duration)
 	}
-	if plain.Tags != (Tags{}) {
+	if !reflect.DeepEqual(plain.Tags, Tags{}) {
 		t.Errorf("untagged file has tags %+v", plain.Tags)
 	}
 }
@@ -187,27 +189,30 @@ func TestProbeMP3MultiValueText(t *testing.T) {
 	// UTF-16 with a BOM per value, as ID3v2.4 requires.
 	utf16LE := "\x01\xff\xfeA\x00\x00\x00\xff\xfeB\x00\x00\x00"
 	tests := []struct {
-		name    string
-		tag     []byte
-		artist  string
-		album   string
-		albumAA string
+		name         string
+		tag          []byte
+		artists      []string
+		album        string
+		albumArtists []string
 	}{
 		{"v2.4 utf-8", id3Tag(4,
 			[2]string{"TIT2", "\x03晴天"},
 			[2]string{"TPE1", "\x03周杰伦\x00费玉清\x00"},
 			[2]string{"TALB", "\x03叶惠美"},
 			[2]string{"TPE2", "\x03周杰伦"},
-		), "周杰伦, 费玉清", "叶惠美", "周杰伦"},
+		), []string{"周杰伦", "费玉清"}, "叶惠美", []string{"周杰伦"}},
 		{"v2.4 utf-16 and latin-1", id3Tag(4,
 			[2]string{"TIT2", "\x03晴天"},
 			[2]string{"TPE1", utf16LE},
 			[2]string{"TPE2", "\x00Simon\x00Garfunkel"},
-		), "A, B", "", "Simon, Garfunkel"},
-		{"v2.3 single value", id3Tag(3,
+		), []string{"A", "B"}, "", []string{"Simon", "Garfunkel"}},
+		// A single value is never split; a multi-value album has no list
+		// to go into, so its values are joined.
+		{"v2.3 single artist, multi-value album", id3Tag(3,
 			[2]string{"TIT2", "\x03晴天"},
 			[2]string{"TPE1", "\x03AC/DC"},
-		), "AC/DC", "", ""},
+			[2]string{"TALB", "\x03Vol. 1\x00Vol. 2"},
+		), []string{"AC/DC"}, "Vol. 1, Vol. 2", nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -217,7 +222,8 @@ func TestProbeMP3MultiValueText(t *testing.T) {
 				t.Fatal(err)
 			}
 			tags := info.Tags
-			if tags.Title != "晴天" || tags.Artist != tt.artist || tags.Album != tt.album || tags.AlbumArtist != tt.albumAA {
+			if tags.Title != "晴天" || !slices.Equal(tags.Artists, tt.artists) || tags.Album != tt.album ||
+				!slices.Equal(tags.AlbumArtists, tt.albumArtists) {
 				t.Errorf("tags = %+v", tags)
 			}
 		})
@@ -300,7 +306,8 @@ func TestProbeVorbisMultiValueFields(t *testing.T) {
 				t.Fatal(err)
 			}
 			tags := info.Tags
-			if tags.Title != "晴天" || tags.Artist != "周杰伦, 费玉清" || tags.Album != "叶惠美" || tags.AlbumArtist != "周杰伦" {
+			if tags.Title != "晴天" || !slices.Equal(tags.Artists, []string{"周杰伦", "费玉清"}) || tags.Album != "叶惠美" ||
+				!slices.Equal(tags.AlbumArtists, []string{"周杰伦"}) {
 				t.Errorf("tags = %+v", tags)
 			}
 		})

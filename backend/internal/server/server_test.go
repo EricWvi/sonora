@@ -367,13 +367,13 @@ func TestLibraryEndpoints(t *testing.T) {
 	if missing.Total != 1 || missing.Items[0].ID != other.ID {
 		t.Fatalf("missing = %+v", missing)
 	}
-	rec := ts.do("PUT", api+"tracks/"+itoa(other.ID), `{"title":"B","artist":"Jay Chou","album":"叶惠美 (Live)"}`)
+	rec := ts.do("PUT", api+"tracks/"+itoa(other.ID), `{"title":"B","artists":["Jay Chou"],"album":"叶惠美 (Live)"}`)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("update: %d %s", rec.Code, rec.Body)
 	}
 	b := decodeBody[store.TrackDetail](t, rec)
 
-	rec = ts.do("POST", api+"artists/"+itoa(tr.Artist.ID)+"/merge", `{"sourceIds":[`+itoa(b.Artist.ID)+`]}`)
+	rec = ts.do("POST", api+"artists/"+itoa(tr.Artists[0].ID)+"/merge", `{"sourceIds":[`+itoa(b.Artists[0].ID)+`]}`)
 	if rec.Code != http.StatusOK || decodeBody[store.Artist](t, rec).TrackCount != 2 {
 		t.Fatalf("merge artists: %d %s", rec.Code, rec.Body)
 	}

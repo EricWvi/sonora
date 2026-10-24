@@ -92,11 +92,11 @@ export interface Ref {
 export interface Track {
   id: number;
   title: string;
-  artist: Ref | null;
+  artists: Ref[];
   album: {
     id: number;
     title: string;
-    artist: Ref | null;
+    artists: Ref[];
     cover: string | null;
   } | null;
   trackNo: number;
@@ -117,9 +117,10 @@ export interface TrackDetail extends Track {
 
 export interface TrackInput {
   title: string;
-  artist: string;
+  artists: string[];
   album: string;
-  albumArtist: string;
+  /** Empty means the same as artists. */
+  albumArtists: string[];
   trackNo: number;
   discNo: number;
   year: number;
@@ -128,7 +129,7 @@ export interface TrackInput {
 export interface Album {
   id: number;
   title: string;
-  artist: Ref | null;
+  artists: Ref[];
   year: number;
   cover: string | null;
   trackCount: number;
@@ -194,3 +195,6 @@ export function formatBytes(n: number) {
   }
   return `${i ? n.toFixed(1) : n} ${units[i]}`;
 }
+
+export const artistNames = (artists: Ref[]) =>
+  artists.map((a) => a.name).join(" / ");

@@ -3,9 +3,11 @@ package store
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -65,6 +67,14 @@ func mediaFiles(t *testing.T, s *testStore) []string {
 		return err
 	})
 	return files
+}
+
+func names(refs []Ref) []string {
+	out := []string{}
+	for _, r := range refs {
+		out = append(out, r.Name)
+	}
+	return out
 }
 
 func coverFiles(t *testing.T, s *testStore) int {
@@ -142,11 +152,11 @@ func TestIngestTaggedFile(t *testing.T) {
 		t.Fatalf("status = %s", res.Status)
 	}
 	tr := res.Track
-	if tr.Title != "晴天" || tr.Artist == nil || tr.Artist.Name != "周杰伦" || tr.Album == nil || tr.Album.Title != "叶惠美" {
+	if tr.Title != "晴天" || !slices.Equal(names(tr.Artists), []string{"周杰伦"}) || tr.Album == nil || tr.Album.Title != "叶惠美" {
 		t.Fatalf("track = %+v", tr)
 	}
-	if tr.Album.Artist == nil || tr.Album.Artist.ID != tr.Artist.ID {
-		t.Fatalf("album artist = %+v", tr.Album.Artist)
+	if !slices.Equal(tr.Album.Artists, tr.Artists) {
+		t.Fatalf("album artists = %+v", tr.Album.Artists)
 	}
 	if tr.TrackNo != 3 || tr.DiscNo != 1 || tr.Year != 2003 || tr.Format != "flac" || tr.DurationMs != 3000 {
 		t.Fatalf("fields = %+v", tr)
@@ -230,7 +240,7 @@ func TestReceiveRejectsBrokenFiles(t *testing.T) {
 func TestIngestUntaggedUsesFileNameAndCountsAsMissing(t *testing.T) {
 	s := openTest(t)
 	res := ingest(t, s, sample(t, "untagged.mp3"), "无名之歌.mp3", nil)
-	if res.Track.Title != "无名之歌" || res.Track.Artist != nil || res.Track.Album != nil {
+	if res.Track.Title != "无名之歌" || len(res.Track.Artists) != 0 || res.Track.Album != nil {
 		t.Fatalf("track = %+v", res.Track)
 	}
 	ctx := context.Background()
@@ -261,8 +271,8 @@ func TestSameAlbumAcrossFormatsSharesAlbumAndCover(t *testing.T) {
 	s := openTest(t)
 	a := ingest(t, s, sample(t, "tagged.mp3"), "a.mp3", nil).Track
 	b := ingest(t, s, sample(t, "tagged.m4a"), "b.m4a", nil).Track
-	if a.Album.ID != b.Album.ID || a.Artist.ID != b.Artist.ID {
-		t.Fatalf("albums %d/%d, artists %d/%d", a.Album.ID, b.Album.ID, a.Artist.ID, b.Artist.ID)
+	if a.Album.ID != b.Album.ID || !slices.Equal(a.Artists, b.Artists) {
+		t.Fatalf("albums %d/%d, artists %v/%v", a.Album.ID, b.Album.ID, a.Artists, b.Artists)
 	}
 	if b.Cover != nil {
 		t.Fatalf("identical art stored as track cover %v", *b.Cover)
@@ -276,11 +286,12 @@ func TestUpdateTrackMovesItAndPrunesEmptyAlbum(t *testing.T) {
 	s := openTest(t)
 	ctx := context.Background()
 	tr := ingest(t, s, sample(t, "tagged.flac"), "a.flac", nil).Track
-	d, err := s.UpdateTrack(ctx, tr.ID, TrackInput{Title: "晴天 (Live)", Artist: "Jay Chou", Album: "Live"})
+	d, err := s.UpdateTrack(ctx, tr.ID, TrackInput{Title: "晴天 (Live)", Artists: []string{"Jay Chou"}, Album: "Live"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.Artist.Name != "Jay Chou" || d.Album.Title != "Live" || d.Album.Artist.Name != "Jay Chou" {
+	if !slices.Equal(names(d.Artists), []string{"Jay Chou"}) || d.Album.Title != "Live" ||
+		!slices.Equal(names(d.Album.Artists), []string{"Jay Chou"}) {
 		t.Fatalf("updated = %+v", d)
 	}
 	albums, _ := s.Albums(ctx, AlbumQuery{})
@@ -306,28 +317,28 @@ func TestMergeArtistsMergesSameNamedAlbums(t *testing.T) {
 	a := ingest(t, s, sample(t, "tagged.mp3"), "a.mp3", nil).Track
 	b := ingest(t, s, sample(t, "tagged.ogg"), "b.ogg", nil).Track
 	// Spell the second artist differently, as messy tags often do.
-	b2, err := s.UpdateTrack(ctx, b.ID, TrackInput{Title: b.Title, Artist: "Jay Chou", Album: "叶惠美"})
+	b2, err := s.UpdateTrack(ctx, b.ID, TrackInput{Title: b.Title, Artists: []string{"Jay Chou"}, Album: "叶惠美"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if b2.Album.ID == a.Album.ID {
 		t.Fatal("different album artists must give different albums")
 	}
-	merged, err := s.MergeArtists(ctx, a.Artist.ID, []int64{b2.Artist.ID})
+	merged, err := s.MergeArtists(ctx, a.Artists[0].ID, []int64{b2.Artists[0].ID})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if merged.TrackCount != 2 || merged.AlbumCount != 1 {
 		t.Fatalf("merged = %+v", merged)
 	}
-	if _, err := s.Artist(ctx, b2.Artist.ID); !errors.Is(err, ErrNotFound) {
+	if _, err := s.Artist(ctx, b2.Artists[0].ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("source artist remains: %v", err)
 	}
 	album, err := s.Album(ctx, a.Album.ID)
 	if err != nil || album.TrackCount != 2 {
 		t.Fatalf("album = %+v, %v", album, err)
 	}
-	if _, err := s.MergeArtists(ctx, a.Artist.ID, []int64{a.Artist.ID}); !errors.Is(err, ErrInvalid) {
+	if _, err := s.MergeArtists(ctx, a.Artists[0].ID, []int64{a.Artists[0].ID}); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("self merge: %v", err)
 	}
 }
@@ -337,11 +348,11 @@ func TestMergeAlbumsAndRenameConflicts(t *testing.T) {
 	ctx := context.Background()
 	a := ingest(t, s, sample(t, "tagged.mp3"), "a.mp3", nil).Track
 	b := ingest(t, s, sample(t, "untagged.mp3"), "b.mp3", nil).Track
-	b2, err := s.UpdateTrack(ctx, b.ID, TrackInput{Title: "b", Artist: "周杰伦", Album: "叶惠美 (Deluxe)"})
+	b2, err := s.UpdateTrack(ctx, b.ID, TrackInput{Title: "b", Artists: []string{"周杰伦"}, Album: "叶惠美 (Deluxe)"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.UpdateAlbum(ctx, b2.Album.ID, AlbumInput{Title: "叶惠美", Artist: "周杰伦"}); !errors.Is(err, ErrConflict) {
+	if _, err := s.UpdateAlbum(ctx, b2.Album.ID, AlbumInput{Title: "叶惠美", Artists: []string{"周杰伦"}}); !errors.Is(err, ErrConflict) {
 		t.Fatalf("rename onto existing album: %v", err)
 	}
 	album, err := s.MergeAlbums(ctx, a.Album.ID, []int64{b2.Album.ID})
@@ -352,11 +363,11 @@ func TestMergeAlbumsAndRenameConflicts(t *testing.T) {
 	if page.Total != 2 {
 		t.Fatalf("album tracks = %d", page.Total)
 	}
-	other, err := s.UpdateTrack(ctx, b.ID, TrackInput{Title: "b", Artist: "Someone"})
+	other, err := s.UpdateTrack(ctx, b.ID, TrackInput{Title: "b", Artists: []string{"Someone"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.RenameArtist(ctx, other.Artist.ID, "周杰伦"); !errors.Is(err, ErrConflict) {
+	if _, err := s.RenameArtist(ctx, other.Artists[0].ID, "周杰伦"); !errors.Is(err, ErrConflict) {
 		t.Fatalf("rename onto existing artist: %v", err)
 	}
 }
@@ -458,5 +469,177 @@ func TestTrackSearchEscapesWildcards(t *testing.T) {
 		if err != nil || page.Total != want {
 			t.Errorf("q=%q: total = %d, %v", q, page.Total, err)
 		}
+	}
+}
+
+func TestMultipleArtists(t *testing.T) {
+	s := openTest(t)
+	ctx := context.Background()
+	a := ingest(t, s, sample(t, "tagged.flac"), "a.flac", nil).Track
+	b := ingest(t, s, sample(t, "tagged.mp3"), "b.mp3", nil).Track
+
+	// Blank and repeated names are dropped; album artists default to the
+	// track artists.
+	d, err := s.UpdateTrack(ctx, a.ID, TrackInput{Title: "千里之外", Artists: []string{"周杰伦", " 费玉清 ", "", "周杰伦"}, Album: "依然范特西"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"周杰伦", "费玉清"}; !slices.Equal(names(d.Artists), want) || !slices.Equal(names(d.Album.Artists), want) {
+		t.Fatalf("artists = %v, album artists = %v", names(d.Artists), names(d.Album.Artists))
+	}
+	// The same artists in another order make the same album.
+	d2, err := s.UpdateTrack(ctx, b.ID, TrackInput{Title: "b", Artists: []string{"费玉清", "周杰伦"}, Album: "依然范特西"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d2.Album.ID != d.Album.ID || !slices.Equal(names(d2.Artists), []string{"费玉清", "周杰伦"}) {
+		t.Fatalf("second track = %+v", d2)
+	}
+	fei := d.Artists[1]
+	artist, err := s.Artist(ctx, fei.ID)
+	if err != nil || artist.TrackCount != 2 || artist.AlbumCount != 1 {
+		t.Fatalf("费玉清 = %+v, %v", artist, err)
+	}
+	if page, _ := s.Tracks(ctx, TrackQuery{ArtistID: fei.ID}); page.Total != 2 {
+		t.Fatalf("tracks of 费玉清 = %d", page.Total)
+	}
+	if page, _ := s.Tracks(ctx, TrackQuery{Q: "费玉"}); page.Total != 2 {
+		t.Fatalf("search 费玉 = %d", page.Total)
+	}
+	if page, _ := s.Albums(ctx, AlbumQuery{ArtistID: fei.ID}); page.Total != 1 {
+		t.Fatalf("albums of 费玉清 = %d", page.Total)
+	}
+
+	// Album artists of their own; the old album is pruned.
+	album, err := s.UpdateAlbum(ctx, d.Album.ID, AlbumInput{Title: "依然范特西", Artists: []string{"群星"}})
+	if err != nil || !slices.Equal(names(album.Artists), []string{"群星"}) {
+		t.Fatalf("album = %+v, %v", album, err)
+	}
+	if artist, _ := s.Artist(ctx, fei.ID); artist.AlbumCount != 0 || artist.TrackCount != 2 {
+		t.Fatalf("费玉清 after album edit = %+v", artist)
+	}
+	if _, err := s.UpdateTrack(ctx, a.ID, TrackInput{Title: "x", Artists: make([]string, maxArtists+1)}); err != nil {
+		t.Fatalf("blank names count toward the limit: %v", err)
+	}
+	many := make([]string, maxArtists+1)
+	for i := range many {
+		many[i] = string(rune('一' + i))
+	}
+	if _, err := s.UpdateTrack(ctx, a.ID, TrackInput{Title: "x", Artists: many}); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("too many artists: %v", err)
+	}
+}
+
+func TestMergeArtistsCollapsesLinksAndAlbums(t *testing.T) {
+	s := openTest(t)
+	ctx := context.Background()
+	a := ingest(t, s, sample(t, "tagged.flac"), "a.flac", nil).Track
+	b := ingest(t, s, sample(t, "tagged.mp3"), "b.mp3", nil).Track
+	duet, err := s.UpdateTrack(ctx, a.ID, TrackInput{Title: "a", Artists: []string{"Jay", "周杰伦"}, Album: "Duet"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	solo, err := s.UpdateTrack(ctx, b.ID, TrackInput{Title: "b", Artists: []string{"周杰伦"}, Album: "Duet"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if duet.Album.ID == solo.Album.ID {
+		t.Fatal("different artist sets must give different albums")
+	}
+	jay, chou := duet.Artists[0].ID, duet.Artists[1].ID
+	merged, err := s.MergeArtists(ctx, chou, []int64{jay})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if merged.TrackCount != 2 || merged.AlbumCount != 1 {
+		t.Fatalf("merged = %+v", merged)
+	}
+	d, err := s.Track(ctx, a.ID)
+	if err != nil || !slices.Equal(names(d.Artists), []string{"周杰伦"}) || d.Album.ID != solo.Album.ID {
+		t.Fatalf("duet after merge = %+v, %v", d, err)
+	}
+	if albums, _ := s.Albums(ctx, AlbumQuery{}); albums.Total != 1 || albums.Items[0].TrackCount != 2 {
+		t.Fatalf("albums = %+v", albums)
+	}
+}
+
+func TestMigrateKeepsArtistsAndRetiredIDs(t *testing.T) {
+	dataDir, mediaDir := t.TempDir(), t.TempDir()
+	db, err := sql.Open("sqlite", "file:"+filepath.Join(dataDir, "sonora.db")+"?_pragma=foreign_keys(1)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := migrations[0](tx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(`
+		PRAGMA user_version = 1;
+		INSERT INTO artists (id, name) VALUES (1, '周杰伦');
+		INSERT INTO albums (id, title, artist_id) VALUES (1, '叶惠美', 1), (2, '无主', NULL), (3, '已删', NULL);
+		INSERT INTO tracks (id, title, artist_id, album_id, duration_ms, format, size, sha256, file, original_name)
+		VALUES (1, '晴天', 1, 1, 1000, 'mp3', 1, 'a', 'a.mp3', 'a.mp3'),
+		       (2, '无名', NULL, 2, 1000, 'mp3', 1, 'b', 'b.mp3', 'b.mp3'),
+		       (9, '已删', NULL, NULL, 1000, 'mp3', 1, 'c', 'c.mp3', 'c.mp3');
+		DELETE FROM tracks WHERE id = 9;
+		DELETE FROM albums WHERE id = 3;`); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+
+	s, err := Open(dataDir, mediaDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := &testStore{Store: s, dataDir: dataDir, mediaDir: mediaDir}
+	t.Cleanup(func() { s.Close() })
+	ctx := context.Background()
+	d, err := s.Track(ctx, 1)
+	if err != nil || !slices.Equal(names(d.Artists), []string{"周杰伦"}) || !slices.Equal(names(d.Album.Artists), []string{"周杰伦"}) {
+		t.Fatalf("migrated track = %+v, %v", d, err)
+	}
+	if d, err := s.Track(ctx, 2); err != nil || len(d.Artists) != 0 || len(d.Album.Artists) != 0 {
+		t.Fatalf("track without artist = %+v, %v", d, err)
+	}
+	var fk int
+	if err := s.db.QueryRow(`PRAGMA foreign_keys`).Scan(&fk); err != nil || fk != 1 {
+		t.Fatalf("foreign_keys = %d, %v", fk, err)
+	}
+	// The tagged sample joins the migrated album; deleted IDs stay retired.
+	tr := ingest(t, ts, sample(t, "tagged.flac"), "x.flac", nil).Track
+	if tr.ID != 10 || tr.Album.ID != 1 {
+		t.Fatalf("new track %d in album %d", tr.ID, tr.Album.ID)
+	}
+	moved, err := s.UpdateTrack(ctx, tr.ID, TrackInput{Title: "x", Album: "新专辑"})
+	if err != nil || moved.Album.ID != 4 {
+		t.Fatalf("new album = %+v, %v", moved.Album, err)
+	}
+}
+
+func TestIngestMultiValueArtists(t *testing.T) {
+	s := openTest(t)
+	// An ID3v2.4 tag whose TPE1 holds two UTF-8 values, before plain audio.
+	var body []byte
+	for _, f := range [][2]string{{"TIT2", "\x03千里之外"}, {"TPE1", "\x03周杰伦\x00费玉清"}, {"TALB", "\x03依然范特西"}} {
+		n := len(f[1])
+		body = append(append(body, f[0]...), byte(n>>21&0x7F), byte(n>>14&0x7F), byte(n>>7&0x7F), byte(n&0x7F), 0, 0)
+		body = append(body, f[1]...)
+	}
+	n := len(body)
+	data := append([]byte{'I', 'D', '3', 4, 0, 0, byte(n >> 21 & 0x7F), byte(n >> 14 & 0x7F), byte(n >> 7 & 0x7F), byte(n & 0x7F)}, body...)
+	data = append(data, sample(t, "untagged.mp3")...)
+
+	tr := ingest(t, s, data, "a.mp3", nil).Track
+	if want := []string{"周杰伦", "费玉清"}; !slices.Equal(names(tr.Artists), want) || !slices.Equal(names(tr.Album.Artists), want) {
+		t.Fatalf("artists = %v, album artists = %v", names(tr.Artists), names(tr.Album.Artists))
+	}
+	if artists, _ := s.Artists(context.Background(), "", Window{}); artists.Total != 2 {
+		t.Fatalf("artists = %+v", artists)
 	}
 }

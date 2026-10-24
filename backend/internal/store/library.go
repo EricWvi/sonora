@@ -3,11 +3,14 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 )
@@ -18,20 +21,33 @@ type Ref struct {
 	Name string `json:"name"`
 }
 
-// AlbumRef is the album a track belongs to.
-type AlbumRef struct {
-	ID     int64   `json:"id"`
-	Title  string  `json:"title"`
-	Artist *Ref    `json:"artist"`
-	Cover  *string `json:"cover"`
+// refs scans the JSON array built by artistsJSON.
+type refs []Ref
+
+func (r *refs) Scan(src any) error {
+	switch v := src.(type) {
+	case string:
+		return json.Unmarshal([]byte(v), (*[]Ref)(r))
+	case []byte:
+		return json.Unmarshal(v, (*[]Ref)(r))
+	}
+	return fmt.Errorf("scan artists from %T", src)
 }
 
-// Track is a song in the library. Artist and Album are nil when no tag
-// named them.
+// AlbumRef is the album a track belongs to.
+type AlbumRef struct {
+	ID      int64   `json:"id"`
+	Title   string  `json:"title"`
+	Artists []Ref   `json:"artists"`
+	Cover   *string `json:"cover"`
+}
+
+// Track is a song in the library. Artists is empty and Album nil when no
+// tag named them.
 type Track struct {
 	ID         int64     `json:"id"`
 	Title      string    `json:"title"`
-	Artist     *Ref      `json:"artist"`
+	Artists    []Ref     `json:"artists"`
 	Album      *AlbumRef `json:"album"`
 	TrackNo    int       `json:"trackNo"`
 	DiscNo     int       `json:"discNo"`
@@ -53,11 +69,11 @@ type TrackDetail struct {
 	Lyrics string `json:"lyrics"`
 }
 
-// Album is a release. Artist is the album artist.
+// Album is a release. Artists are the album artists.
 type Album struct {
 	ID         int64   `json:"id"`
 	Title      string  `json:"title"`
-	Artist     *Ref    `json:"artist"`
+	Artists    []Ref   `json:"artists"`
 	Year       int     `json:"year"`
 	Cover      *string `json:"cover"`
 	TrackCount int     `json:"trackCount"`
@@ -65,7 +81,7 @@ type Album struct {
 	CreatedAt  string  `json:"createdAt"`
 }
 
-// Artist is a performer, either of tracks or as an album artist.
+// Artist is a performer, of tracks or as an album artist.
 type Artist struct {
 	ID         int64  `json:"id"`
 	Name       string `json:"name"`
@@ -90,6 +106,7 @@ const (
 	defaultLimit = 50
 	maxLimit     = 500
 	maxNameLen   = 300
+	maxArtists   = 50
 )
 
 func (w Window) clamp() Window {
@@ -109,6 +126,81 @@ func like(q string) string {
 	return "%" + r.Replace(q) + "%"
 }
 
+// --- artist links ----------------------------------------------------------
+
+// artistsJSON selects, as a JSON array in position order, the artists that
+// table (track_artists or album_artists) links to the row whose ID is ref.
+func artistsJSON(table, col, ref string) string {
+	return `(SELECT json_group_array(json_object('id', a.id, 'name', a.name) ORDER BY x.position)
+		FROM ` + table + ` x JOIN artists a ON a.id = x.artist_id WHERE x.` + col + ` = ` + ref + `)`
+}
+
+// normalizeNames trims names and drops empty and repeated ones, keeping
+// the first spelling.
+func normalizeNames(names []string) ([]string, error) {
+	out := []string{}
+	seen := map[string]bool{}
+	for _, n := range names {
+		n = strings.TrimSpace(n)
+		if n == "" || seen[strings.ToLower(n)] {
+			continue
+		}
+		if utf8.RuneCountInString(n) > maxNameLen {
+			return nil, invalid(fmt.Sprintf("名称不能超过 %d 个字符", maxNameLen))
+		}
+		seen[strings.ToLower(n)] = true
+		out = append(out, n)
+	}
+	if len(out) > maxArtists {
+		return nil, invalid(fmt.Sprintf("艺术家不能超过 %d 位", maxArtists))
+	}
+	return out, nil
+}
+
+// artistIDs finds or creates the named artists, in order and without
+// repeats.
+func artistIDs(ctx context.Context, tx *sql.Tx, names []string) ([]int64, error) {
+	ids := []int64{}
+	for _, name := range names {
+		var id int64
+		err := tx.QueryRowContext(ctx, `SELECT id FROM artists WHERE name = ?`, name).Scan(&id)
+		if errors.Is(err, sql.ErrNoRows) {
+			err = tx.QueryRowContext(ctx, `INSERT INTO artists (name) VALUES (?) RETURNING id`, name).Scan(&id)
+		}
+		if err != nil {
+			return nil, err
+		}
+		if !slices.Contains(ids, id) {
+			ids = append(ids, id)
+		}
+	}
+	return ids, nil
+}
+
+// setArtists replaces the artists table links to the row id.
+func setArtists(ctx context.Context, tx *sql.Tx, table, col string, id int64, artists []int64) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE `+col+` = ?`, id); err != nil {
+		return err
+	}
+	for i, a := range artists {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO `+table+` (`+col+`, artist_id, position) VALUES (?, ?, ?)`, id, a, i); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// albumKey identifies a set of album artists regardless of their order.
+func albumKey(artists []int64) string {
+	sorted := slices.Sorted(slices.Values(artists))
+	parts := make([]string, len(sorted))
+	for i, id := range sorted {
+		parts[i] = strconv.FormatInt(id, 10)
+	}
+	return strings.Join(parts, ",")
+}
+
 // --- tracks ----------------------------------------------------------------
 
 // TrackQuery filters the track list.
@@ -121,39 +213,33 @@ type TrackQuery struct {
 	Window
 }
 
-const trackColumns = `
+var trackColumns = `
 	t.id, t.title, t.track_no, t.disc_no, t.year, t.duration_ms, t.format, t.size,
-	t.cover, t.lyrics <> '', t.original_name, t.created_at,
-	ar.id, ar.name, al.id, al.title, al.cover, aa.id, aa.name`
+	t.cover, t.lyrics <> '', t.original_name, t.created_at, ` +
+	artistsJSON("track_artists", "track_id", "t.id") + `,
+	al.id, al.title, al.cover, ` + artistsJSON("album_artists", "album_id", "al.id")
 
 const trackFrom = `
 	FROM tracks t
-	LEFT JOIN artists ar ON ar.id = t.artist_id
-	LEFT JOIN albums al ON al.id = t.album_id
-	LEFT JOIN artists aa ON aa.id = al.artist_id`
+	LEFT JOIN albums al ON al.id = t.album_id`
 
 type scanner interface{ Scan(...any) error }
 
 func scanTrack(row scanner, extra ...any) (Track, error) {
 	var t Track
-	var arID, alID, aaID sql.NullInt64
-	var arName, alTitle, aaName, alCover sql.NullString
+	var alID sql.NullInt64
+	var alTitle, alCover sql.NullString
+	var alArtists []Ref
 	dest := []any{&t.ID, &t.Title, &t.TrackNo, &t.DiscNo, &t.Year, &t.DurationMs, &t.Format, &t.Size,
-		&t.Cover, &t.HasLyrics, &t.OriginalName, &t.CreatedAt,
-		&arID, &arName, &alID, &alTitle, &alCover, &aaID, &aaName}
+		&t.Cover, &t.HasLyrics, &t.OriginalName, &t.CreatedAt, (*refs)(&t.Artists),
+		&alID, &alTitle, &alCover, (*refs)(&alArtists)}
 	if err := row.Scan(append(dest, extra...)...); err != nil {
 		return t, err
 	}
-	if arID.Valid {
-		t.Artist = &Ref{ID: arID.Int64, Name: arName.String}
-	}
 	if alID.Valid {
-		t.Album = &AlbumRef{ID: alID.Int64, Title: alTitle.String}
+		t.Album = &AlbumRef{ID: alID.Int64, Title: alTitle.String, Artists: alArtists}
 		if alCover.Valid {
 			t.Album.Cover = &alCover.String
-		}
-		if aaID.Valid {
-			t.Album.Artist = &Ref{ID: aaID.Int64, Name: aaName.String}
 		}
 	}
 	return t, nil
@@ -166,19 +252,22 @@ func (s *Store) Tracks(ctx context.Context, q TrackQuery) (Page[Track], error) {
 	var where []string
 	var args []any
 	if q.Q = strings.TrimSpace(q.Q); q.Q != "" {
-		where = append(where, `(t.title LIKE ? ESCAPE '\' OR ar.name LIKE ? ESCAPE '\' OR al.title LIKE ? ESCAPE '\')`)
+		where = append(where, `(t.title LIKE ? ESCAPE '\' OR al.title LIKE ? ESCAPE '\' OR EXISTS (
+			SELECT 1 FROM track_artists x JOIN artists a ON a.id = x.artist_id
+			WHERE x.track_id = t.id AND a.name LIKE ? ESCAPE '\'))`)
 		p := like(q.Q)
 		args = append(args, p, p, p)
 	}
 	if q.Missing {
-		where = append(where, `(t.artist_id IS NULL OR t.album_id IS NULL)`)
+		where = append(where, `(t.album_id IS NULL OR NOT EXISTS (SELECT 1 FROM track_artists WHERE track_id = t.id))`)
 	}
 	if q.AlbumID > 0 {
 		where = append(where, `t.album_id = ?`)
 		args = append(args, q.AlbumID)
 	}
 	if q.ArtistID > 0 {
-		where = append(where, `(t.artist_id = ? OR al.artist_id = ?)`)
+		where = append(where, `(EXISTS (SELECT 1 FROM track_artists WHERE track_id = t.id AND artist_id = ?)
+			OR EXISTS (SELECT 1 FROM album_artists WHERE album_id = t.album_id AND artist_id = ?))`)
 		args = append(args, q.ArtistID, q.ArtistID)
 	}
 	cond := ""
@@ -228,30 +317,33 @@ func (s *Store) track(ctx context.Context, q querier, id int64) (TrackDetail, er
 	return d, err
 }
 
-// TrackInput is the editable metadata of a track. An empty Artist or
-// Album leaves the track without one; an empty AlbumArtist uses Artist.
+// TrackInput is the editable metadata of a track. Empty Artists or Album
+// leave the track without them; empty AlbumArtists use Artists.
 type TrackInput struct {
-	Title       string `json:"title"`
-	Artist      string `json:"artist"`
-	Album       string `json:"album"`
-	AlbumArtist string `json:"albumArtist"`
-	TrackNo     int    `json:"trackNo"`
-	DiscNo      int    `json:"discNo"`
-	Year        int    `json:"year"`
+	Title        string   `json:"title"`
+	Artists      []string `json:"artists"`
+	Album        string   `json:"album"`
+	AlbumArtists []string `json:"albumArtists"`
+	TrackNo      int      `json:"trackNo"`
+	DiscNo       int      `json:"discNo"`
+	Year         int      `json:"year"`
 }
 
 func (in *TrackInput) normalize() error {
 	in.Title = strings.TrimSpace(in.Title)
-	in.Artist = strings.TrimSpace(in.Artist)
 	in.Album = strings.TrimSpace(in.Album)
-	in.AlbumArtist = strings.TrimSpace(in.AlbumArtist)
 	if in.Title == "" {
 		return invalid("标题不能为空")
 	}
-	for _, v := range []string{in.Title, in.Artist, in.Album, in.AlbumArtist} {
-		if utf8.RuneCountInString(v) > maxNameLen {
-			return invalid(fmt.Sprintf("名称不能超过 %d 个字符", maxNameLen))
-		}
+	if utf8.RuneCountInString(in.Title) > maxNameLen || utf8.RuneCountInString(in.Album) > maxNameLen {
+		return invalid(fmt.Sprintf("名称不能超过 %d 个字符", maxNameLen))
+	}
+	var err error
+	if in.Artists, err = normalizeNames(in.Artists); err != nil {
+		return err
+	}
+	if in.AlbumArtists, err = normalizeNames(in.AlbumArtists); err != nil {
+		return err
 	}
 	if in.TrackNo < 0 || in.TrackNo > 9999 || in.DiscNo < 0 || in.DiscNo > 999 {
 		return invalid("音轨号或碟号超出范围")
@@ -272,19 +364,22 @@ func (s *Store) UpdateTrack(ctx context.Context, id int64, in TrackInput) (Track
 	defer s.files.Unlock()
 	var d TrackDetail
 	err := s.inTx(ctx, func(tx *sql.Tx) error {
-		artist, album, err := resolveTrackRefs(ctx, tx, in)
+		artists, album, err := resolveTrackRefs(ctx, tx, in)
 		if err != nil {
 			return err
 		}
 		res, err := tx.ExecContext(ctx, `
-			UPDATE tracks SET title = ?, artist_id = ?, album_id = ?, track_no = ?, disc_no = ?, year = ?,
+			UPDATE tracks SET title = ?, album_id = ?, track_no = ?, disc_no = ?, year = ?,
 				updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
-			WHERE id = ?`, in.Title, artist, album, in.TrackNo, in.DiscNo, in.Year, id)
+			WHERE id = ?`, in.Title, album, in.TrackNo, in.DiscNo, in.Year, id)
 		if err != nil {
 			return err
 		}
 		if n, _ := res.RowsAffected(); n == 0 {
 			return ErrNotFound
+		}
+		if err := setArtists(ctx, tx, "track_artists", "track_id", id, artists); err != nil {
+			return err
 		}
 		if err := pruneOrphans(ctx, tx); err != nil {
 			return err
@@ -298,47 +393,36 @@ func (s *Store) UpdateTrack(ctx context.Context, id int64, in TrackInput) (Track
 	return d, err
 }
 
-// resolveTrackRefs finds or creates the artist and album the input names.
-func resolveTrackRefs(ctx context.Context, tx *sql.Tx, in TrackInput) (artist, album sql.NullInt64, err error) {
-	if artist, err = artistID(ctx, tx, in.Artist); err != nil {
+// resolveTrackRefs finds or creates the artists and album the input names.
+func resolveTrackRefs(ctx context.Context, tx *sql.Tx, in TrackInput) (artists []int64, album sql.NullInt64, err error) {
+	if artists, err = artistIDs(ctx, tx, in.Artists); err != nil {
 		return
 	}
-	albumArtistName := in.AlbumArtist
-	if albumArtistName == "" {
-		albumArtistName = in.Artist
+	albumArtists := artists
+	if len(in.AlbumArtists) > 0 {
+		if albumArtists, err = artistIDs(ctx, tx, in.AlbumArtists); err != nil {
+			return
+		}
 	}
-	albumArtist, err := artistID(ctx, tx, albumArtistName)
-	if err != nil {
-		return
-	}
-	album, err = albumID(ctx, tx, in.Album, albumArtist, in.Year)
+	album, err = albumID(ctx, tx, in.Album, albumArtists, in.Year)
 	return
 }
 
-func artistID(ctx context.Context, tx *sql.Tx, name string) (sql.NullInt64, error) {
-	var id sql.NullInt64
-	if name == "" {
-		return id, nil
-	}
-	err := tx.QueryRowContext(ctx, `SELECT id FROM artists WHERE name = ?`, name).Scan(&id)
-	if errors.Is(err, sql.ErrNoRows) {
-		err = tx.QueryRowContext(ctx, `INSERT INTO artists (name) VALUES (?) RETURNING id`, name).Scan(&id)
-	}
-	return id, err
-}
-
-func albumID(ctx context.Context, tx *sql.Tx, title string, artist sql.NullInt64, year int) (sql.NullInt64, error) {
+func albumID(ctx context.Context, tx *sql.Tx, title string, artists []int64, year int) (sql.NullInt64, error) {
 	var id sql.NullInt64
 	if title == "" {
 		return id, nil
 	}
 	err := tx.QueryRowContext(ctx,
-		`SELECT id FROM albums WHERE title = ? COLLATE NOCASE AND IFNULL(artist_id, 0) = IFNULL(?, 0)`,
-		title, artist).Scan(&id)
+		`SELECT id FROM albums WHERE title = ? COLLATE NOCASE AND artist_key = ?`,
+		title, albumKey(artists)).Scan(&id)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
-		err = tx.QueryRowContext(ctx,
-			`INSERT INTO albums (title, artist_id, year) VALUES (?, ?, ?) RETURNING id`, title, artist, year).Scan(&id)
+		err = tx.QueryRowContext(ctx, `INSERT INTO albums (title, artist_key, year) VALUES (?, ?, ?) RETURNING id`,
+			title, albumKey(artists), year).Scan(&id)
+		if err == nil {
+			err = setArtists(ctx, tx, "album_artists", "album_id", id.Int64, artists)
+		}
 	case err == nil && year > 0:
 		_, err = tx.ExecContext(ctx, `UPDATE albums SET year = ? WHERE id = ? AND year = 0`, year, id)
 	}
@@ -351,8 +435,8 @@ func pruneOrphans(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.ExecContext(ctx, `
 		DELETE FROM albums WHERE NOT EXISTS (SELECT 1 FROM tracks WHERE album_id = albums.id);
 		DELETE FROM artists
-		WHERE NOT EXISTS (SELECT 1 FROM tracks WHERE artist_id = artists.id)
-		  AND NOT EXISTS (SELECT 1 FROM albums WHERE artist_id = artists.id);`)
+		WHERE NOT EXISTS (SELECT 1 FROM track_artists WHERE artist_id = artists.id)
+		  AND NOT EXISTS (SELECT 1 FROM album_artists WHERE artist_id = artists.id);`)
 	return err
 }
 
@@ -413,20 +497,16 @@ type AlbumQuery struct {
 	Window
 }
 
-const albumSelect = `
-	SELECT al.id, al.title, al.year, al.cover, al.created_at, aa.id, aa.name,
+var albumSelect = `
+	SELECT al.id, al.title, al.year, al.cover, al.created_at, ` +
+	artistsJSON("album_artists", "album_id", "al.id") + `,
 		(SELECT COUNT(*) FROM tracks WHERE album_id = al.id),
 		(SELECT IFNULL(SUM(duration_ms), 0) FROM tracks WHERE album_id = al.id)
-	FROM albums al LEFT JOIN artists aa ON aa.id = al.artist_id`
+	FROM albums al`
 
 func scanAlbum(row scanner) (Album, error) {
 	var a Album
-	var aaID sql.NullInt64
-	var aaName sql.NullString
-	err := row.Scan(&a.ID, &a.Title, &a.Year, &a.Cover, &a.CreatedAt, &aaID, &aaName, &a.TrackCount, &a.DurationMs)
-	if aaID.Valid {
-		a.Artist = &Ref{ID: aaID.Int64, Name: aaName.String}
-	}
+	err := row.Scan(&a.ID, &a.Title, &a.Year, &a.Cover, &a.CreatedAt, (*refs)(&a.Artists), &a.TrackCount, &a.DurationMs)
 	return a, err
 }
 
@@ -436,12 +516,14 @@ func (s *Store) Albums(ctx context.Context, q AlbumQuery) (Page[Album], error) {
 	var where []string
 	var args []any
 	if q.Q = strings.TrimSpace(q.Q); q.Q != "" {
-		where = append(where, `(al.title LIKE ? ESCAPE '\' OR aa.name LIKE ? ESCAPE '\')`)
+		where = append(where, `(al.title LIKE ? ESCAPE '\' OR EXISTS (
+			SELECT 1 FROM album_artists x JOIN artists a ON a.id = x.artist_id
+			WHERE x.album_id = al.id AND a.name LIKE ? ESCAPE '\'))`)
 		p := like(q.Q)
 		args = append(args, p, p)
 	}
 	if q.ArtistID > 0 {
-		where = append(where, `al.artist_id = ?`)
+		where = append(where, `EXISTS (SELECT 1 FROM album_artists WHERE album_id = al.id AND artist_id = ?)`)
 		args = append(args, q.ArtistID)
 	}
 	cond := ""
@@ -449,7 +531,7 @@ func (s *Store) Albums(ctx context.Context, q AlbumQuery) (Page[Album], error) {
 		cond = " WHERE " + strings.Join(where, " AND ")
 	}
 	err := s.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM albums al LEFT JOIN artists aa ON aa.id = al.artist_id`+cond, args...).Scan(&page.Total)
+		`SELECT COUNT(*) FROM albums al`+cond, args...).Scan(&page.Total)
 	if err != nil {
 		return page, err
 	}
@@ -483,51 +565,58 @@ func (s *Store) album(ctx context.Context, q querier, id int64) (Album, error) {
 	return a, err
 }
 
-// AlbumInput is the editable metadata of an album. Artist is the album
-// artist's name; empty leaves the album without one.
+// AlbumInput is the editable metadata of an album. Artists are the album
+// artists' names; empty leaves the album without any.
 type AlbumInput struct {
-	Title  string `json:"title"`
-	Artist string `json:"artist"`
-	Year   int    `json:"year"`
+	Title   string   `json:"title"`
+	Artists []string `json:"artists"`
+	Year    int      `json:"year"`
 }
 
 // UpdateAlbum replaces an album's metadata. Renaming onto another album of
-// the same artist is a conflict: merge them instead.
+// the same artists is a conflict: merge them instead.
 func (s *Store) UpdateAlbum(ctx context.Context, id int64, in AlbumInput) (Album, error) {
-	in.Title, in.Artist = strings.TrimSpace(in.Title), strings.TrimSpace(in.Artist)
+	in.Title = strings.TrimSpace(in.Title)
 	switch {
 	case in.Title == "":
 		return Album{}, invalid("专辑名不能为空")
-	case utf8.RuneCountInString(in.Title) > maxNameLen || utf8.RuneCountInString(in.Artist) > maxNameLen:
+	case utf8.RuneCountInString(in.Title) > maxNameLen:
 		return Album{}, invalid(fmt.Sprintf("名称不能超过 %d 个字符", maxNameLen))
 	case in.Year < 0 || in.Year > 9999:
 		return Album{}, invalid("年份超出范围")
 	}
+	var err error
+	if in.Artists, err = normalizeNames(in.Artists); err != nil {
+		return Album{}, err
+	}
 	s.files.Lock()
 	defer s.files.Unlock()
 	var a Album
-	err := s.inTx(ctx, func(tx *sql.Tx) error {
-		artist, err := artistID(ctx, tx, in.Artist)
+	err = s.inTx(ctx, func(tx *sql.Tx) error {
+		artists, err := artistIDs(ctx, tx, in.Artists)
 		if err != nil {
 			return err
 		}
 		var other int64
 		err = tx.QueryRowContext(ctx,
-			`SELECT id FROM albums WHERE title = ? COLLATE NOCASE AND IFNULL(artist_id, 0) = IFNULL(?, 0) AND id <> ?`,
-			in.Title, artist, id).Scan(&other)
+			`SELECT id FROM albums WHERE title = ? COLLATE NOCASE AND artist_key = ? AND id <> ?`,
+			in.Title, albumKey(artists), id).Scan(&other)
 		if err == nil {
 			return conflict("该艺术家已有同名专辑，请改用合并")
 		}
 		if !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
-		res, err := tx.ExecContext(ctx, `UPDATE albums SET title = ?, artist_id = ?, year = ? WHERE id = ?`,
-			in.Title, artist, in.Year, id)
+		res, err := tx.ExecContext(ctx, `UPDATE albums SET title = ?, artist_key = ?, year = ? WHERE id = ?`,
+			in.Title, albumKey(artists), in.Year, id)
 		if err != nil {
 			return err
 		}
 		if n, _ := res.RowsAffected(); n == 0 {
 			return ErrNotFound
+		}
+		if err := setArtists(ctx, tx, "album_artists", "album_id", id, artists); err != nil {
+			return err
 		}
 		if err := pruneOrphans(ctx, tx); err != nil {
 			return err
@@ -588,8 +677,8 @@ func mergeAlbumInto(ctx context.Context, tx *sql.Tx, target, src int64) error {
 
 const artistSelect = `
 	SELECT a.id, a.name, a.created_at,
-		(SELECT COUNT(*) FROM tracks WHERE artist_id = a.id),
-		(SELECT COUNT(*) FROM albums WHERE artist_id = a.id)
+		(SELECT COUNT(*) FROM track_artists WHERE artist_id = a.id),
+		(SELECT COUNT(*) FROM album_artists WHERE artist_id = a.id)
 	FROM artists a`
 
 func scanArtist(row scanner) (Artist, error) {
@@ -672,8 +761,8 @@ func (s *Store) RenameArtist(ctx context.Context, id int64, name string) (Artist
 }
 
 // MergeArtists moves the tracks and albums of the source artists to target
-// and deletes the sources. Albums that then share a title with one of the
-// target's albums are merged into it.
+// and deletes the sources. An album whose artists then match another
+// album of the same title is merged into it.
 func (s *Store) MergeArtists(ctx context.Context, target int64, sources []int64) (Artist, error) {
 	if err := checkMerge(target, sources); err != nil {
 		return Artist{}, err
@@ -686,43 +775,22 @@ func (s *Store) MergeArtists(ctx context.Context, target int64, sources []int64)
 			return err
 		}
 		for _, src := range sources {
-			if _, err := tx.ExecContext(ctx, `UPDATE tracks SET artist_id = ? WHERE artist_id = ?`, target, src); err != nil {
-				return err
-			}
-			rows, err := tx.QueryContext(ctx, `
-				SELECT a.id, b.id FROM albums a
-				LEFT JOIN albums b ON b.artist_id = ? AND b.title = a.title COLLATE NOCASE
-				WHERE a.artist_id = ?`, target, src)
-			if err != nil {
-				return err
-			}
-			type move struct {
-				album int64
-				into  sql.NullInt64
-			}
-			var moves []move
-			for rows.Next() {
-				var m move
-				if err := rows.Scan(&m.album, &m.into); err != nil {
-					rows.Close()
+			// Where target is already linked, the source link just goes.
+			for _, table := range []string{"track_artists", "album_artists"} {
+				if _, err := tx.ExecContext(ctx, `UPDATE OR IGNORE `+table+` SET artist_id = ? WHERE artist_id = ?`,
+					target, src); err != nil {
 					return err
 				}
-				moves = append(moves, m)
-			}
-			rows.Close()
-			for _, m := range moves {
-				if m.into.Valid {
-					err = mergeAlbumInto(ctx, tx, m.into.Int64, m.album)
-				} else {
-					_, err = tx.ExecContext(ctx, `UPDATE albums SET artist_id = ? WHERE id = ?`, target, m.album)
-				}
-				if err != nil {
+				if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE artist_id = ?`, src); err != nil {
 					return err
 				}
 			}
 			if _, err := tx.ExecContext(ctx, `DELETE FROM artists WHERE id = ?`, src); err != nil {
 				return err
 			}
+		}
+		if err := rekeyAlbums(ctx, tx, target); err != nil {
+			return err
 		}
 		if err := pruneOrphans(ctx, tx); err != nil {
 			return err
@@ -735,6 +803,59 @@ func (s *Store) MergeArtists(ctx context.Context, target int64, sources []int64)
 		s.collectCovers(ctx)
 	}
 	return a, err
+}
+
+// rekeyAlbums recomputes artist_key for the albums of artist, merging an
+// album into another of the same title whose artists it now matches.
+func rekeyAlbums(ctx context.Context, tx *sql.Tx, artist int64) error {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT al.id, al.title, (SELECT group_concat(artist_id) FROM album_artists WHERE album_id = al.id)
+		FROM albums al WHERE EXISTS (SELECT 1 FROM album_artists WHERE album_id = al.id AND artist_id = ?)`, artist)
+	if err != nil {
+		return err
+	}
+	type album struct {
+		id      int64
+		title   string
+		artists string
+	}
+	var albums []album
+	for rows.Next() {
+		var a album
+		if err := rows.Scan(&a.id, &a.title, &a.artists); err != nil {
+			rows.Close()
+			return err
+		}
+		albums = append(albums, a)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, a := range albums {
+		var ids []int64
+		for _, part := range strings.Split(a.artists, ",") {
+			id, err := strconv.ParseInt(part, 10, 64)
+			if err != nil {
+				return err
+			}
+			ids = append(ids, id)
+		}
+		key := albumKey(ids)
+		var into int64
+		err := tx.QueryRowContext(ctx, `SELECT id FROM albums WHERE title = ? COLLATE NOCASE AND artist_key = ? AND id <> ?`,
+			a.title, key, a.id).Scan(&into)
+		switch {
+		case err == nil:
+			err = mergeAlbumInto(ctx, tx, into, a.id)
+		case errors.Is(err, sql.ErrNoRows):
+			_, err = tx.ExecContext(ctx, `UPDATE albums SET artist_key = ? WHERE id = ?`, key, a.id)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func checkMerge(target int64, sources []int64) error {
@@ -786,7 +907,8 @@ func (s *Store) Overview(ctx context.Context) (Overview, error) {
 			(SELECT COUNT(*) FROM tracks),
 			(SELECT COUNT(*) FROM albums),
 			(SELECT COUNT(*) FROM artists),
-			(SELECT COUNT(*) FROM tracks WHERE artist_id IS NULL OR album_id IS NULL),
+			(SELECT COUNT(*) FROM tracks t
+				WHERE t.album_id IS NULL OR NOT EXISTS (SELECT 1 FROM track_artists WHERE track_id = t.id)),
 			(SELECT IFNULL(SUM(duration_ms), 0) FROM tracks),
 			(SELECT IFNULL(SUM(size), 0) FROM tracks)`).
 		Scan(&o.Tracks, &o.Albums, &o.Artists, &o.MissingTags, &o.DurationMs, &o.MediaBytes)

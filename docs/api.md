@@ -50,11 +50,13 @@
 | `PUT/DELETE tracks/{id}/cover` | 请求体为图片原始字节；单曲封面优先于专辑封面 |
 | `PUT/DELETE tracks/{id}/lyrics` | 请求体为歌词原始字节，服务识别 UTF-8、UTF-16 与 GB18030 |
 | `GET tracks/{id}/audio` | 音频流，支持 Range，用于试听 |
-| `GET albums`、`GET/PUT/DELETE albums/{id}` | 列表（`q`、`artistId`）/ 详情 / 修改 `{title, artist, year}` / 删除专辑及其全部歌曲 |
+| `GET albums`、`GET/PUT/DELETE albums/{id}` | 列表（`q`、`artistId`）/ 详情 / 修改 `{title, artists, year}` / 删除专辑及其全部歌曲 |
 | `POST albums/{id}/merge` | `{sourceIds}` 合并到路径中的专辑 |
 | `PUT/DELETE albums/{id}/cover` | 同单曲封面 |
 | `GET artists`、`GET/PUT artists/{id}` | 列表（`q`）/ 详情 / 重命名 `{name}` |
-| `POST artists/{id}/merge` | `{sourceIds}`；合并后同名专辑一并合并 |
+| `POST artists/{id}/merge` | `{sourceIds}`；合并后艺术家组合相同的同名专辑一并合并 |
 | `GET covers/{name}` | 封面图片，按内容哈希命名，可长期缓存 |
 
-歌曲修改 `PUT tracks/{id}` 的正文为 `{title, artist, album, albumArtist, trackNo, discNo, year}`。艺术家与专辑按名称查找，不存在时创建；`albumArtist` 为空时使用 `artist`。没有歌曲的专辑、既无歌曲也无专辑的艺术家自动删除，因此不提供单独删除艺术家的接口。
+歌曲修改 `PUT tracks/{id}` 的正文为 `{title, artists, album, albumArtists, trackNo, discNo, year}`，`artists` 与 `albumArtists` 是有序的名称数组。艺术家与专辑按名称查找，不存在时创建；名称去掉首尾空白，空名与重复名（不区分大小写）忽略，最多 50 位；`albumArtists` 为空时使用 `artists`。没有歌曲的专辑、既无歌曲也无专辑的艺术家自动删除，因此不提供单独删除艺术家的接口。
+
+歌曲、专辑响应中的艺术家是有序数组 `artists: [{id, name}]`，歌曲所属专辑为 `album: {id, title, artists, cover}`；没有艺术家时为空数组。按 `artistId` 筛选歌曲时，包括该艺术家参与的歌曲和其专辑中的歌曲。

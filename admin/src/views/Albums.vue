@@ -19,6 +19,7 @@ import {
   type DataTableRowKey,
 } from "naive-ui";
 import {
+  artistNames,
   coverURL,
   formatDuration,
   query,
@@ -27,6 +28,8 @@ import {
   type ApiError,
   type Page,
 } from "../api";
+import ArtistLinks from "../components/ArtistLinks.vue";
+import ArtistsInput from "../components/ArtistsInput.vue";
 import CoverEditor from "../components/CoverEditor.vue";
 import MergeModal from "../components/MergeModal.vue";
 
@@ -101,14 +104,14 @@ function clearSelection() {
 }
 
 const label = (a: Album) =>
-  a.artist ? `${a.title} — ${a.artist.name}` : a.title;
+  a.artists.length ? `${a.title} — ${artistNames(a.artists)}` : a.title;
 
 // --- editing ----------------------------------------------------------------
 
 const editing = ref<Album | null>(null);
 // Kept separate from `editing` so the content survives the leave transition.
 const showEdit = ref(false);
-const form = reactive({ title: "", artist: "", year: 0 });
+const form = reactive({ title: "", artists: [] as string[], year: 0 });
 const saving = ref(false);
 
 function edit(a: Album) {
@@ -116,7 +119,7 @@ function edit(a: Album) {
   showEdit.value = true;
   Object.assign(form, {
     title: a.title,
-    artist: a.artist?.name ?? "",
+    artists: a.artists.map((r) => r.name),
     year: a.year,
   });
 }
@@ -216,8 +219,12 @@ const columns: DataTableColumns<Album> = [
     key: "artist",
     ellipsis: { tooltip: true },
     render: (a) =>
-      a.artist?.name ??
-      h(NTag, { size: "small", bordered: false }, () => "未知"),
+      a.artists.length
+        ? h(ArtistLinks, {
+            artists: a.artists,
+            to: (id: number) => `/albums?artistId=${id}`,
+          })
+        : h(NTag, { size: "small", bordered: false }, () => "未知"),
   },
   { title: "年份", key: "year", width: 80, render: (a) => a.year || "" },
   {
@@ -311,7 +318,7 @@ const pagination = computed(() => ({
           <n-input v-model:value="form.title" />
         </n-form-item>
         <n-form-item label="专辑艺术家">
-          <n-input v-model:value="form.artist" clearable />
+          <artists-input v-model="form.artists" />
         </n-form-item>
         <n-form-item label="年份">
           <n-input-number

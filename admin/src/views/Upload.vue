@@ -14,7 +14,12 @@ import {
   type DataTableColumns,
   type UploadFileInfo,
 } from "naive-ui";
-import { formatBytes, type ApiError, type TrackDetail } from "../api";
+import {
+  artistNames,
+  formatBytes,
+  type ApiError,
+  type TrackDetail,
+} from "../api";
 import { isLyrics, stem, uploadTrack } from "../upload";
 
 type State =
@@ -215,7 +220,7 @@ const columns: DataTableColumns<Item> = [
       }
       if (!it.track) return null;
       const t = it.track;
-      const label = [t.title, t.artist?.name, t.album?.title]
+      const label = [t.title, artistNames(t.artists), t.album?.title]
         .filter(Boolean)
         .join(" · ");
       const prefix = it.state === "duplicate" ? "曲库中已有：" : "";
