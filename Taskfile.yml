@@ -14,44 +14,78 @@ tasks:
   install:
     desc: Install all project dependencies
     cmds:
-      - task: install:frontend
+      - task: install:web
+      - task: install:go
 
-  install:frontend:
-    desc: Install locked frontend dependencies (Node 22.12+, pnpm 10.28.1)
+  install:web:
+    desc: Install locked frontend and admin dependencies (Node 22.12+, pnpm 10.28.1)
     cmds:
       - pnpm install --frozen-lockfile
 
+  install:go:
+    desc: Download Go module dependencies
+    dir: backend
+    cmds:
+      - go mod download
+
   # Clean and build
   build:
-    desc: Build the production Web frontend
+    desc: Build the release binary with both web apps embedded (release/sonora)
     cmds:
-      - task: build:frontend
+      - ./scripts/build.sh
 
   build:frontend:
     desc: Typecheck and build frontend/dist
     cmds:
       - pnpm build
 
-  clean:
-    desc: Remove the generated frontend dist
+  build:admin:
+    desc: Typecheck and build admin/dist
     cmds:
-      - rm -rf frontend/dist
+      - pnpm build:admin
+
+  build:go:
+    desc: Compile all Go packages
+    dir: backend
+    cmds:
+      - go build ./...
+
+  clean:
+    desc: Remove web builds, embedded copies and release binaries
+    cmds:
+      - rm -rf frontend/dist admin/dist release
+      - find backend/web -mindepth 2 ! -name .gitkeep -delete
 
   # Format and validate
   format:
-    desc: Format frontend source and configuration
+    desc: Format frontend, admin and Go sources
     cmds:
       - task: format:frontend
+      - task: format:admin
+      - task: format:go
 
   format:frontend:
     desc: Format frontend files with Prettier
     cmds:
       - pnpm format
 
+  format:admin:
+    desc: Format admin files with Prettier
+    cmds:
+      - pnpm format:admin
+
+  format:go:
+    desc: Format Go sources with gofmt
+    dir: backend
+    cmds:
+      - gofmt -w .
+
   lint:
     desc: Run all formatting, lint and type checks
     cmds:
       - task: lint:frontend
+      - task: lint:admin
+      - task: lint:go
 
   lint:frontend:
     desc: Check frontend formatting, ESLint and TypeScript
@@ -60,14 +94,56 @@ tasks:
       - pnpm lint
       - pnpm typecheck
 
+  lint:admin:
+    desc: Check admin formatting, ESLint and TypeScript
+    cmds:
+      - pnpm format:check:admin
+      - pnpm lint:admin
+      - pnpm typecheck:admin
+
+  lint:go:
+    desc: Check gofmt and run go vet for release and dev builds
+    dir: backend
+    silent: true
+    cmds:
+      - |
+        unformatted=$(gofmt -l .)
+        if [ -n "$unformatted" ]; then
+          echo "gofmt needed (run task format:go):"
+          echo "$unformatted"
+          exit 1
+        fi
+      - go vet ./...
+      - go vet -tags dev ./...
+
   test:
-    desc: Run all current checks and production build (no unit tests yet)
+    desc: Run all checks, Go tests and web builds
     cmds:
       - task: lint
-      - task: build
+      - task: test:go
+      - task: build:frontend
+      - task: build:admin
 
-  # Development server
+  test:go:
+    desc: Run Go unit and HTTP tests for release and dev builds
+    dir: backend
+    cmds:
+      - go test ./...
+      - go test -tags dev ./internal/config
+
+  # Development servers
   run:web:
-    desc: Start the Vite development server (localhost:14559)
+    desc: Start the player Vite development server (localhost:14559)
     cmds:
       - pnpm dev {{.CLI_ARGS}}
+
+  run:admin:
+    desc: Start the admin Vite development server (localhost:14561/admin/)
+    cmds:
+      - pnpm dev:admin {{.CLI_ARGS}}
+
+  run:server:
+    desc: Run the Go service in development mode (127.0.0.1:14560, admin / admin)
+    dir: backend
+    cmds:
+      - go run -tags dev ./cmd/sonora -config config.dev.yaml {{.CLI_ARGS}}

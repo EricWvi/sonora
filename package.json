@@ -13,6 +13,12 @@
     "lint": "pnpm --filter @sonora/frontend lint",
     "format": "pnpm --filter @sonora/frontend format",
     "format:check": "pnpm --filter @sonora/frontend format:check",
-    "build": "pnpm --filter @sonora/frontend build"
+    "build": "pnpm --filter @sonora/frontend build",
+    "dev:admin": "pnpm --filter @sonora/admin dev",
+    "typecheck:admin": "pnpm --filter @sonora/admin typecheck",
+    "lint:admin": "pnpm --filter @sonora/admin lint",
+    "format:admin": "pnpm --filter @sonora/admin format",
+    "format:check:admin": "pnpm --filter @sonora/admin format:check",
+    "build:admin": "pnpm --filter @sonora/admin build"
   }
 }

@@ -8,6 +8,49 @@ importers:
 
   .: {}
 
+  admin:
+    dependencies:
+      naive-ui:
+        specifier: 2.43.2
+        version: 2.43.2(vue@3.5.44(typescript@6.0.3))
+      vue:
+        specifier: ^3.5.35
+        version: 3.5.44(typescript@6.0.3)
+      vue-router:
+        specifier: ^5.1.0
+        version: 5.4.0(@vue/compiler-sfc@3.5.44)(esbuild@0.28.2)(pinia@3.0.4(typescript@6.0.3)(vue@3.5.44(typescript@6.0.3)))(rollup@4.64.12)(vite@7.3.7(@types/node@24.19.2)(jiti@2.7.0)(sass@1.106.1))(vue@3.5.44(typescript@6.0.3))
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.0
+        version: 24.19.2
+      '@typescript-eslint/eslint-plugin':
+        specifier: ^8.60.1
+        version: 8.72.0(@typescript-eslint/parser@8.72.0(eslint@9.39.5(jiti@2.7.0))(typescript@6.0.3))(eslint@9.39.5(jiti@2.7.0))(typescript@6.0.3)
+      '@typescript-eslint/parser':
+        specifier: ^8.60.1
+        version: 8.72.0(eslint@9.39.5(jiti@2.7.0))(typescript@6.0.3)
+      '@vitejs/plugin-vue':
+        specifier: ^6.0.7
+        version: 6.0.10(vite@7.3.7(@types/node@24.19.2)(jiti@2.7.0)(sass@1.106.1))(vue@3.5.44(typescript@6.0.3))
+      eslint:
+        specifier: ^9.39.4
+        version: 9.39.5(jiti@2.7.0)
+      eslint-plugin-vue:
+        specifier: ^9.33.0
+        version: 9.33.0(eslint@9.39.5(jiti@2.7.0))
+      prettier:
+        specifier: ^3.8.3
+        version: 3.9.10
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^7.3.5
+        version: 7.3.7(@types/node@24.19.2)(jiti@2.7.0)(sass@1.106.1)
+      vue-tsc:
+        specifier: ^3.3.3
+        version: 3.3.13(typescript@6.0.3)
+
   frontend:
     dependencies:
       '@material/material-color-utilities':
