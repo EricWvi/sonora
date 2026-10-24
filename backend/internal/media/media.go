@@ -75,6 +75,10 @@ type Tags struct {
 	Picture     *Picture
 }
 
+// multiSeparator joins the values of a multi-value tag field, such as
+// two artists of one song.
+const multiSeparator = ", "
+
 // Picture is an embedded cover image.
 type Picture struct {
 	MIME string
@@ -139,6 +143,23 @@ func readTags(r io.ReadSeeker) (Tags, error) {
 		AlbumArtist: clean(m.AlbumArtist()),
 		Year:        m.Year(),
 		Lyrics:      clean(m.Lyrics()),
+	}
+	// The tag library flattens multi-value fields; reread those it would
+	// get wrong and join the values.
+	var multi map[string][]string
+	var keys [4]string // title, artist, album, album artist
+	switch m.Format() {
+	case tag.ID3v2_3, tag.ID3v2_4:
+		keys = [4]string{"TIT2", "TPE1", "TALB", "TPE2"}
+		multi = id3TextValues(r, keys[:]...)
+	case tag.VORBIS:
+		keys = [4]string{"title", "artist", "album", "albumartist"}
+		multi = vorbisValues(r)
+	}
+	for i, field := range []*string{&t.Title, &t.Artist, &t.Album, &t.AlbumArtist} {
+		if v := multi[keys[i]]; len(v) > 1 {
+			*field = strings.Join(v, multiSeparator)
+		}
 	}
 	t.Track, _ = m.Track()
 	t.Disc, _ = m.Disc()

@@ -2,6 +2,7 @@ package media
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"os"
 	"path/filepath"
@@ -156,5 +157,152 @@ func TestProbeMP3USLTLyrics(t *testing.T) {
 	}
 	if diff := (info.Duration - 3030167*time.Microsecond).Abs(); diff > 30*time.Millisecond {
 		t.Errorf("duration with ID3 = %v", info.Duration)
+	}
+}
+
+// id3Tag builds an ID3v2 tag of the given version from frames whose
+// bodies already start with the text encoding byte.
+func id3Tag(version byte, frames ...[2]string) []byte {
+	size := func(n int) []byte {
+		if version == 4 {
+			return []byte{byte(n >> 21 & 0x7F), byte(n >> 14 & 0x7F), byte(n >> 7 & 0x7F), byte(n & 0x7F)}
+		}
+		return []byte{byte(n >> 24), byte(n >> 16), byte(n >> 8), byte(n)}
+	}
+	var body []byte
+	for _, f := range frames {
+		body = append(append(append(body, f[0]...), size(len(f[1]))...), 0, 0)
+		body = append(body, f[1]...)
+	}
+	n := len(body)
+	header := []byte{'I', 'D', '3', version, 0, 0, byte(n >> 21 & 0x7F), byte(n >> 14 & 0x7F), byte(n >> 7 & 0x7F), byte(n & 0x7F)}
+	return append(header, body...)
+}
+
+func TestProbeMP3MultiValueText(t *testing.T) {
+	audio, err := os.ReadFile(filepath.Join("testdata", "untagged.mp3"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// UTF-16 with a BOM per value, as ID3v2.4 requires.
+	utf16LE := "\x01\xff\xfeA\x00\x00\x00\xff\xfeB\x00\x00\x00"
+	tests := []struct {
+		name    string
+		tag     []byte
+		artist  string
+		album   string
+		albumAA string
+	}{
+		{"v2.4 utf-8", id3Tag(4,
+			[2]string{"TIT2", "\x03晴天"},
+			[2]string{"TPE1", "\x03周杰伦\x00费玉清\x00"},
+			[2]string{"TALB", "\x03叶惠美"},
+			[2]string{"TPE2", "\x03周杰伦"},
+		), "周杰伦, 费玉清", "叶惠美", "周杰伦"},
+		{"v2.4 utf-16 and latin-1", id3Tag(4,
+			[2]string{"TIT2", "\x03晴天"},
+			[2]string{"TPE1", utf16LE},
+			[2]string{"TPE2", "\x00Simon\x00Garfunkel"},
+		), "A, B", "", "Simon, Garfunkel"},
+		{"v2.3 single value", id3Tag(3,
+			[2]string{"TIT2", "\x03晴天"},
+			[2]string{"TPE1", "\x03AC/DC"},
+		), "AC/DC", "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data := append(tt.tag, audio...)
+			info, err := Probe(bytes.NewReader(data), int64(len(data)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			tags := info.Tags
+			if tags.Title != "晴天" || tags.Artist != tt.artist || tags.Album != tt.album || tags.AlbumArtist != tt.albumAA {
+				t.Errorf("tags = %+v", tags)
+			}
+		})
+	}
+}
+
+// vorbisComment builds a Vorbis comment from KEY=value fields.
+func vorbisComment(fields ...string) []byte {
+	le := func(n int) []byte { return binary.LittleEndian.AppendUint32(nil, uint32(n)) }
+	b := append(le(6), "sonora"...)
+	b = append(b, le(len(fields))...)
+	for _, f := range fields {
+		b = append(append(b, le(len(f))...), f...)
+	}
+	return b
+}
+
+// oggPageBytes builds one Ogg page holding segments whose lacing values
+// are given, with the checksum the tag library verifies.
+func oggPageBytes(kind byte, granule uint64, seq uint32, lacing []byte, payload []byte) []byte {
+	p := append([]byte("OggS"), 0, kind)
+	p = binary.LittleEndian.AppendUint64(p, granule)
+	p = binary.LittleEndian.AppendUint32(p, 1) // serial
+	p = binary.LittleEndian.AppendUint32(p, seq)
+	p = append(p, 0, 0, 0, 0, byte(len(lacing)))
+	p = append(append(p, lacing...), payload...)
+	var crc uint32
+	for _, b := range p {
+		crc ^= uint32(b) << 24
+		for range 8 {
+			if crc&0x80000000 != 0 {
+				crc = crc<<1 ^ 0x04c11db7
+			} else {
+				crc <<= 1
+			}
+		}
+	}
+	binary.LittleEndian.PutUint32(p[22:], crc)
+	return p
+}
+
+// oggFile builds a three-second Ogg stream whose comment packet spans two
+// pages.
+func oggFile(id, commentPrefix string, rate uint64, comment []byte) []byte {
+	packet := append([]byte(commentPrefix), comment...)
+	if len(packet) <= 255 || len(packet)-255 >= 255 {
+		panic("comment packet must span exactly one full segment")
+	}
+	f := oggPageBytes(0x02, 0, 0, []byte{byte(len(id))}, []byte(id))
+	f = append(f, oggPageBytes(0, ^uint64(0), 1, []byte{255}, packet[:255])...)
+	f = append(f, oggPageBytes(0x01, 0, 2, []byte{byte(len(packet) - 255)}, packet[255:])...)
+	return append(f, oggPageBytes(0x04, 3*rate, 3, []byte{1}, []byte{0})...)
+}
+
+func TestProbeVorbisMultiValueFields(t *testing.T) {
+	comment := vorbisComment(
+		"TITLE=晴天", "ARTIST=周杰伦", "artist=费玉清", "ALBUM=叶惠美", "ALBUMARTIST=周杰伦",
+		"COMMENT="+strings.Repeat("x", 300),
+	)
+	streamInfo := make([]byte, 34)
+	binary.BigEndian.PutUint64(streamInfo[10:], 44100<<44|3*44100)
+	flac := append([]byte("fLaC\x00\x00\x00\x22"), streamInfo...)
+	flac = append(flac, 0x84, byte(len(comment)>>16), byte(len(comment)>>8), byte(len(comment)))
+	flac = append(append(flac, comment...), 0xFF, 0xF8)
+
+	vorbisID := "\x01vorbis\x00\x00\x00\x00\x01\x44\xac\x00\x00" + strings.Repeat("\x00", 15)
+	opusID := "OpusHead\x01\x01\x00\x00\x80\xbb\x00\x00\x00\x00\x00"
+	tests := []struct {
+		name string
+		data []byte
+	}{
+		{"flac", flac},
+		{"ogg", oggFile(vorbisID, "\x03vorbis", 44100, comment)},
+		{"opus", oggFile(opusID, "OpusTags", 48000, comment)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			info, err := Probe(bytes.NewReader(tt.data), int64(len(tt.data)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			tags := info.Tags
+			if tags.Title != "晴天" || tags.Artist != "周杰伦, 费玉清" || tags.Album != "叶惠美" || tags.AlbumArtist != "周杰伦" {
+				t.Errorf("tags = %+v", tags)
+			}
+		})
 	}
 }
