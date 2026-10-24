@@ -55,8 +55,10 @@
 | `PUT/DELETE albums/{id}/cover` | 同单曲封面 |
 | `GET artists`、`GET/PUT artists/{id}` | 列表（`q`）/ 详情 / 重命名 `{name}` |
 | `POST artists/{id}/merge` | `{sourceIds}`；合并后艺术家组合相同的同名专辑一并合并 |
-| `GET covers/{name}` | 封面图片，按内容哈希命名，可长期缓存 |
+| `GET covers/{name}` | 封面原图，按内容哈希命名，可长期缓存。`?size=96` 或 `?size=300` 返回长边不超过该值的 JPEG 缩略图，首次请求时生成；原图已不大于该尺寸或无法解码时返回原图；其他尺寸 400 |
 
 歌曲修改 `PUT tracks/{id}` 的正文为 `{title, artists, album, albumArtists, trackNo, discNo, year}`，`artists` 与 `albumArtists` 是有序的名称数组。艺术家与专辑按名称查找，不存在时创建；名称去掉首尾空白，空名与重复名（不区分大小写）忽略，最多 50 位；`albumArtists` 为空时使用 `artists`。没有歌曲的专辑、既无歌曲也无专辑的艺术家自动删除，因此不提供单独删除艺术家的接口。
+
+歌曲、专辑及歌曲所属专辑的封面为 `cover: {name, thumbhash}`，没有封面时为 `null`。`thumbhash` 是 [ThumbHash](https://evanw.github.io/thumbhash/) 的标准 base64，客户端解码为模糊占位图，在缩略图加载完成前显示；图片无法解码时为空字符串。
 
 歌曲、专辑响应中的艺术家是有序数组 `artists: [{id, name}]`，歌曲所属专辑为 `album: {id, title, artists, cover}`；没有艺术家时为空数组。按 `artistId` 筛选歌曲时，包括该艺术家参与的歌曲和其专辑中的歌曲。

@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { NButton, NSpace, NText, useMessage } from "naive-ui";
-import { coverURL, type ApiError } from "../api";
+import type { ApiError, Cover } from "../api";
+import CoverImage from "./CoverImage.vue";
 
 // Shows a cover and replaces or removes it. fallback is shown, dimmed,
 // when there is no cover of its own (a track falls back to its album's).
 const props = defineProps<{
-  cover: string | null;
-  fallback?: string | null;
+  cover: Cover | null;
+  fallback?: Cover | null;
   fallbackLabel?: string;
   upload: (file: File) => Promise<unknown>;
   remove: () => Promise<unknown>;
@@ -38,11 +39,11 @@ function picked(e: Event) {
 <template>
   <n-space align="center" :size="16">
     <div class="cover">
-      <img v-if="cover" :src="coverURL(cover)" alt="" />
-      <img
+      <cover-image v-if="cover" :cover="cover" :size="300" />
+      <cover-image
         v-else-if="fallback"
-        :src="coverURL(fallback)"
-        alt=""
+        :cover="fallback"
+        :size="300"
         class="fallback"
       />
       <n-text v-else depth="3">无封面</n-text>
@@ -84,12 +85,7 @@ function picked(e: Event) {
   place-items: center;
   background: rgba(128, 128, 128, 0.12);
 }
-.cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.cover img.fallback {
+.cover .fallback {
   opacity: 0.6;
 }
 </style>

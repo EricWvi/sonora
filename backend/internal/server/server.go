@@ -420,10 +420,24 @@ func (s *server) mergeArtists(w http.ResponseWriter, r *http.Request) {
 
 // getCover serves a cover image. Names are content hashes, so the response
 // never changes and may be cached for a year.
+//
+// ?size= picks a thumbnail edge length from store.CoverSizes.
 func (s *server) getCover(w http.ResponseWriter, r *http.Request) {
-	path, err := s.store.CoverPath(r.PathValue("name"))
+	name := r.PathValue("name")
+	var path string
+	var err error
+	if size := r.URL.Query().Get("size"); size != "" {
+		n, perr := strconv.Atoi(size)
+		if perr != nil {
+			admin.WriteError(w, http.StatusBadRequest, "invalid", "封面尺寸无效")
+			return
+		}
+		path, err = s.store.CoverThumb(name, n)
+	} else {
+		path, err = s.store.CoverPath(name)
+	}
 	if err != nil {
-		http.NotFound(w, r)
+		writeStoreError(w, r, err)
 		return
 	}
 	h := w.Header()

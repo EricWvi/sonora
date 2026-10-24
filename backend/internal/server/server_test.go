@@ -387,9 +387,23 @@ func TestLibraryEndpoints(t *testing.T) {
 	}
 
 	// The cover is served by its hash name.
-	rec = ts.do("GET", api+"covers/"+*albums.Items[0].Cover, "")
+	cover := albums.Items[0].Cover
+	if cover.Thumbhash == "" {
+		t.Fatalf("cover without placeholder: %+v", cover)
+	}
+	rec = ts.do("GET", api+"covers/"+cover.Name, "")
 	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "image/jpeg" {
 		t.Fatalf("cover: %d %s", rec.Code, rec.Header())
+	}
+	rec = ts.do("GET", api+"covers/"+cover.Name+"?size=96", "")
+	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "image/jpeg" ||
+		!strings.Contains(rec.Header().Get("Cache-Control"), "immutable") {
+		t.Fatalf("cover thumb: %d %s", rec.Code, rec.Header())
+	}
+	for _, size := range []string{"97", "big"} {
+		if rec := ts.do("GET", api+"covers/"+cover.Name+"?size="+size, ""); rec.Code != http.StatusBadRequest {
+			t.Fatalf("size %s: %d", size, rec.Code)
+		}
 	}
 	if rec := ts.do("GET", api+"covers/..%2Fsonora.db", ""); rec.Code != http.StatusNotFound {
 		t.Fatalf("cover traversal: %d", rec.Code)

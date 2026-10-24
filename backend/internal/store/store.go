@@ -40,6 +40,9 @@ type Store struct {
 	// with the rows that reference them, so garbage collection never
 	// removes a file a concurrent request is about to reference.
 	files sync.Mutex
+	// decoding bounds concurrent thumbnail decodes, which hold whole
+	// images in memory.
+	decoding chan struct{}
 }
 
 // Open opens (and migrates) the database inside dataDir and prepares the
@@ -47,7 +50,7 @@ type Store struct {
 func Open(dataDir, mediaDir string) (*Store, error) {
 	coverDir := filepath.Join(dataDir, "covers")
 	incoming := filepath.Join(mediaDir, ".incoming")
-	for _, dir := range []string{coverDir, mediaDir, incoming} {
+	for _, dir := range []string{coverDir, filepath.Join(coverDir, "thumbs"), mediaDir, incoming} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return nil, fmt.Errorf("create data dir: %w", err)
 		}
@@ -70,7 +73,12 @@ func Open(dataDir, mediaDir string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
-	return &Store{db: db, coverDir: coverDir, mediaDir: mediaDir, incoming: incoming}, nil
+	s := &Store{db: db, coverDir: coverDir, mediaDir: mediaDir, incoming: incoming, decoding: make(chan struct{}, 2)}
+	if err := s.backfillPlaceholders(context.Background()); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("cover placeholders: %w", err)
+	}
+	return s, nil
 }
 
 // Close closes the database.

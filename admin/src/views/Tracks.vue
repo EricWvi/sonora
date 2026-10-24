@@ -13,7 +13,6 @@ import {
   type DataTableColumns,
 } from "naive-ui";
 import {
-  coverURL,
   formatDuration,
   query,
   request,
@@ -23,6 +22,7 @@ import {
   type Track,
 } from "../api";
 import ArtistLinks from "../components/ArtistLinks.vue";
+import CoverImage from "../components/CoverImage.vue";
 import TrackDrawer from "../components/TrackDrawer.vue";
 
 const PAGE_SIZE = 50;
@@ -107,9 +107,11 @@ const columns: DataTableColumns<Track> = [
     width: 56,
     render: (t) => {
       const c = t.cover ?? t.album?.cover;
-      return c
-        ? h("img", { src: coverURL(c), class: "thumb", alt: "" })
-        : h("div", { class: "thumb" });
+      return h(
+        "div",
+        { class: "thumb" },
+        c ? [h(CoverImage, { cover: c, size: 96 })] : [],
+      );
     },
   },
   {
@@ -262,8 +264,7 @@ const pagination = computed(() => ({
   width: 36px;
   height: 36px;
   border-radius: 3px;
-  object-fit: cover;
-  display: block;
+  overflow: hidden;
   background: rgba(128, 128, 128, 0.12);
 }
 :deep(.link) {

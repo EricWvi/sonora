@@ -20,7 +20,6 @@ import {
 } from "naive-ui";
 import {
   artistNames,
-  coverURL,
   formatDuration,
   query,
   request,
@@ -29,6 +28,7 @@ import {
   type Page,
 } from "../api";
 import ArtistLinks from "../components/ArtistLinks.vue";
+import CoverImage from "../components/CoverImage.vue";
 import ArtistsInput from "../components/ArtistsInput.vue";
 import CoverEditor from "../components/CoverEditor.vue";
 import MergeModal from "../components/MergeModal.vue";
@@ -204,9 +204,11 @@ const columns: DataTableColumns<Album> = [
     key: "cover",
     width: 56,
     render: (a) =>
-      a.cover
-        ? h("img", { src: coverURL(a.cover), class: "thumb", alt: "" })
-        : h("div", { class: "thumb" }),
+      h(
+        "div",
+        { class: "thumb" },
+        a.cover ? [h(CoverImage, { cover: a.cover, size: 96 })] : [],
+      ),
   },
   {
     title: "专辑",
@@ -360,8 +362,7 @@ const pagination = computed(() => ({
   width: 36px;
   height: 36px;
   border-radius: 3px;
-  object-fit: cover;
-  display: block;
+  overflow: hidden;
   background: rgba(128, 128, 128, 0.12);
 }
 :deep(.link) {

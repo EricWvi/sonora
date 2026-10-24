@@ -114,7 +114,7 @@ func (s *Store) Ingest(ctx context.Context, u *Upload, lyrics []byte) (IngestRes
 	var cover sql.NullString
 	if p := tags.Picture; p != nil {
 		// A broken embedded picture is not worth rejecting the song for.
-		if name, err := s.saveCover(p.Data); err == nil {
+		if name, err := s.saveCover(ctx, p.Data); err == nil {
 			cover = sql.NullString{String: name, Valid: true}
 		} else {
 			slog.Warn("ignore embedded cover", "file", u.name, "err", err)

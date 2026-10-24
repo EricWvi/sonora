@@ -36,10 +36,10 @@ func (r *refs) Scan(src any) error {
 
 // AlbumRef is the album a track belongs to.
 type AlbumRef struct {
-	ID      int64   `json:"id"`
-	Title   string  `json:"title"`
-	Artists []Ref   `json:"artists"`
-	Cover   *string `json:"cover"`
+	ID      int64  `json:"id"`
+	Title   string `json:"title"`
+	Artists []Ref  `json:"artists"`
+	Cover   *Cover `json:"cover"`
 }
 
 // Track is a song in the library. Artists is empty and Album nil when no
@@ -57,10 +57,10 @@ type Track struct {
 	Size       int64     `json:"size"`
 	// Cover is the track's own art, set only when it differs from the
 	// album cover.
-	Cover        *string `json:"cover"`
-	HasLyrics    bool    `json:"hasLyrics"`
-	OriginalName string  `json:"originalName"`
-	CreatedAt    string  `json:"createdAt"`
+	Cover        *Cover `json:"cover"`
+	HasLyrics    bool   `json:"hasLyrics"`
+	OriginalName string `json:"originalName"`
+	CreatedAt    string `json:"createdAt"`
 }
 
 // TrackDetail is a track with its lyrics.
@@ -71,14 +71,14 @@ type TrackDetail struct {
 
 // Album is a release. Artists are the album artists.
 type Album struct {
-	ID         int64   `json:"id"`
-	Title      string  `json:"title"`
-	Artists    []Ref   `json:"artists"`
-	Year       int     `json:"year"`
-	Cover      *string `json:"cover"`
-	TrackCount int     `json:"trackCount"`
-	DurationMs int64   `json:"durationMs"`
-	CreatedAt  string  `json:"createdAt"`
+	ID         int64  `json:"id"`
+	Title      string `json:"title"`
+	Artists    []Ref  `json:"artists"`
+	Year       int    `json:"year"`
+	Cover      *Cover `json:"cover"`
+	TrackCount int    `json:"trackCount"`
+	DurationMs int64  `json:"durationMs"`
+	CreatedAt  string `json:"createdAt"`
 }
 
 // Artist is a performer, of tracks or as an album artist.
@@ -201,6 +201,11 @@ func albumKey(artists []int64) string {
 	return strings.Join(parts, ",")
 }
 
+// placeholderOf selects the ThumbHash of the cover named by col.
+func placeholderOf(col string) string {
+	return `(SELECT thumbhash FROM covers WHERE name = ` + col + `)`
+}
+
 // --- tracks ----------------------------------------------------------------
 
 // TrackQuery filters the track list.
@@ -215,9 +220,9 @@ type TrackQuery struct {
 
 var trackColumns = `
 	t.id, t.title, t.track_no, t.disc_no, t.year, t.duration_ms, t.format, t.size,
-	t.cover, t.lyrics <> '', t.original_name, t.created_at, ` +
+	t.cover, ` + placeholderOf("t.cover") + `, t.lyrics <> '', t.original_name, t.created_at, ` +
 	artistsJSON("track_artists", "track_id", "t.id") + `,
-	al.id, al.title, al.cover, ` + artistsJSON("album_artists", "album_id", "al.id")
+	al.id, al.title, al.cover, ` + placeholderOf("al.cover") + `, ` + artistsJSON("album_artists", "album_id", "al.id")
 
 const trackFrom = `
 	FROM tracks t
@@ -228,19 +233,17 @@ type scanner interface{ Scan(...any) error }
 func scanTrack(row scanner, extra ...any) (Track, error) {
 	var t Track
 	var alID sql.NullInt64
-	var alTitle, alCover sql.NullString
+	var cover, coverHash, alTitle, alCover, alCoverHash sql.NullString
 	var alArtists []Ref
 	dest := []any{&t.ID, &t.Title, &t.TrackNo, &t.DiscNo, &t.Year, &t.DurationMs, &t.Format, &t.Size,
-		&t.Cover, &t.HasLyrics, &t.OriginalName, &t.CreatedAt, (*refs)(&t.Artists),
-		&alID, &alTitle, &alCover, (*refs)(&alArtists)}
+		&cover, &coverHash, &t.HasLyrics, &t.OriginalName, &t.CreatedAt, (*refs)(&t.Artists),
+		&alID, &alTitle, &alCover, &alCoverHash, (*refs)(&alArtists)}
 	if err := row.Scan(append(dest, extra...)...); err != nil {
 		return t, err
 	}
+	t.Cover = coverOf(cover, coverHash)
 	if alID.Valid {
-		t.Album = &AlbumRef{ID: alID.Int64, Title: alTitle.String, Artists: alArtists}
-		if alCover.Valid {
-			t.Album.Cover = &alCover.String
-		}
+		t.Album = &AlbumRef{ID: alID.Int64, Title: alTitle.String, Artists: alArtists, Cover: coverOf(alCover, alCoverHash)}
 	}
 	return t, nil
 }
@@ -498,7 +501,7 @@ type AlbumQuery struct {
 }
 
 var albumSelect = `
-	SELECT al.id, al.title, al.year, al.cover, al.created_at, ` +
+	SELECT al.id, al.title, al.year, al.cover, ` + placeholderOf("al.cover") + `, al.created_at, ` +
 	artistsJSON("album_artists", "album_id", "al.id") + `,
 		(SELECT COUNT(*) FROM tracks WHERE album_id = al.id),
 		(SELECT IFNULL(SUM(duration_ms), 0) FROM tracks WHERE album_id = al.id)
@@ -506,7 +509,9 @@ var albumSelect = `
 
 func scanAlbum(row scanner) (Album, error) {
 	var a Album
-	err := row.Scan(&a.ID, &a.Title, &a.Year, &a.Cover, &a.CreatedAt, (*refs)(&a.Artists), &a.TrackCount, &a.DurationMs)
+	var cover, coverHash sql.NullString
+	err := row.Scan(&a.ID, &a.Title, &a.Year, &cover, &coverHash, &a.CreatedAt, (*refs)(&a.Artists), &a.TrackCount, &a.DurationMs)
+	a.Cover = coverOf(cover, coverHash)
 	return a, err
 }
 

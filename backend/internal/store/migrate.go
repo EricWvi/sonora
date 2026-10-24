@@ -154,6 +154,16 @@ var migrations = []migration{
 	CREATE INDEX track_artists_artist ON track_artists (artist_id);
 	CREATE INDEX album_artists_artist ON album_artists (artist_id);
 	`),
+
+	// thumbhash is the cover's blurred placeholder, '' when the image
+	// could not be decoded. Rows for covers stored before this migration
+	// are filled in when the store opens.
+	execSQL(`
+	CREATE TABLE covers (
+		name      TEXT PRIMARY KEY,
+		thumbhash TEXT NOT NULL
+	) WITHOUT ROWID;
+	`),
 }
 
 func migrate(db *sql.DB) error {

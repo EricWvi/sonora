@@ -5,6 +5,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"image"
+	"image/color"
+	"image/png"
 	"os"
 	"path/filepath"
 	"slices"
@@ -83,7 +86,13 @@ func coverFiles(t *testing.T, s *testStore) int {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return len(entries)
+	n := 0
+	for _, e := range entries {
+		if !e.IsDir() {
+			n++
+		}
+	}
+	return n
 }
 
 func TestCreateFirstAdminOnlyOnce(t *testing.T) {
@@ -405,7 +414,7 @@ func TestCoversAndLyricsReplaceAndClear(t *testing.T) {
 		t.Fatalf("garbage cover: %v", err)
 	}
 	album, err := s.SetAlbumCover(ctx, tr.Album.ID, png)
-	if err != nil || album.Cover == nil || filepath.Ext(*album.Cover) != ".png" {
+	if err != nil || album.Cover == nil || filepath.Ext(album.Cover.Name) != ".png" {
 		t.Fatalf("album = %+v, %v", album, err)
 	}
 	if n := coverFiles(t, s); n != 1 {
@@ -641,5 +650,94 @@ func TestIngestMultiValueArtists(t *testing.T) {
 	}
 	if artists, _ := s.Artists(context.Background(), "", Window{}); artists.Total != 2 {
 		t.Fatalf("artists = %+v", artists)
+	}
+}
+
+// gradient encodes a w×h PNG.
+func gradient(t *testing.T, w, h int) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	for y := range h {
+		for x := range w {
+			img.Set(x, y, color.RGBA{uint8(x), uint8(y), 200, 255})
+		}
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+func TestCoverPlaceholdersAndThumbnails(t *testing.T) {
+	s := openTest(t)
+	ctx := context.Background()
+	tr := ingest(t, s, sample(t, "tagged.flac"), "a.flac", nil).Track
+	if tr.Album.Cover == nil || tr.Album.Cover.Thumbhash == "" {
+		t.Fatalf("embedded cover = %+v", tr.Album.Cover)
+	}
+	// The 64×64 sample is smaller than any thumbnail: the original serves.
+	orig, _ := s.CoverPath(tr.Album.Cover.Name)
+	if p, err := s.CoverThumb(tr.Album.Cover.Name, 96); err != nil || p != orig {
+		t.Fatalf("small cover thumb = %s, %v", p, err)
+	}
+
+	album, err := s.SetAlbumCover(ctx, tr.Album.ID, gradient(t, 400, 200))
+	if err != nil || album.Cover.Thumbhash == "" {
+		t.Fatalf("album = %+v, %v", album, err)
+	}
+	p, err := s.CoverThumb(album.Cover.Name, 96)
+	if err != nil || filepath.Ext(p) != ".jpg" {
+		t.Fatalf("thumb = %s, %v", p, err)
+	}
+	f, err := os.Open(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, format, err := image.DecodeConfig(f)
+	f.Close()
+	if err != nil || format != "jpeg" || cfg.Width != 96 || cfg.Height != 48 {
+		t.Fatalf("thumb is %s %dx%d, %v", format, cfg.Width, cfg.Height, err)
+	}
+	if again, err := s.CoverThumb(album.Cover.Name, 96); err != nil || again != p {
+		t.Fatalf("second request = %s, %v", again, err)
+	}
+	if _, err := s.CoverThumb(album.Cover.Name, 97); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("odd size: %v", err)
+	}
+	if _, err := s.CoverThumb("../sonora.db", 96); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("bad name: %v", err)
+	}
+
+	// Clearing the cover takes its thumbnail and placeholder along.
+	if _, err := s.ClearAlbumCover(ctx, tr.Album.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(p); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("thumbnail kept: %v", err)
+	}
+	var rows int
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM covers`).Scan(&rows); err != nil || rows != 0 {
+		t.Fatalf("covers rows = %d, %v", rows, err)
+	}
+}
+
+func TestPlaceholdersBackfilledOnOpen(t *testing.T) {
+	s := openTest(t)
+	ctx := context.Background()
+	tr := ingest(t, s, sample(t, "tagged.flac"), "a.flac", nil).Track
+	want := tr.Album.Cover.Thumbhash
+	if _, err := s.db.Exec(`DELETE FROM covers`); err != nil {
+		t.Fatal(err)
+	}
+	s.Store.Close()
+	reopened, err := Open(s.dataDir, s.mediaDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.Store = reopened
+	d, err := reopened.Track(ctx, tr.ID)
+	if err != nil || d.Album.Cover.Thumbhash != want {
+		t.Fatalf("after reopen: %+v, %v", d.Album.Cover, err)
 	}
 }

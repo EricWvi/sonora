@@ -68,7 +68,11 @@ export async function request<T>(
   return res.json();
 }
 
-export const coverURL = (name: string) => `${API}/covers/${name}`;
+/** Thumbnail edge lengths the service serves besides the original. */
+export type CoverSize = 96 | 300;
+
+export const coverURL = (name: string, size?: CoverSize) =>
+  `${API}/covers/${name}` + (size ? `?size=${size}` : "");
 export const audioURL = (id: number) => `${API}/tracks/${id}/audio`;
 
 // --- types ------------------------------------------------------------------
@@ -84,6 +88,12 @@ export interface Status {
   admin: Admin | null;
 }
 
+export interface Cover {
+  name: string;
+  /** Blurred placeholder (ThumbHash, base64); empty when unavailable. */
+  thumbhash: string;
+}
+
 export interface Ref {
   id: number;
   name: string;
@@ -97,7 +107,7 @@ export interface Track {
     id: number;
     title: string;
     artists: Ref[];
-    cover: string | null;
+    cover: Cover | null;
   } | null;
   trackNo: number;
   discNo: number;
@@ -105,7 +115,7 @@ export interface Track {
   durationMs: number;
   format: string;
   size: number;
-  cover: string | null;
+  cover: Cover | null;
   hasLyrics: boolean;
   originalName: string;
   createdAt: string;
@@ -131,7 +141,7 @@ export interface Album {
   title: string;
   artists: Ref[];
   year: number;
-  cover: string | null;
+  cover: Cover | null;
   trackCount: number;
   durationMs: number;
   createdAt: string;
