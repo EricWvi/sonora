@@ -11,6 +11,21 @@
 
 2026-10-23 确定：标志图形暂时复用；界面中的 SPlayer 名称与文字均替换为 Sonora。Sonora 不迁入网易来源、认证或业务接口。各依赖的许可证仍以各包声明为准。
 
+# Poppins
+
+`frontend/public/fonts/logo.woff2` 是 SPlayer 随附的 Logo 字体，经字体名称表确认为 Poppins Medium（Indian Type Foundry），SIL Open Font License 1.1。许可证全文随字体放在 [frontend/public/fonts/OFL.txt](frontend/public/fonts/OFL.txt)：
+
+> Copyright 2020 The Poppins Project Authors (https://github.com/itfoundry/Poppins)
+
+# 图标
+
+`frontend/src/assets/icons/` 的图标复制自 SPlayer，其中可确认来源的属于以下图标集（核对方法见[视觉资源与许可清单](docs/visual-assets.md#4-图标)）：
+
+- [Google Material Icons](https://github.com/google/material-design-icons)、[Material Symbols](https://github.com/google/material-design-icons)：Copyright Google LLC，Apache License 2.0。
+- [Phosphor Icons](https://github.com/phosphor-icons/core)：Copyright (c) 2023 Phosphor Icons，MIT 许可证。
+
+其余图标来源尚未确认，按 SPlayer 的 AGPL-3.0 处理。
+
 # ThumbHash
 
 `backend/internal/thumbhash/` 的编码器移植自 Evan Wallace 的 [ThumbHash](https://github.com/evanw/thumbhash) 参考实现，MIT 许可证：

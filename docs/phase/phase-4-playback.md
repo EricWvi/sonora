@@ -20,7 +20,7 @@
 - [x] 当前用户的喜爱、歌单、播放历史读写；按用户隔离；删除歌曲时级联移除。迁移 5 新增 `likes`、`play_history`、`playlists`、`playlist_tracks`。行为参照 SPlayer：喜爱只针对歌曲，播放端用 ID 集合判断喜爱状态（`isLikeSong`）；历史去重、最近在前、上限 500（[data.ts](../../reference/SPlayer/src/stores/data.ts) 的 `setHistory`）。证据：[listeners.go](../../backend/internal/store/listeners.go)、`TestLikesAreIdempotentAndPerUser`、`TestHistoryMovesReplaysToTopAndIsCapped`、`TestPlaylists`（含另一用户全部操作返回 404、整体重排校验）、`TestDeletingTrackRemovesItFromListenerData`、`TestListenerDataIsPerUser`（HTTP 层两个用户互不可见、跨站写入 403、过期重排 409）；[API 约定](../api.md#播放端用户数据)。运行确认（2026-10-24）：真实曲库数据库副本上迁移 5 应用成功，喜爱、记录播放、建歌单并添加歌曲正常。
 - 歌单封面取第一首有封面的歌，与现有实现一致（2026-10-24 Eric 确认）。不做歌单自定义封面，不做收藏专辑或艺术家。
 - [x] 音频流支持 HTTP Range。证据：`TestPlayerCatalog` 断言 206 与内容；运行确认真实 MP3 返回 206 `audio/mpeg`。
-- [ ] 按阶段 2 的 Chrome 实验结论决定是否需要转码。
+- [x] 按阶段 2 的 Chrome 实验结论决定是否需要转码：不做服务端转码（2026-10-25）。五种格式在 Chromium 中都能直接流式播放与跳转；MP3 起播前 Chrome 要读约 2.4 MB，Eric 确认可以接受。见[阶段 2 的音频实验](phase-2-player-baseline.md#03-chrome-音频实验)。
 
 ## 4.3 服务端补充（2026-10-24 讨论确定）
 

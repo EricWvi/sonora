@@ -16,6 +16,7 @@
 ### 3.2 主题与视觉相关代码
 
 - [ ] 对照 [Provider.vue](../../reference/SPlayer/src/components/Global/Provider.vue) 补齐 Naive UI 主题覆盖、字体与全局配置。
+- [ ] 最小窗口宽度 990px（2026-10-25 确定）：窗口更窄时页面保持 990px 宽、出现横向滚动；不引入 SPlayer 在 `max-width: 989.98px` 下的移动版全屏播放器与移动布局。
 - [ ] 复刻主题色与封面取色链路（[color.ts](../../reference/SPlayer/src/utils/color.ts)），以固定封面验证生成的 CSS 变量与原项目一致。
 - [ ] 复刻外观与歌词设置项对视觉的作用（设置界面在阶段 5 接入），用 fixture 切换验证。
 
