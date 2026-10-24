@@ -117,6 +117,8 @@ export interface Track {
   size: number;
   cover: Cover | null;
   hasLyrics: boolean;
+  /** Empty when the track has no lyrics. */
+  lyricsFormat: "lrc" | "ttml" | "";
   originalName: string;
   createdAt: string;
 }
@@ -150,6 +152,7 @@ export interface Album {
 export interface Artist {
   id: number;
   name: string;
+  image: Cover | null;
   trackCount: number;
   albumCount: number;
   createdAt: string;

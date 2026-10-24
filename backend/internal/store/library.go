@@ -57,8 +57,10 @@ type Track struct {
 	Size       int64     `json:"size"`
 	// Cover is the track's own art, set only when it differs from the
 	// album cover.
-	Cover        *Cover `json:"cover"`
-	HasLyrics    bool   `json:"hasLyrics"`
+	Cover     *Cover `json:"cover"`
+	HasLyrics bool   `json:"hasLyrics"`
+	// LyricsFormat is LRC or TTML, empty when the track has no lyrics.
+	LyricsFormat string `json:"lyricsFormat"`
 	OriginalName string `json:"originalName"`
 	CreatedAt    string `json:"createdAt"`
 }
@@ -81,10 +83,12 @@ type Album struct {
 	CreatedAt  string `json:"createdAt"`
 }
 
-// Artist is a performer, of tracks or as an album artist.
+// Artist is a performer, of tracks or as an album artist. Image is
+// uploaded by the admin and stored like a cover.
 type Artist struct {
 	ID         int64  `json:"id"`
 	Name       string `json:"name"`
+	Image      *Cover `json:"image"`
 	TrackCount int    `json:"trackCount"`
 	AlbumCount int    `json:"albumCount"`
 	CreatedAt  string `json:"createdAt"`
@@ -215,12 +219,14 @@ type TrackQuery struct {
 	Missing  bool
 	AlbumID  int64
 	ArtistID int64
+	Sort     Sort
 	Window
 }
 
 var trackColumns = `
 	t.id, t.title, t.track_no, t.disc_no, t.year, t.duration_ms, t.format, t.size,
-	t.cover, ` + placeholderOf("t.cover") + `, t.lyrics <> '', t.original_name, t.created_at, ` +
+	t.cover, ` + placeholderOf("t.cover") + `, t.lyrics <> '',
+	CASE WHEN t.lyrics = '' THEN '' ELSE t.lyrics_format END, t.original_name, t.created_at, ` +
 	artistsJSON("track_artists", "track_id", "t.id") + `,
 	al.id, al.title, al.cover, ` + placeholderOf("al.cover") + `, ` + artistsJSON("album_artists", "album_id", "al.id")
 
@@ -236,7 +242,7 @@ func scanTrack(row scanner, extra ...any) (Track, error) {
 	var cover, coverHash, alTitle, alCover, alCoverHash sql.NullString
 	var alArtists []Ref
 	dest := []any{&t.ID, &t.Title, &t.TrackNo, &t.DiscNo, &t.Year, &t.DurationMs, &t.Format, &t.Size,
-		&cover, &coverHash, &t.HasLyrics, &t.OriginalName, &t.CreatedAt, (*refs)(&t.Artists),
+		&cover, &coverHash, &t.HasLyrics, &t.LyricsFormat, &t.OriginalName, &t.CreatedAt, (*refs)(&t.Artists),
 		&alID, &alTitle, &alCover, &alCoverHash, (*refs)(&alArtists)}
 	if err := row.Scan(append(dest, extra...)...); err != nil {
 		return t, err
@@ -248,10 +254,18 @@ func scanTrack(row scanner, extra ...any) (Track, error) {
 	return t, nil
 }
 
-// Tracks lists tracks: an album's in disc and track order, otherwise
-// newest first.
+// Tracks lists tracks in q.Sort order; by default an album's in disc and
+// track order, otherwise newest first.
 func (s *Store) Tracks(ctx context.Context, q TrackQuery) (Page[Track], error) {
 	page := Page[Track]{Items: []Track{}}
+	natural := `t.id DESC`
+	if q.AlbumID > 0 {
+		natural = `t.disc_no, t.track_no, t.id`
+	}
+	order, err := q.Sort.orderBy(trackSortKeys, natural)
+	if err != nil {
+		return page, err
+	}
 	var where []string
 	var args []any
 	if q.Q = strings.TrimSpace(q.Q); q.Q != "" {
@@ -279,10 +293,6 @@ func (s *Store) Tracks(ctx context.Context, q TrackQuery) (Page[Track], error) {
 	}
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*)`+trackFrom+cond, args...).Scan(&page.Total); err != nil {
 		return page, err
-	}
-	order := ` ORDER BY t.id DESC`
-	if q.AlbumID > 0 {
-		order = ` ORDER BY t.disc_no, t.track_no, t.id`
 	}
 	w := q.Window.clamp()
 	rows, err := s.db.QueryContext(ctx, `SELECT `+trackColumns+trackFrom+cond+order+` LIMIT ? OFFSET ?`,
@@ -493,10 +503,12 @@ func (s *Store) deleteTracks(ctx context.Context, cond string, id int64) error {
 
 // --- albums ----------------------------------------------------------------
 
-// AlbumQuery filters the album list.
+// AlbumQuery filters the album list. Sort accepts SortCreateTime besides
+// the default order by title.
 type AlbumQuery struct {
 	Q        string
 	ArtistID int64
+	Sort     Sort
 	Window
 }
 
@@ -515,9 +527,13 @@ func scanAlbum(row scanner) (Album, error) {
 	return a, err
 }
 
-// Albums lists albums by title.
+// Albums lists albums, by title unless q.Sort says otherwise.
 func (s *Store) Albums(ctx context.Context, q AlbumQuery) (Page[Album], error) {
 	page := Page[Album]{Items: []Album{}}
+	order, err := q.Sort.orderBy(albumSortKeys, `al.title COLLATE `+sortCollation+`, al.id`)
+	if err != nil {
+		return page, err
+	}
 	var where []string
 	var args []any
 	if q.Q = strings.TrimSpace(q.Q); q.Q != "" {
@@ -535,13 +551,13 @@ func (s *Store) Albums(ctx context.Context, q AlbumQuery) (Page[Album], error) {
 	if len(where) > 0 {
 		cond = " WHERE " + strings.Join(where, " AND ")
 	}
-	err := s.db.QueryRowContext(ctx,
+	err = s.db.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM albums al`+cond, args...).Scan(&page.Total)
 	if err != nil {
 		return page, err
 	}
 	w := q.Window.clamp()
-	rows, err := s.db.QueryContext(ctx, albumSelect+cond+` ORDER BY al.title COLLATE NOCASE, al.id LIMIT ? OFFSET ?`,
+	rows, err := s.db.QueryContext(ctx, albumSelect+cond+order+` LIMIT ? OFFSET ?`,
 		append(args, w.Limit, w.Offset)...)
 	if err != nil {
 		return page, err
@@ -629,6 +645,9 @@ func (s *Store) UpdateAlbum(ctx context.Context, id int64, in AlbumInput) (Album
 		a, err = s.album(ctx, tx, id)
 		return err
 	})
+	if err == nil {
+		s.collectCovers(ctx) // a pruned artist may leave its image behind
+	}
 	return a, err
 }
 
@@ -680,15 +699,17 @@ func mergeAlbumInto(ctx context.Context, tx *sql.Tx, target, src int64) error {
 
 // --- artists ---------------------------------------------------------------
 
-const artistSelect = `
-	SELECT a.id, a.name, a.created_at,
+var artistSelect = `
+	SELECT a.id, a.name, a.image, ` + placeholderOf("a.image") + `, a.created_at,
 		(SELECT COUNT(*) FROM track_artists WHERE artist_id = a.id),
 		(SELECT COUNT(*) FROM album_artists WHERE artist_id = a.id)
 	FROM artists a`
 
 func scanArtist(row scanner) (Artist, error) {
 	var a Artist
-	err := row.Scan(&a.ID, &a.Name, &a.CreatedAt, &a.TrackCount, &a.AlbumCount)
+	var image, imageHash sql.NullString
+	err := row.Scan(&a.ID, &a.Name, &image, &imageHash, &a.CreatedAt, &a.TrackCount, &a.AlbumCount)
+	a.Image = coverOf(image, imageHash)
 	return a, err
 }
 
@@ -703,7 +724,7 @@ func (s *Store) Artists(ctx context.Context, q string, w Window) (Page[Artist], 
 		return page, err
 	}
 	w = w.clamp()
-	rows, err := s.db.QueryContext(ctx, artistSelect+cond+` ORDER BY a.name COLLATE NOCASE, a.id LIMIT ? OFFSET ?`,
+	rows, err := s.db.QueryContext(ctx, artistSelect+cond+` ORDER BY a.name COLLATE `+sortCollation+`, a.id LIMIT ? OFFSET ?`,
 		append(args, w.Limit, w.Offset)...)
 	if err != nil {
 		return page, err
@@ -766,7 +787,7 @@ func (s *Store) RenameArtist(ctx context.Context, id int64, name string) (Artist
 }
 
 // MergeArtists moves the tracks and albums of the source artists to target
-// and deletes the sources. An album whose artists then match another
+// and deletes the sources. The target keeps its own image when set. An album whose artists then match another
 // album of the same title is merged into it.
 func (s *Store) MergeArtists(ctx context.Context, target int64, sources []int64) (Artist, error) {
 	if err := checkMerge(target, sources); err != nil {
@@ -789,6 +810,10 @@ func (s *Store) MergeArtists(ctx context.Context, target int64, sources []int64)
 				if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE artist_id = ?`, src); err != nil {
 					return err
 				}
+			}
+			if _, err := tx.ExecContext(ctx, `UPDATE artists SET image = IFNULL(image, (SELECT image FROM artists WHERE id = ?))
+				WHERE id = ?`, src, target); err != nil {
+				return err
 			}
 			if _, err := tx.ExecContext(ctx, `DELETE FROM artists WHERE id = ?`, src); err != nil {
 				return err

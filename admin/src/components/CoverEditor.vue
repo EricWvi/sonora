@@ -4,15 +4,20 @@ import { NButton, NSpace, NText, useMessage } from "naive-ui";
 import type { ApiError, Cover } from "../api";
 import CoverImage from "./CoverImage.vue";
 
-// Shows a cover and replaces or removes it. fallback is shown, dimmed,
-// when there is no cover of its own (a track falls back to its album's).
-const props = defineProps<{
-  cover: Cover | null;
-  fallback?: Cover | null;
-  fallbackLabel?: string;
-  upload: (file: File) => Promise<unknown>;
-  remove: () => Promise<unknown>;
-}>();
+// Shows a cover (or an artist image) and replaces or removes it. fallback
+// is shown, dimmed, when there is no cover of its own (a track falls back
+// to its album's).
+const props = withDefaults(
+  defineProps<{
+    cover: Cover | null;
+    fallback?: Cover | null;
+    fallbackLabel?: string;
+    emptyText?: string;
+    upload: (file: File) => Promise<unknown>;
+    remove: () => Promise<unknown>;
+  }>(),
+  { fallback: null, fallbackLabel: "", emptyText: "无封面" },
+);
 
 const message = useMessage();
 const input = ref<HTMLInputElement | null>(null);
@@ -46,7 +51,7 @@ function picked(e: Event) {
         :size="300"
         class="fallback"
       />
-      <n-text v-else depth="3">无封面</n-text>
+      <n-text v-else depth="3">{{ emptyText }}</n-text>
     </div>
     <n-space vertical :size="8">
       <n-text v-if="!cover && fallback && fallbackLabel" depth="3">{{

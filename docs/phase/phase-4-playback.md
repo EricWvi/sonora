@@ -1,6 +1,6 @@
 # 阶段 4：播放端认证、API 与播放闭环
 
-状态：进行中。4.1 的服务端部分与 4.2 的播放端 API（曲库、喜爱、歌单、历史）已实现（2026-10-24）；4.3 的服务端补充、Playback 与播放端接入未开始。前置：阶段 1 的曲库与上传；阶段 3 的播放器展示层。参照路线图：[播放状态与异步规则](../roadmap.md#52-播放状态与异步规则)。
+状态：进行中。4.1 的服务端部分与 4.2 的播放端 API（曲库、喜爱、歌单、历史）已实现（2026-10-24）；4.3 的服务端补充已实现（2026-10-25）；Playback 与播放端接入未开始。前置：阶段 1 的曲库与上传；阶段 3 的播放器展示层。参照路线图：[播放状态与异步规则](../roadmap.md#52-播放状态与异步规则)。
 
 ## 4.1 OIDC 认证
 
@@ -16,7 +16,7 @@
 ## 4.2 播放端 API
 
 - [x] 歌曲、专辑、艺术家的列表与详情，分页；搜索（各列表的 `q`）；封面；歌词。数据形态沿用管理端的 `artists` 数组、`cover` 对象和缩略图尺寸，去掉管理字段；歌曲的 `cover` 已解析为实际显示的封面。证据：[player.go](../../backend/internal/server/player.go)、`TestPlayerCatalog`、`TestPlayerAPIRequiresListenerSession`（管理会话与播放端会话互不通用）；[API 约定](../api.md#播放端-api)。运行确认（2026-10-24）：开发模式实例加载 `backend/.data` 的副本（310 张专辑、194 位艺术家），迁移 4 应用成功，列表、详情、歌词、封面正常。
-- [ ] 歌曲列表排序：`sort` 为默认、标题、歌手、专辑、时长、添加时间，`order` 为升序或降序；适用于全部歌曲、我喜欢、歌单、艺术家的歌曲与搜索结果（2026-10-24 确定，见[阶段 2](phase-2-player-baseline.md#歌曲列表)）。
+- [x] 歌曲列表排序：`sort` 为默认、标题、歌手、专辑、时长、添加时间，`order` 为升序或降序；适用于全部歌曲、我喜欢、歌单、艺术家的歌曲与搜索结果（2026-10-24 确定，见[阶段 2](phase-2-player-baseline.md#歌曲列表)）。证据：[sort.go](../../backend/internal/store/sort.go)、`TestSortedTrackLists`、`TestPlayerCatalog`（非法取值 400）；[API 约定](../api.md#通用约定)。字段名沿用 SPlayer 的 `sortFieldOptions`（`title`、`artist`、`album`、`duration`、`createTime`）。名称比较用注册到 SQLite 的排序规则 `zh_numeric`（`golang.org/x/text/collate`，简体中文加数字按数值），对应 SPlayer 的 `Intl.Collator("zh-CN", {numeric: true})`；相等时保持列表自身的顺序，与 SPlayer 的稳定排序一致。专辑与艺术家列表的默认顺序也改用这一规则（原为 `NOCASE` 的码点顺序）。运行确认（2026-10-25）：真实曲库副本上标题升序为 `Angel … Young For You, 爱的四季, 爱人错过, 暗涌, 八月照相馆`，337 首按歌手排序 6 ms。
 - [x] 当前用户的喜爱、歌单、播放历史读写；按用户隔离；删除歌曲时级联移除。迁移 5 新增 `likes`、`play_history`、`playlists`、`playlist_tracks`。行为参照 SPlayer：喜爱只针对歌曲，播放端用 ID 集合判断喜爱状态（`isLikeSong`）；历史去重、最近在前、上限 500（[data.ts](../../reference/SPlayer/src/stores/data.ts) 的 `setHistory`）。证据：[listeners.go](../../backend/internal/store/listeners.go)、`TestLikesAreIdempotentAndPerUser`、`TestHistoryMovesReplaysToTopAndIsCapped`、`TestPlaylists`（含另一用户全部操作返回 404、整体重排校验）、`TestDeletingTrackRemovesItFromListenerData`、`TestListenerDataIsPerUser`（HTTP 层两个用户互不可见、跨站写入 403、过期重排 409）；[API 约定](../api.md#播放端用户数据)。运行确认（2026-10-24）：真实曲库数据库副本上迁移 5 应用成功，喜爱、记录播放、建歌单并添加歌曲正常。
 - 歌单封面取第一首有封面的歌，与现有实现一致（2026-10-24 Eric 确认）。不做歌单自定义封面，不做收藏专辑或艺术家。
 - [x] 音频流支持 HTTP Range。证据：`TestPlayerCatalog` 断言 206 与内容；运行确认真实 MP3 返回 206 `audio/mpeg`。
@@ -24,10 +24,12 @@
 
 ## 4.3 服务端补充（2026-10-24 讨论确定）
 
-- [ ] 歌词格式：保存原文与格式 `lrc` / `ttml`（迁移新增格式列，已有歌词为 `lrc`）；管理后台接受 `.ttml` 上传与同名外置文件；播放端歌词接口改为 `{format, lyrics}`。
-- [ ] 艺术家图片：管理后台上传、替换、删除，与封面相同的存储、缩略图与 ThumbHash 处理；管理和播放端的艺术家数据增加 `image: {name, thumbhash}`。
-- [ ] 设置同步：按用户保存外观与歌词设置，播放端整体读写（例如 `GET/PUT settings`，服务端只校验大小与 JSON 格式，不解释内容）；设备相关设置不上传。
-- [ ] 首页数据：最近添加的专辑（专辑列表支持按添加时间倒序）；最近播放沿用 `history`。
+迁移 6 一次加入本节的三处表结构：`tracks.lyrics_format`、`artists.image`、`user_settings`。运行确认（2026-10-25）：开发模式实例加载 `backend/.data/data` 的副本（`user_version` 4，337 首），迁移 5、6 依次应用成功，已有歌词全部为 `lrc`；以下各项的接口与管理后台界面在该实例上逐一操作通过（Playwright，Chrome 1440×1000），用完删除副本。
+
+- [x] 歌词格式：保存原文与格式 `lrc` / `ttml`（迁移新增格式列，已有歌词为 `lrc`）；管理后台接受 `.ttml` 上传与同名外置文件；播放端歌词接口改为 `{format, lyrics}`。证据：[lyrics.go](../../backend/internal/store/lyrics.go)、`TestLyricsFormat`、`TestLyricsKeepTheirFormat`、`TestPlayerCatalog`。格式按内容判断而不看扩展名，因此管理后台直接粘贴编辑的文本也适用：以 `<` 开头的必须是根元素为 `tt` 的合法 XML，否则 400；其余按 LRC。音频内嵌歌词按 LRC。管理后台：歌曲列表的“歌词”列显示 `LRC` / `TTML`，歌曲抽屉显示格式并接受 `.lrc` / `.ttml`；上传页把同名 `.lrc` 或 `.ttml` 与音频配对，两者都有时用 TTML，LRC 标为未使用并说明原因（运行确认）。
+- [x] 艺术家图片：管理后台上传、替换、删除，与封面相同的存储、缩略图与 ThumbHash 处理；管理和播放端的艺术家数据增加 `image: {name, thumbhash}`。证据：`PUT/DELETE /admin/api/v1/artists/{id}/image`、`TestArtistImages`（合并时目标沿用来源图片；艺术家随最后一首歌被清理时图片文件一并删除）、`TestPlayerCatalog`。图片与封面共用 `covers` 目录、`covers` 表和 `covers/{name}` 接口；图片相关的错误提示由“封面”改为“图片”。修改专辑可能清理掉艺术家，因此 `UpdateAlbum` 之后也回收无人引用的图片。管理后台的艺术家页增加圆形缩略图列，“重命名”弹窗改为“编辑艺术家”，含名称与图片（运行确认）。
+- [x] 设置同步：按用户保存外观与歌词设置，播放端整体读写（例如 `GET/PUT settings`，服务端只校验大小与 JSON 格式，不解释内容）；设备相关设置不上传。证据：[settings.go](../../backend/internal/store/settings.go)、`TestSettingsArePerUserJSONObjects`、`TestSettingsSync`。`GET settings` 在未保存时返回 `{}`；`PUT settings` 整体替换，只接受不超过 256 KB 的 JSON 对象，后写入的覆盖先写入的。
+- [x] 首页数据：最近添加的专辑（专辑列表支持按添加时间倒序）；最近播放沿用 `history`。证据：`GET albums?sort=createTime&order=desc`，`TestSortedTrackLists`。“添加时间”是专辑创建的时间（按 ID），给旧专辑补传歌曲不会让它排到前面。
 
 ## 4.4 Playback
 

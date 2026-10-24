@@ -55,15 +55,19 @@ func trackExists(ctx context.Context, q querier, id int64) error {
 
 // --- likes -----------------------------------------------------------------
 
-// LikedTracks lists the tracks the user liked, most recent first.
-func (s *Store) LikedTracks(ctx context.Context, userID int64, w Window) (Page[Track], error) {
+// LikedTracks lists the tracks the user liked, by default most recent
+// first.
+func (s *Store) LikedTracks(ctx context.Context, userID int64, sort Sort, w Window) (Page[Track], error) {
 	page := Page[Track]{Items: []Track{}}
-	var err error
+	order, err := sort.orderBy(trackSortKeys, `l.id DESC`)
+	if err != nil {
+		return page, err
+	}
 	page.Total, err = s.trackPage(ctx,
 		`SELECT COUNT(*) FROM likes WHERE user_id = ?`,
 		`SELECT `+trackColumns+` FROM likes l JOIN tracks t ON t.id = l.track_id
 			LEFT JOIN albums al ON al.id = t.album_id
-		WHERE l.user_id = ? ORDER BY l.id DESC`,
+		WHERE l.user_id = ?`+order,
 		[]any{userID}, w, func(rows *sql.Rows) error {
 			t, err := scanTrack(rows)
 			page.Items = append(page.Items, t)
@@ -327,18 +331,21 @@ func (s *Store) DeletePlaylist(ctx context.Context, userID, id int64) error {
 	return nil
 }
 
-// PlaylistTracks lists a playlist's tracks in order.
-func (s *Store) PlaylistTracks(ctx context.Context, userID, id int64, w Window) (Page[Track], error) {
+// PlaylistTracks lists a playlist's tracks, by default in its order.
+func (s *Store) PlaylistTracks(ctx context.Context, userID, id int64, sort Sort, w Window) (Page[Track], error) {
 	page := Page[Track]{Items: []Track{}}
+	order, err := sort.orderBy(trackSortKeys, `pt.position`)
+	if err != nil {
+		return page, err
+	}
 	if err := ownPlaylist(ctx, s.db, userID, id); err != nil {
 		return page, err
 	}
-	var err error
 	page.Total, err = s.trackPage(ctx,
 		`SELECT COUNT(*) FROM playlist_tracks WHERE playlist_id = ?`,
 		`SELECT `+trackColumns+` FROM playlist_tracks pt JOIN tracks t ON t.id = pt.track_id
 			LEFT JOIN albums al ON al.id = t.album_id
-		WHERE pt.playlist_id = ? ORDER BY pt.position`,
+		WHERE pt.playlist_id = ?`+order,
 		[]any{id}, w, func(rows *sql.Rows) error {
 			t, err := scanTrack(rows)
 			page.Items = append(page.Items, t)

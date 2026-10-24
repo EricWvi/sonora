@@ -92,6 +92,8 @@ func New(st *store.Store, authn *admin.Service, listeners *auth.Service, player,
 	private.HandleFunc("GET "+p+"artists/{id}", s.getArtist)
 	private.HandleFunc("PUT "+p+"artists/{id}", s.renameArtist)
 	private.HandleFunc("POST "+p+"artists/{id}/merge", s.mergeArtists)
+	private.HandleFunc("PUT "+p+"artists/{id}/image", s.setArtistImage)
+	private.HandleFunc("DELETE "+p+"artists/{id}/image", s.clearArtistImage)
 
 	private.HandleFunc("GET "+p+"covers/{name}", s.getCover)
 	private.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -118,6 +120,7 @@ func (s *server) listTracks(w http.ResponseWriter, r *http.Request) {
 		Missing:  q.Get("missing") == "true",
 		AlbumID:  queryInt(q.Get("albumId")),
 		ArtistID: queryInt(q.Get("artistId")),
+		Sort:     listSort(r),
 		Window:   window(r),
 	})
 	respond(w, r, page, err)
@@ -242,7 +245,7 @@ func (s *server) setTrackCover(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	data, ok := readBody(w, r, store.MaxCoverBytes, "封面不能超过 10 MB")
+	data, ok := readBody(w, r, store.MaxCoverBytes, "图片不能超过 10 MB")
 	if !ok {
 		return
 	}
@@ -307,6 +310,7 @@ func (s *server) listAlbums(w http.ResponseWriter, r *http.Request) {
 	page, err := s.store.Albums(r.Context(), store.AlbumQuery{
 		Q:        q.Get("q"),
 		ArtistID: queryInt(q.Get("artistId")),
+		Sort:     listSort(r),
 		Window:   window(r),
 	})
 	respond(w, r, page, err)
@@ -365,7 +369,7 @@ func (s *server) setAlbumCover(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	data, ok := readBody(w, r, store.MaxCoverBytes, "封面不能超过 10 MB")
+	data, ok := readBody(w, r, store.MaxCoverBytes, "图片不能超过 10 MB")
 	if !ok {
 		return
 	}
@@ -426,7 +430,30 @@ func (s *server) mergeArtists(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, a, err)
 }
 
-// getCover serves a cover image. Names are content hashes, so the response
+// setArtistImage takes the raw image bytes as the request body.
+func (s *server) setArtistImage(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	data, ok := readBody(w, r, store.MaxCoverBytes, "图片不能超过 10 MB")
+	if !ok {
+		return
+	}
+	a, err := s.store.SetArtistImage(r.Context(), id, data)
+	respond(w, r, a, err)
+}
+
+func (s *server) clearArtistImage(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	a, err := s.store.ClearArtistImage(r.Context(), id)
+	respond(w, r, a, err)
+}
+
+// getCover serves a cover image or artist image. Names are content hashes, so the response
 // never changes and may be cached for a year.
 //
 // ?size= picks a thumbnail edge length from store.CoverSizes.
@@ -509,6 +536,13 @@ func pathInt(w http.ResponseWriter, r *http.Request, name string) (int64, bool) 
 func queryInt(s string) int64 {
 	n, _ := strconv.ParseInt(s, 10, 64)
 	return n
+}
+
+// listSort reads the sort and order query parameters; the store rejects
+// values it does not know.
+func listSort(r *http.Request) store.Sort {
+	q := r.URL.Query()
+	return store.Sort{Field: q.Get("sort"), Order: q.Get("order")}
 }
 
 func window(r *http.Request) store.Window {

@@ -32,7 +32,7 @@ Sonora 是自托管的音乐流媒体服务，由三部分组成：
 | 1 Go 服务基础与管理后台 | [phase-1-admin.md](phase-1-admin.md) | 已实现并运行确认（2026-10-24）；真实曲库规模待验证 | 无 |
 | 2 播放端参照与页面清单 | [phase-2-player-baseline.md](phase-2-player-baseline.md) | 进行中：页面清单与设计取舍已确定（2026-10-24）；播放器基线、资源清单与音频实验未开始 | 开始做播放端时 |
 | 3 播放端视觉外壳 | [phase-3-player-shell.md](phase-3-player-shell.md) | 未开始：已有主框架、导航与主题的初始化，仍是 SPlayer 在线模式菜单 | 阶段 2 的页面清单；播放器部分需要阶段 2 的播放器基线 |
-| 4 播放端认证、API 与播放闭环 | [phase-4-playback.md](phase-4-playback.md) | 进行中：OIDC 与播放端 API（曲库、喜爱、歌单、历史）已实现（2026-10-24）；Playback 与播放端接入未开始 | 阶段 1；阶段 3 的播放器展示层 |
+| 4 播放端认证、API 与播放闭环 | [phase-4-playback.md](phase-4-playback.md) | 进行中：OIDC 与播放端 API（曲库、喜爱、歌单、历史）已实现（2026-10-24）；歌词格式、排序、艺术家图片、设置同步与首页数据已实现（2026-10-25）；Playback 与播放端接入未开始 | 阶段 1；阶段 3 的播放器展示层 |
 | 5 播放端功能页面 | [phase-5-player-pages.md](phase-5-player-pages.md) | 未开始 | 阶段 4 |
 | 6 首版 | [phase-6-first-release.md](phase-6-first-release.md) | 未开始 | 阶段 5 |
 | 7 高级能力 | [phase-7-advanced.md](phase-7-advanced.md) | 候选池，不排期 | 按单项需求评估 |

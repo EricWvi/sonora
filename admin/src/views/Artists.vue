@@ -5,6 +5,7 @@ import {
   NAlert,
   NButton,
   NDataTable,
+  NDivider,
   NForm,
   NFormItem,
   NInput,
@@ -15,6 +16,8 @@ import {
   type DataTableRowKey,
 } from "naive-ui";
 import { query, request, type ApiError, type Artist, type Page } from "../api";
+import CoverEditor from "../components/CoverEditor.vue";
+import CoverImage from "../components/CoverImage.vue";
 import MergeModal from "../components/MergeModal.vue";
 
 const PAGE_SIZE = 50;
@@ -79,25 +82,49 @@ function clearSelection() {
   selected.clear();
 }
 
-const renaming = ref<Artist | null>(null);
+const showEdit = ref(false);
+const editing = ref<Artist | null>(null);
 const name = ref("");
 const saving = ref(false);
 
+function edit(a: Artist) {
+  editing.value = a;
+  name.value = a.name;
+  showEdit.value = true;
+}
+
 async function rename() {
-  if (!renaming.value) return;
+  if (!editing.value) return;
   saving.value = true;
   try {
-    await request<Artist>("PUT", `/artists/${renaming.value.id}`, {
-      name: name.value,
-    });
+    editing.value = await request<Artist>(
+      "PUT",
+      `/artists/${editing.value.id}`,
+      { name: name.value },
+    );
     message.success("已保存");
-    renaming.value = null;
     load();
   } catch (err) {
     message.error((err as ApiError).message);
   } finally {
     saving.value = false;
   }
+}
+
+async function setImage(file: File) {
+  editing.value = await request<Artist>(
+    "PUT",
+    `/artists/${editing.value!.id}/image`,
+    file,
+  );
+  load();
+}
+async function clearImage() {
+  editing.value = await request<Artist>(
+    "DELETE",
+    `/artists/${editing.value!.id}/image`,
+  );
+  load();
 }
 
 const merging = ref(false);
@@ -118,21 +145,21 @@ async function merge(target: number, sources: number[]) {
 const columns: DataTableColumns<Artist> = [
   { type: "selection" },
   {
+    title: "",
+    key: "image",
+    width: 56,
+    render: (a) =>
+      h(
+        "div",
+        { class: "thumb" },
+        a.image ? [h(CoverImage, { cover: a.image, size: 96 })] : [],
+      ),
+  },
+  {
     title: "艺术家",
     key: "name",
     ellipsis: { tooltip: true },
-    render: (a) =>
-      h(
-        "a",
-        {
-          class: "link",
-          onClick: () => {
-            renaming.value = a;
-            name.value = a.name;
-          },
-        },
-        a.name,
-      ),
+    render: (a) => h("a", { class: "link", onClick: () => edit(a) }, a.name),
   },
   {
     title: "歌曲",
@@ -204,20 +231,30 @@ const pagination = computed(() => ({
   </n-space>
 
   <n-modal
-    :show="renaming != null"
+    :show="showEdit"
     preset="card"
-    title="重命名艺术家"
-    style="width: 400px"
-    @update:show="(v: boolean) => !v && (renaming = null)"
+    title="编辑艺术家"
+    style="width: 480px"
+    @update:show="(v: boolean) => (showEdit = v)"
+    @after-leave="editing = null"
   >
-    <n-form @submit.prevent="rename">
-      <n-form-item label="名称">
-        <n-input v-model:value="name" autofocus />
-      </n-form-item>
-      <n-button type="primary" attr-type="submit" :loading="saving"
-        >保存</n-button
-      >
-    </n-form>
+    <template v-if="editing">
+      <n-form @submit.prevent="rename">
+        <n-form-item label="名称">
+          <n-input v-model:value="name" autofocus />
+        </n-form-item>
+        <n-button type="primary" attr-type="submit" :loading="saving"
+          >保存</n-button
+        >
+      </n-form>
+      <n-divider title-placement="left">图片</n-divider>
+      <cover-editor
+        :cover="editing.image"
+        empty-text="无图片"
+        :upload="setImage"
+        :remove="clearImage"
+      />
+    </template>
   </n-modal>
 
   <merge-modal
@@ -230,6 +267,13 @@ const pagination = computed(() => ({
 </template>
 
 <style scoped>
+:deep(.thumb) {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(128, 128, 128, 0.12);
+}
 :deep(.link) {
   color: inherit !important;
 }

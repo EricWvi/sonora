@@ -45,4 +45,5 @@ export function stem(name: string) {
   return (dot > 0 ? name.slice(0, dot) : name).toLowerCase();
 }
 
-export const isLyrics = (name: string) => /\.lrc$/i.test(name);
+export const isLyrics = (name: string) => /\.(lrc|ttml)$/i.test(name);
+export const isTTML = (name: string) => /\.ttml$/i.test(name);

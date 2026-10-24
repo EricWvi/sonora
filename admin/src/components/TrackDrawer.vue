@@ -243,7 +243,11 @@ function confirmDelete() {
           :remove="clearCover"
         />
 
-        <n-divider title-placement="left">歌词</n-divider>
+        <n-divider title-placement="left">
+          歌词<template v-if="track.lyricsFormat">
+            · {{ track.lyricsFormat.toUpperCase() }}</template
+          >
+        </n-divider>
         <n-input
           v-model:value="lyrics"
           type="textarea"
@@ -264,7 +268,7 @@ function confirmDelete() {
             :disabled="savingLyrics"
             @click="lyricsInput?.click()"
           >
-            上传 .lrc
+            上传 .lrc / .ttml
           </n-button>
           <n-button
             v-if="track.hasLyrics"
@@ -278,7 +282,7 @@ function confirmDelete() {
         <input
           ref="lyricsInput"
           type="file"
-          accept=".lrc,.txt"
+          accept=".lrc,.ttml,.txt"
           hidden
           @change="lyricsPicked"
         />

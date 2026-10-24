@@ -229,6 +229,22 @@ var migrations = []migration{
 	CREATE INDEX playlist_tracks_order ON playlist_tracks (playlist_id, position);
 	CREATE INDEX playlist_tracks_track ON playlist_tracks (track_id);
 	`),
+
+	// lyrics_format says how the player parses lyrics: 'lrc' (plain,
+	// word-timed or enhanced LRC, told apart by the player) or 'ttml'.
+	// artists.image is a cover-store image name like albums.cover.
+	// user_settings holds each listener's appearance and lyrics settings
+	// as one JSON object the service does not interpret.
+	execSQL(`
+	ALTER TABLE tracks ADD COLUMN lyrics_format TEXT NOT NULL DEFAULT 'lrc';
+	ALTER TABLE artists ADD COLUMN image TEXT;
+
+	CREATE TABLE user_settings (
+		user_id    INTEGER PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+		settings   TEXT    NOT NULL,
+		updated_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+	);
+	`),
 }
 
 func migrate(db *sql.DB) error {

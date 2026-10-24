@@ -60,10 +60,14 @@ func TestPlayerCatalog(t *testing.T) {
 	ts := newTest(t)
 	ts.setup()
 	tr := decodeBody[store.IngestResult](t, ts.upload("a.flac", sample(t, "tagged.flac"), "[00:01.00]歌词")).Track
+	rec := ts.do("PUT", api+"artists/"+itoa(tr.Artists[0].ID)+"/image", string(sample(t, "cover.jpg")))
+	if rec.Code != http.StatusOK || decodeBody[store.Artist](t, rec).Image == nil {
+		t.Fatalf("artist image: %d %s", rec.Code, rec.Body)
+	}
 	ts.cookie = ""
 	ts.signIn("alice", "Alice")
 
-	rec := ts.do("GET", playerAPI+"tracks", "")
+	rec = ts.do("GET", playerAPI+"tracks", "")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("tracks: %d %s", rec.Code, rec.Body)
 	}
@@ -100,15 +104,33 @@ func TestPlayerCatalog(t *testing.T) {
 	}
 	artist := decodeBody[playerArtist](t, ts.do("GET", playerAPI+"artists/"+itoa(tr.Artists[0].ID), ""))
 	artists := decodeBody[store.Page[playerArtist]](t, ts.do("GET", playerAPI+"artists", ""))
-	if artist.TrackCount != 1 || artist.AlbumCount != 1 || artists.Total != 1 {
+	if artist.TrackCount != 1 || artist.AlbumCount != 1 || artist.Image == nil || artists.Total != 1 ||
+		artists.Items[0].Image == nil {
 		t.Fatalf("artist = %+v, artists = %+v", artist, artists)
+	}
+	if rec := ts.do("GET", playerAPI+"covers/"+artist.Image.Name+"?size=96", ""); rec.Code != http.StatusOK {
+		t.Fatalf("artist image: %d", rec.Code)
+	}
+
+	// Lists take sort and order; unknown values are rejected.
+	for path, want := range map[string]int{
+		"tracks?sort=title&order=desc":      http.StatusOK,
+		"tracks?sort=size":                  http.StatusBadRequest,
+		"tracks?sort=title&order=sideways":  http.StatusBadRequest,
+		"albums?sort=createTime&order=desc": http.StatusOK,
+		"albums?sort=duration":              http.StatusBadRequest,
+		"likes?sort=artist":                 http.StatusOK,
+	} {
+		if rec := ts.do("GET", playerAPI+path, ""); rec.Code != want {
+			t.Errorf("%s: %d %s", path, rec.Code, rec.Body)
+		}
 	}
 	if rec := ts.do("GET", playerAPI+"albums/999", ""); rec.Code != http.StatusNotFound {
 		t.Fatalf("missing album: %d", rec.Code)
 	}
 
 	lyrics := decodeBody[map[string]string](t, ts.do("GET", playerAPI+"tracks/"+itoa(tr.ID)+"/lyrics", ""))
-	if lyrics["lyrics"] != "[00:01.00]歌词" {
+	if lyrics["lyrics"] != "[00:01.00]歌词" || lyrics["format"] != "lrc" {
 		t.Fatalf("lyrics = %q", lyrics)
 	}
 
@@ -210,5 +232,33 @@ func TestListenerDataIsPerUser(t *testing.T) {
 	}
 	if rec := ts.do("DELETE", playerAPI+"playlists/"+itoa(pl.ID), ""); rec.Code != http.StatusNoContent {
 		t.Fatalf("delete playlist: %d", rec.Code)
+	}
+}
+
+func TestSettingsSync(t *testing.T) {
+	ts := newTest(t)
+	ts.signIn("alice", "Alice")
+	alice := ts.listener
+	if rec := ts.do("GET", playerAPI+"settings", ""); rec.Code != http.StatusOK || strings.TrimSpace(rec.Body.String()) != "{}" {
+		t.Fatalf("unsaved: %d %s", rec.Code, rec.Body)
+	}
+	if rec := ts.do("PUT", playerAPI+"settings", `{"themeMode":"dark","lyricFontSize":46}`); rec.Code != http.StatusNoContent {
+		t.Fatalf("save: %d %s", rec.Code, rec.Body)
+	}
+	if rec := ts.do("PUT", playerAPI+"settings", `["not","an","object"]`); rec.Code != http.StatusBadRequest {
+		t.Fatalf("save array: %d", rec.Code)
+	}
+	big := `{"x":"` + strings.Repeat("a", store.MaxSettingsBytes) + `"}`
+	if rec := ts.do("PUT", playerAPI+"settings", big); rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("save too large: %d", rec.Code)
+	}
+	ts.signIn("bob", "Bob")
+	if rec := ts.do("GET", playerAPI+"settings", ""); strings.TrimSpace(rec.Body.String()) != "{}" {
+		t.Fatalf("bob sees %s", rec.Body)
+	}
+	ts.listener = alice
+	got := decodeBody[map[string]any](t, ts.do("GET", playerAPI+"settings", ""))
+	if got["themeMode"] != "dark" || got["lyricFontSize"] != float64(46) {
+		t.Fatalf("alice settings = %v", got)
 	}
 }

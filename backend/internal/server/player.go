@@ -31,6 +31,9 @@ func (s *server) registerPlayer(private *http.ServeMux) {
 
 	private.HandleFunc("GET "+p+"covers/{name}", s.getCover)
 
+	private.HandleFunc("GET "+p+"settings", s.getSettings)
+	private.HandleFunc("PUT "+p+"settings", s.saveSettings)
+
 	private.HandleFunc("GET "+p+"likes", s.listLikes)
 	private.HandleFunc("GET "+p+"likes/ids", s.listLikeIDs)
 	private.HandleFunc("PUT "+p+"likes/{trackId}", s.like)
@@ -90,10 +93,11 @@ type playerAlbum struct {
 }
 
 type playerArtist struct {
-	ID         int64  `json:"id"`
-	Name       string `json:"name"`
-	TrackCount int    `json:"trackCount"`
-	AlbumCount int    `json:"albumCount"`
+	ID         int64        `json:"id"`
+	Name       string       `json:"name"`
+	Image      *store.Cover `json:"image"`
+	TrackCount int          `json:"trackCount"`
+	AlbumCount int          `json:"albumCount"`
 }
 
 // toPlayerTrack resolves the cover the track shows: its own art, or else
@@ -120,7 +124,7 @@ func toPlayerAlbum(a store.Album) playerAlbum {
 }
 
 func toPlayerArtist(a store.Artist) playerArtist {
-	return playerArtist{ID: a.ID, Name: a.Name, TrackCount: a.TrackCount, AlbumCount: a.AlbumCount}
+	return playerArtist{ID: a.ID, Name: a.Name, Image: a.Image, TrackCount: a.TrackCount, AlbumCount: a.AlbumCount}
 }
 
 func mapPage[T, U any](p store.Page[T], f func(T) U) store.Page[U] {
@@ -141,6 +145,7 @@ func (s *server) listPlayerTracks(w http.ResponseWriter, r *http.Request) {
 		Q:        q.Get("q"),
 		AlbumID:  queryInt(q.Get("albumId")),
 		ArtistID: queryInt(q.Get("artistId")),
+		Sort:     listSort(r),
 		Window:   window(r),
 	})
 	respond(w, r, mapPage(page, toPlayerTrack), err)
@@ -155,15 +160,16 @@ func (s *server) getPlayerTrack(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, toPlayerTrack(d.Track), err)
 }
 
-// getPlayerLyrics returns the stored lyrics text, LRC or plain, as
-// {"lyrics": "..."}; empty when the track has none.
+// getPlayerLyrics returns the stored lyrics text as {"format", "lyrics"}:
+// format is "lrc" or "ttml", both empty when the track has none. The
+// player parses them.
 func (s *server) getPlayerLyrics(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r)
 	if !ok {
 		return
 	}
 	d, err := s.store.Track(r.Context(), id)
-	respond(w, r, map[string]string{"lyrics": d.Lyrics}, err)
+	respond(w, r, map[string]string{"format": d.LyricsFormat, "lyrics": d.Lyrics}, err)
 }
 
 func (s *server) listPlayerAlbums(w http.ResponseWriter, r *http.Request) {
@@ -171,6 +177,7 @@ func (s *server) listPlayerAlbums(w http.ResponseWriter, r *http.Request) {
 	page, err := s.store.Albums(r.Context(), store.AlbumQuery{
 		Q:        q.Get("q"),
 		ArtistID: queryInt(q.Get("artistId")),
+		Sort:     listSort(r),
 		Window:   window(r),
 	})
 	respond(w, r, mapPage(page, toPlayerAlbum), err)
@@ -207,8 +214,25 @@ func pathTrackID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	return pathInt(w, r, "trackId")
 }
 
+// getSettings returns the listener's appearance and lyrics settings as
+// saved by the player.
+func (s *server) getSettings(w http.ResponseWriter, r *http.Request) {
+	settings, err := s.store.Settings(r.Context(), userID(r))
+	respond(w, r, settings, err)
+}
+
+// saveSettings takes the whole settings object as the body and replaces
+// what was saved.
+func (s *server) saveSettings(w http.ResponseWriter, r *http.Request) {
+	data, ok := readBody(w, r, store.MaxSettingsBytes, "设置不能超过 256 KB")
+	if !ok {
+		return
+	}
+	respondEmpty(w, r, s.store.SaveSettings(r.Context(), userID(r), data))
+}
+
 func (s *server) listLikes(w http.ResponseWriter, r *http.Request) {
-	page, err := s.store.LikedTracks(r.Context(), userID(r), window(r))
+	page, err := s.store.LikedTracks(r.Context(), userID(r), listSort(r), window(r))
 	respond(w, r, mapPage(page, toPlayerTrack), err)
 }
 
@@ -326,7 +350,7 @@ func (s *server) listPlaylistTracks(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	page, err := s.store.PlaylistTracks(r.Context(), userID(r), id, window(r))
+	page, err := s.store.PlaylistTracks(r.Context(), userID(r), id, listSort(r), window(r))
 	respond(w, r, mapPage(page, toPlayerTrack), err)
 }
 

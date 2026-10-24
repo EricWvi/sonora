@@ -76,14 +76,15 @@ type IngestResult struct {
 
 // Ingest adds the upload to the library. A file whose content is already
 // in the library is not stored again; the existing track is returned.
-// lyrics is an optional sidecar lyrics file that takes precedence over
-// lyrics embedded in the tags.
+// lyrics is an optional sidecar LRC or TTML file that takes precedence
+// over lyrics embedded in the tags.
 func (s *Store) Ingest(ctx context.Context, u *Upload, lyrics []byte) (IngestResult, error) {
 	defer u.Discard()
-	text := u.info.Tags.Lyrics
+	// Embedded lyrics are taken as LRC.
+	text, format := u.info.Tags.Lyrics, LRC
 	if len(lyrics) > 0 {
 		var err error
-		if text, err = decodeLyrics(lyrics); err != nil {
+		if text, format, err = readLyrics(lyrics); err != nil {
 			return IngestResult{}, err
 		}
 	}
@@ -169,10 +170,10 @@ func (s *Store) Ingest(ctx context.Context, u *Upload, lyrics []byte) (IngestRes
 		var id int64
 		err = tx.QueryRowContext(ctx, `
 			INSERT INTO tracks (title, album_id, track_no, disc_no, year, duration_ms, format, size,
-				sha256, file, original_name, cover, lyrics)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+				sha256, file, original_name, cover, lyrics, lyrics_format)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
 			in.Title, album, in.TrackNo, in.DiscNo, in.Year, u.info.Duration.Milliseconds(),
-			string(u.info.Format), u.size, u.sha256, rel, u.name, trackCover, text).Scan(&id)
+			string(u.info.Format), u.size, u.sha256, rel, u.name, trackCover, text, format).Scan(&id)
 		if err != nil {
 			return err
 		}

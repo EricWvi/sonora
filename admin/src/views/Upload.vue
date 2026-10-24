@@ -20,7 +20,7 @@ import {
   type ApiError,
   type TrackDetail,
 } from "../api";
-import { isLyrics, stem, uploadTrack } from "../upload";
+import { isLyrics, isTTML, stem, uploadTrack } from "../upload";
 
 type State =
   "queued" | "uploading" | "processing" | "created" | "duplicate" | "failed";
@@ -51,16 +51,25 @@ const counts = computed(() => {
   return c;
 });
 
-// Files picked together are paired by name: "song.lrc" goes with
-// "song.flac". The service decides what counts as audio.
+// Files picked together are paired by name: "song.lrc" or "song.ttml"
+// goes with "song.flac". A song has one lyrics file; TTML wins over LRC.
+// The service decides what counts as audio.
 function add(files: File[]) {
   const audio = files.filter((f) => !isLyrics(f.name));
-  const lyrics = new Map(
-    files.filter((f) => isLyrics(f.name)).map((f) => [stem(f.name), f]),
-  );
+  const lyrics = new Map<string, File>();
+  const spare: File[] = [];
+  for (const f of files.filter((f) => isLyrics(f.name))) {
+    const other = lyrics.get(stem(f.name));
+    if (other && !isTTML(f.name)) {
+      spare.push(f);
+      continue;
+    }
+    if (other) spare.push(other);
+    lyrics.set(stem(f.name), f);
+  }
   for (const f of audio) {
     const lrc = lyrics.get(stem(f.name)) ?? null;
-    lyrics.delete(stem(f.name));
+    if (lrc) lyrics.delete(stem(f.name));
     items.push({
       key: nextKey++,
       file: f,
@@ -70,6 +79,19 @@ function add(files: File[]) {
       state: "queued",
       progress: 0,
       error: "",
+      track: null,
+    });
+  }
+  for (const f of spare) {
+    items.push({
+      key: nextKey++,
+      file: null,
+      name: f.name,
+      size: f.size,
+      lyrics: null,
+      state: "failed",
+      progress: 0,
+      error: "同名的 .ttml 歌词已优先使用",
       track: null,
     });
   }
@@ -241,13 +263,13 @@ const columns: DataTableColumns<Item> = [
       directory-dnd
       :default-upload="false"
       :show-file-list="false"
-      accept="audio/*,.mp3,.flac,.m4a,.ogg,.opus,.lrc"
+      accept="audio/*,.mp3,.flac,.m4a,.ogg,.opus,.lrc,.ttml"
       @change="onChange"
     >
       <n-upload-dragger>
         <n-p style="margin: 0; font-size: 16px">点击或拖入音频文件</n-p>
         <n-text depth="3"
-          >MP3、FLAC、AAC（M4A）、Ogg Vorbis、Opus；同名 .lrc
+          >MP3、FLAC、AAC（M4A）、Ogg Vorbis、Opus；同名 .lrc 或 .ttml
           作为歌词一并上传</n-text
         >
       </n-upload-dragger>

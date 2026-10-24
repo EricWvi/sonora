@@ -62,7 +62,7 @@ func TestLikesAreIdempotentAndPerUser(t *testing.T) {
 	if !slices.Equal(ids, []int64{tracks[2], tracks[0]}) {
 		t.Fatalf("alice likes = %v", ids)
 	}
-	page, err := s.LikedTracks(ctx, alice, Window{})
+	page, err := s.LikedTracks(ctx, alice, Sort{}, Window{})
 	if err != nil || page.Total != 2 || !slices.Equal(trackIDs(page.Items), ids) {
 		t.Fatalf("liked tracks = %+v, %v", page, err)
 	}
@@ -161,7 +161,7 @@ func TestPlaylists(t *testing.T) {
 	if _, _, err := s.AddToPlaylist(ctx, alice, p.ID, []int64{9999}); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("add missing track: %v", err)
 	}
-	page, _ := s.PlaylistTracks(ctx, alice, p.ID, Window{})
+	page, _ := s.PlaylistTracks(ctx, alice, p.ID, Sort{}, Window{})
 	if !slices.Equal(trackIDs(page.Items), []int64{tracks[1], tracks[0], tracks[2]}) {
 		t.Fatalf("order = %v", trackIDs(page.Items))
 	}
@@ -177,7 +177,7 @@ func TestPlaylists(t *testing.T) {
 	if err != nil || p.TrackCount != 3 {
 		t.Fatalf("reorder = %+v, %v", p, err)
 	}
-	page, _ = s.PlaylistTracks(ctx, alice, p.ID, Window{})
+	page, _ = s.PlaylistTracks(ctx, alice, p.ID, Sort{}, Window{})
 	if !slices.Equal(trackIDs(page.Items), []int64{tracks[0], tracks[2], tracks[1]}) {
 		t.Fatalf("reordered = %v", trackIDs(page.Items))
 	}
@@ -197,7 +197,7 @@ func TestPlaylists(t *testing.T) {
 	}
 	for name, err := range map[string]error{
 		"get":    func() error { _, err := s.Playlist(ctx, bob, p.ID); return err }(),
-		"tracks": func() error { _, err := s.PlaylistTracks(ctx, bob, p.ID, Window{}); return err }(),
+		"tracks": func() error { _, err := s.PlaylistTracks(ctx, bob, p.ID, Sort{}, Window{}); return err }(),
 		"add":    func() error { _, _, err := s.AddToPlaylist(ctx, bob, p.ID, tracks[:1]); return err }(),
 		"remove": func() error { _, err := s.RemoveFromPlaylist(ctx, bob, p.ID, tracks[0]); return err }(),
 		"order":  func() error { _, err := s.ReorderPlaylist(ctx, bob, p.ID, tracks[:2]); return err }(),

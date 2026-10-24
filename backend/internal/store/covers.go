@@ -24,7 +24,8 @@ import (
 	"sonora/internal/thumbhash"
 )
 
-// MaxCoverBytes caps an uploaded or embedded cover image.
+// MaxCoverBytes caps an uploaded or embedded cover image, and an artist
+// image, which is stored the same way.
 const MaxCoverBytes = 10 << 20
 
 // maxCoverPixels bounds the images decoded for placeholders and
@@ -35,6 +36,12 @@ const maxCoverPixels = 25_000_000
 var CoverSizes = []int{96, 300}
 
 var coverName = regexp.MustCompile(`^[0-9a-f]{32}\.(jpg|png|webp)$`)
+
+// usedCovers selects the names of the stored images something refers to.
+const usedCovers = `
+	SELECT cover FROM albums WHERE cover IS NOT NULL
+	UNION SELECT cover FROM tracks WHERE cover IS NOT NULL
+	UNION SELECT image FROM artists WHERE image IS NOT NULL`
 
 // Cover is a stored cover image. Thumbhash is its blurred placeholder,
 // empty when the image could not be decoded.
@@ -78,15 +85,15 @@ func placeholder(data []byte) string {
 // placeholder and returns the file name. The caller holds s.files.
 func (s *Store) saveCover(ctx context.Context, data []byte) (string, error) {
 	if len(data) > MaxCoverBytes {
-		return "", invalid("封面不能超过 10 MB")
+		return "", invalid("图片不能超过 10 MB")
 	}
 	_, format, err := image.DecodeConfig(bytes.NewReader(data))
 	if err != nil {
-		return "", invalid("封面只支持 JPEG、PNG 或 WebP 图片")
+		return "", invalid("图片只支持 JPEG、PNG 或 WebP 格式")
 	}
 	ext := map[string]string{"jpeg": ".jpg", "png": ".png", "webp": ".webp"}[format]
 	if ext == "" {
-		return "", invalid("封面只支持 JPEG、PNG 或 WebP 图片")
+		return "", invalid("图片只支持 JPEG、PNG 或 WebP 格式")
 	}
 	sum := sha256.Sum256(data)
 	name := hex.EncodeToString(sum[:16]) + ext
@@ -208,9 +215,7 @@ func writeFileAtomic(dir, path string, data []byte) error {
 // backfillPlaceholders records placeholders for covers stored before they
 // existed.
 func (s *Store) backfillPlaceholders(ctx context.Context) error {
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT cover FROM albums WHERE cover IS NOT NULL UNION SELECT cover FROM tracks WHERE cover IS NOT NULL
-		EXCEPT SELECT name FROM covers`)
+	rows, err := s.db.QueryContext(ctx, usedCovers+` EXCEPT SELECT name FROM covers`)
 	if err != nil {
 		return err
 	}
@@ -264,6 +269,16 @@ func (s *Store) ClearTrackCover(ctx context.Context, id int64) (TrackDetail, err
 	return setCover(s, ctx, `UPDATE tracks SET cover = ? WHERE id = ?`, id, nil, s.track)
 }
 
+// SetArtistImage replaces an artist's image.
+func (s *Store) SetArtistImage(ctx context.Context, id int64, data []byte) (Artist, error) {
+	return setCover(s, ctx, `UPDATE artists SET image = ? WHERE id = ?`, id, data, s.artist)
+}
+
+// ClearArtistImage removes an artist's image.
+func (s *Store) ClearArtistImage(ctx context.Context, id int64) (Artist, error) {
+	return setCover(s, ctx, `UPDATE artists SET image = ? WHERE id = ?`, id, nil, s.artist)
+}
+
 // setCover stores data (nil clears) and points the row at it.
 func setCover[T any](s *Store, ctx context.Context, query string, id int64, data []byte,
 	get func(context.Context, querier, int64) (T, error)) (T, error) {
@@ -297,12 +312,11 @@ func setCover[T any](s *Store, ctx context.Context, query string, id int64, data
 	return out, nil
 }
 
-// collectCovers removes cover files no album or track refers to. The
+// collectCovers removes image files no album, track or artist refers to. The
 // caller holds s.files. Failures are logged; a leftover file is harmless.
 func (s *Store) collectCovers(ctx context.Context) {
 	used := map[string]bool{}
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT cover FROM albums WHERE cover IS NOT NULL UNION SELECT cover FROM tracks WHERE cover IS NOT NULL`)
+	rows, err := s.db.QueryContext(ctx, usedCovers)
 	if err != nil {
 		slog.Error("collect covers", "err", err)
 		return
@@ -321,8 +335,7 @@ func (s *Store) collectCovers(ctx context.Context) {
 		return
 	}
 	if _, err := s.db.ExecContext(ctx, `
-		DELETE FROM covers WHERE name NOT IN (
-			SELECT cover FROM albums WHERE cover IS NOT NULL UNION SELECT cover FROM tracks WHERE cover IS NOT NULL)`); err != nil {
+		DELETE FROM covers WHERE name NOT IN (`+usedCovers+`)`); err != nil {
 		slog.Error("collect covers", "err", err)
 	}
 	entries, err := os.ReadDir(s.coverDir)

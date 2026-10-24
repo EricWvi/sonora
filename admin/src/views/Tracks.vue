@@ -180,8 +180,11 @@ const columns: DataTableColumns<Track> = [
   {
     title: "歌词",
     key: "hasLyrics",
-    width: 60,
-    render: (t) => (t.hasLyrics ? "有" : h(NText, { depth: 3 }, () => "—")),
+    width: 70,
+    render: (t) =>
+      t.lyricsFormat
+        ? t.lyricsFormat.toUpperCase()
+        : h(NText, { depth: 3 }, () => "—"),
   },
 ];
 
