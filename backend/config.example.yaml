@@ -1,0 +1,11 @@
+# HTTP listen address
+listen: ":14560"
+# SQLite database and cover images
+data_dir: "/data"
+# Volume for uploaded audio. Only Sonora writes here; music enters the
+# library through the admin console, files placed by hand are ignored.
+media_dir: "/media"
+
+# Origin browsers use to reach Sonora. Requests that change state must
+# come from it. The admin console lives at <public_url>/admin/.
+public_url: "https://music.example.com"

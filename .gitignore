@@ -13,3 +13,10 @@ dist/
 *.tsbuildinfo
 /only_session
 /.local/
+
+# Go service
+/backend/.data/
+/backend/config.yaml
+/backend/web/*/*
+!/backend/web/*/.gitkeep
+/release/
