@@ -30,6 +30,27 @@ func (s *server) registerPlayer(private *http.ServeMux) {
 	private.HandleFunc("GET "+p+"artists/{id}", s.getPlayerArtist)
 
 	private.HandleFunc("GET "+p+"covers/{name}", s.getCover)
+
+	private.HandleFunc("GET "+p+"likes", s.listLikes)
+	private.HandleFunc("GET "+p+"likes/ids", s.listLikeIDs)
+	private.HandleFunc("PUT "+p+"likes/{trackId}", s.like)
+	private.HandleFunc("DELETE "+p+"likes/{trackId}", s.unlike)
+
+	private.HandleFunc("GET "+p+"history", s.listHistory)
+	private.HandleFunc("POST "+p+"history", s.recordPlay)
+	private.HandleFunc("DELETE "+p+"history", s.clearHistory)
+	private.HandleFunc("DELETE "+p+"history/{trackId}", s.removeFromHistory)
+
+	private.HandleFunc("GET "+p+"playlists", s.listPlaylists)
+	private.HandleFunc("POST "+p+"playlists", s.createPlaylist)
+	private.HandleFunc("GET "+p+"playlists/{id}", s.getPlaylist)
+	private.HandleFunc("PUT "+p+"playlists/{id}", s.updatePlaylist)
+	private.HandleFunc("DELETE "+p+"playlists/{id}", s.deletePlaylist)
+	private.HandleFunc("GET "+p+"playlists/{id}/tracks", s.listPlaylistTracks)
+	private.HandleFunc("POST "+p+"playlists/{id}/tracks", s.addToPlaylist)
+	private.HandleFunc("DELETE "+p+"playlists/{id}/tracks/{trackId}", s.removeFromPlaylist)
+	private.HandleFunc("PUT "+p+"playlists/{id}/order", s.reorderPlaylist)
+
 	private.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		admin.WriteError(w, http.StatusNotFound, "not_found", "接口不存在")
 	})
@@ -176,4 +197,182 @@ func (s *server) getPlayerArtist(w http.ResponseWriter, r *http.Request) {
 	}
 	a, err := s.store.Artist(r.Context(), id)
 	respond(w, r, toPlayerArtist(a), err)
+}
+
+// --- listener data ---------------------------------------------------------
+
+func userID(r *http.Request) int64 { return auth.User(r.Context()).ID }
+
+func pathTrackID(w http.ResponseWriter, r *http.Request) (int64, bool) {
+	return pathInt(w, r, "trackId")
+}
+
+func (s *server) listLikes(w http.ResponseWriter, r *http.Request) {
+	page, err := s.store.LikedTracks(r.Context(), userID(r), window(r))
+	respond(w, r, mapPage(page, toPlayerTrack), err)
+}
+
+func (s *server) listLikeIDs(w http.ResponseWriter, r *http.Request) {
+	ids, err := s.store.LikedTrackIDs(r.Context(), userID(r))
+	respond(w, r, map[string][]int64{"ids": ids}, err)
+}
+
+func (s *server) like(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathTrackID(w, r)
+	if !ok {
+		return
+	}
+	respondEmpty(w, r, s.store.Like(r.Context(), userID(r), id))
+}
+
+func (s *server) unlike(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathTrackID(w, r)
+	if !ok {
+		return
+	}
+	respondEmpty(w, r, s.store.Unlike(r.Context(), userID(r), id))
+}
+
+type playerHistoryEntry struct {
+	Track    playerTrack `json:"track"`
+	PlayedAt string      `json:"playedAt"`
+}
+
+func (s *server) listHistory(w http.ResponseWriter, r *http.Request) {
+	page, err := s.store.History(r.Context(), userID(r), window(r))
+	respond(w, r, mapPage(page, func(e store.HistoryEntry) playerHistoryEntry {
+		return playerHistoryEntry{Track: toPlayerTrack(e.Track), PlayedAt: e.PlayedAt}
+	}), err)
+}
+
+// recordPlay takes {"trackId": n}. The player decides when a play counts.
+func (s *server) recordPlay(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		TrackID int64 `json:"trackId"`
+	}
+	if !admin.Decode(w, r, &in) {
+		return
+	}
+	if in.TrackID <= 0 {
+		admin.WriteError(w, http.StatusBadRequest, "bad_request", "无效的 trackId")
+		return
+	}
+	respondEmpty(w, r, s.store.RecordPlay(r.Context(), userID(r), in.TrackID))
+}
+
+func (s *server) clearHistory(w http.ResponseWriter, r *http.Request) {
+	respondEmpty(w, r, s.store.ClearHistory(r.Context(), userID(r)))
+}
+
+func (s *server) removeFromHistory(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathTrackID(w, r)
+	if !ok {
+		return
+	}
+	respondEmpty(w, r, s.store.RemoveFromHistory(r.Context(), userID(r), id))
+}
+
+func (s *server) listPlaylists(w http.ResponseWriter, r *http.Request) {
+	page, err := s.store.Playlists(r.Context(), userID(r), r.URL.Query().Get("q"), window(r))
+	respond(w, r, page, err)
+}
+
+func (s *server) createPlaylist(w http.ResponseWriter, r *http.Request) {
+	var in store.PlaylistInput
+	if !admin.Decode(w, r, &in) {
+		return
+	}
+	p, err := s.store.CreatePlaylist(r.Context(), userID(r), in)
+	if err != nil {
+		writeStoreError(w, r, err)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	admin.WriteJSON(w, http.StatusCreated, p)
+}
+
+func (s *server) getPlaylist(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	p, err := s.store.Playlist(r.Context(), userID(r), id)
+	respond(w, r, p, err)
+}
+
+func (s *server) updatePlaylist(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	var in store.PlaylistInput
+	if !admin.Decode(w, r, &in) {
+		return
+	}
+	p, err := s.store.UpdatePlaylist(r.Context(), userID(r), id, in)
+	respond(w, r, p, err)
+}
+
+func (s *server) deletePlaylist(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	respondEmpty(w, r, s.store.DeletePlaylist(r.Context(), userID(r), id))
+}
+
+func (s *server) listPlaylistTracks(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	page, err := s.store.PlaylistTracks(r.Context(), userID(r), id, window(r))
+	respond(w, r, mapPage(page, toPlayerTrack), err)
+}
+
+type trackIDsInput struct {
+	TrackIDs []int64 `json:"trackIds"`
+}
+
+// addToPlaylist appends {"trackIds": [...]} and answers
+// {"added": n, "playlist": {...}}; tracks already in it are skipped.
+func (s *server) addToPlaylist(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	var in trackIDsInput
+	if !admin.Decode(w, r, &in) {
+		return
+	}
+	added, p, err := s.store.AddToPlaylist(r.Context(), userID(r), id, in.TrackIDs)
+	respond(w, r, map[string]any{"added": added, "playlist": p}, err)
+}
+
+func (s *server) removeFromPlaylist(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	trackID, ok := pathTrackID(w, r)
+	if !ok {
+		return
+	}
+	p, err := s.store.RemoveFromPlaylist(r.Context(), userID(r), id, trackID)
+	respond(w, r, p, err)
+}
+
+// reorderPlaylist takes the playlist's complete track list in the new
+// order as {"trackIds": [...]}.
+func (s *server) reorderPlaylist(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	var in trackIDsInput
+	if !admin.Decode(w, r, &in) {
+		return
+	}
+	p, err := s.store.ReorderPlaylist(r.Context(), userID(r), id, in.TrackIDs)
+	respond(w, r, p, err)
 }

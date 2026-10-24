@@ -493,7 +493,12 @@ func detail(err, sentinel error) string {
 }
 
 func pathID(w http.ResponseWriter, r *http.Request) (int64, bool) {
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	return pathInt(w, r, "id")
+}
+
+// pathInt reads a positive ID from the named path segment.
+func pathInt(w http.ResponseWriter, r *http.Request, name string) (int64, bool) {
+	id, err := strconv.ParseInt(r.PathValue(name), 10, 64)
 	if err != nil || id <= 0 {
 		admin.WriteError(w, http.StatusBadRequest, "bad_request", "无效的 id")
 		return 0, false

@@ -185,6 +185,50 @@ var migrations = []migration{
 	);
 	CREATE INDEX sessions_user ON sessions (user_id);
 	`),
+
+	// What each listener keeps: liked tracks, playlists and play history.
+	// Rows go with their user or track. id orders likes and history,
+	// newest last, since several can share a second.
+	execSQL(`
+	CREATE TABLE likes (
+		id         INTEGER PRIMARY KEY,
+		user_id    INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+		track_id   INTEGER NOT NULL REFERENCES tracks (id) ON DELETE CASCADE,
+		created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+		UNIQUE (user_id, track_id)
+	);
+	CREATE INDEX likes_track ON likes (track_id);
+
+	-- One row per track: playing it again moves it to the top.
+	CREATE TABLE play_history (
+		id        INTEGER PRIMARY KEY,
+		user_id   INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+		track_id  INTEGER NOT NULL REFERENCES tracks (id) ON DELETE CASCADE,
+		played_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+		UNIQUE (user_id, track_id)
+	);
+	CREATE INDEX play_history_track ON play_history (track_id);
+
+	CREATE TABLE playlists (
+		id          INTEGER PRIMARY KEY AUTOINCREMENT,
+		user_id     INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+		name        TEXT    NOT NULL,
+		description TEXT    NOT NULL DEFAULT '',
+		created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+		updated_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+	);
+	CREATE INDEX playlists_user ON playlists (user_id);
+
+	-- A track appears at most once in a playlist; position orders it.
+	CREATE TABLE playlist_tracks (
+		playlist_id INTEGER NOT NULL REFERENCES playlists (id) ON DELETE CASCADE,
+		track_id    INTEGER NOT NULL REFERENCES tracks (id) ON DELETE CASCADE,
+		position    INTEGER NOT NULL,
+		PRIMARY KEY (playlist_id, track_id)
+	) WITHOUT ROWID;
+	CREATE INDEX playlist_tracks_order ON playlist_tracks (playlist_id, position);
+	CREATE INDEX playlist_tracks_track ON playlist_tracks (track_id);
+	`),
 }
 
 func migrate(db *sql.DB) error {

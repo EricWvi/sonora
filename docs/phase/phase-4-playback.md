@@ -1,6 +1,6 @@
 # 阶段 4：播放端认证、API 与播放闭环
 
-状态：进行中。4.1 的服务端部分与 4.2 的只读曲库 API 已实现（2026-10-24）；用户数据、Playback 与播放端接入未开始。前置：阶段 1 的曲库与上传；阶段 3 的播放器展示层。参照路线图：[播放状态与异步规则](../roadmap.md#52-播放状态与异步规则)。
+状态：进行中。4.1 的服务端部分与 4.2 的播放端 API（曲库、喜爱、歌单、历史）已实现（2026-10-24）；Playback 与播放端接入未开始。前置：阶段 1 的曲库与上传；阶段 3 的播放器展示层。参照路线图：[播放状态与异步规则](../roadmap.md#52-播放状态与异步规则)。
 
 ## 4.1 OIDC 认证
 
@@ -17,8 +17,8 @@
 
 - [x] 歌曲、专辑、艺术家的列表与详情，分页；搜索（各列表的 `q`）；封面；歌词。数据形态沿用管理端的 `artists` 数组、`cover` 对象和缩略图尺寸，去掉管理字段；歌曲的 `cover` 已解析为实际显示的封面。证据：[player.go](../../backend/internal/server/player.go)、`TestPlayerCatalog`、`TestPlayerAPIRequiresListenerSession`（管理会话与播放端会话互不通用）；[API 约定](../api.md#播放端-api)。运行确认（2026-10-24）：开发模式实例加载 `backend/.data` 的副本（310 张专辑、194 位艺术家），迁移 4 应用成功，列表、详情、歌词、封面正常。
 - [ ] 排序选项（如按标题、按时长、最近添加）：目前只有固定默认排序，等阶段 2 的页面清单确定需要哪些排序再加。
-- [ ] 歌单的列表与详情（随用户数据一起做）。
-- [ ] 当前用户的喜爱、歌单、播放历史读写；按用户隔离。
+- [x] 当前用户的喜爱、歌单、播放历史读写；按用户隔离；删除歌曲时级联移除。迁移 5 新增 `likes`、`play_history`、`playlists`、`playlist_tracks`。行为参照 SPlayer：喜爱只针对歌曲，播放端用 ID 集合判断喜爱状态（`isLikeSong`）；历史去重、最近在前、上限 500（[data.ts](../../reference/SPlayer/src/stores/data.ts) 的 `setHistory`）。证据：[listeners.go](../../backend/internal/store/listeners.go)、`TestLikesAreIdempotentAndPerUser`、`TestHistoryMovesReplaysToTopAndIsCapped`、`TestPlaylists`（含另一用户全部操作返回 404、整体重排校验）、`TestDeletingTrackRemovesItFromListenerData`、`TestListenerDataIsPerUser`（HTTP 层两个用户互不可见、跨站写入 403、过期重排 409）；[API 约定](../api.md#播放端用户数据)。运行确认（2026-10-24）：真实曲库数据库副本上迁移 5 应用成功，喜爱、记录播放、建歌单并添加歌曲正常。
+- [ ] 歌单自定义封面、收藏专辑或艺术家：页面清单没有，等阶段 2 确认后再定。
 - [x] 音频流支持 HTTP Range。证据：`TestPlayerCatalog` 断言 206 与内容；运行确认真实 MP3 返回 206 `audio/mpeg`。
 - [ ] 按阶段 2 的 Chrome 实验结论决定是否需要转码。
 

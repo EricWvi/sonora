@@ -56,7 +56,7 @@
 
 - [x] 曲库模型：歌曲、专辑、艺术家；ID 由 `AUTOINCREMENT` 分配、删除后不复用；文件路径只在 store 内部使用，存储卷布局为 `<sha256 前两位>/<sha256>.<格式>`。证据：`TestUploadOutcomes` 断言响应不含路径、`file` 与哈希。
 - [x] 上传：多文件上传，读取标题、艺术家、专辑、专辑艺术家、音轨号、碟号、时长、年份、内嵌封面、内嵌歌词与同名外置 `.lrc`；处理重复文件、缺标签与损坏文件。证据：`media_test.go`（五种格式、VBR/CBR/Xing、ID3 USLT、ID3 与 Vorbis 多值字段、截断文件）、`store_test.go`（入库、去重、并发重复上传、GB18030 歌词、跨格式同专辑共用封面、多值艺术家入库）。
-- [x] 删除歌曲同时清理存储卷文件、无引用的封面以及空专辑和孤立艺术家。播放端的歌单、喜爱、历史引用留待阶段 4。证据：`TestDeleteRemovesFilesAndOrphans`。
+- [x] 删除歌曲同时清理存储卷文件、无引用的封面以及空专辑和孤立艺术家。播放端的歌单、喜爱、历史引用在阶段 4 以外键级联移除（`TestDeletingTrackRemovesItFromListenerData`）。证据：`TestDeleteRemovesFilesAndOrphans`。
 - [x] 用真实编码器产出的音频样本测试上传、去重与失败路径。证据：见“证据位置”的测试样本说明。
 
 实际做法与偏差：

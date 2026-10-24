@@ -26,7 +26,7 @@ Eric 已明确：Web 前端技术栈按照 SPlayer，明确舍弃 Electron，后
 - **标志图形暂时复用；所有 SPlayer 名称与文字换成 Sonora。**
 - **视觉基线直接截取本机参考实例，页面数据来自网易云。** SPlayer 的本地模式页面只在 Electron 中显示，Sonora 播放端页面以结构相同的参考页面为基线。管理后台在 SPlayer 中没有对应界面，不受复刻约束，采用 Naive UI 默认风格。
 
-Go 服务已在阶段 1 实现管理员初始化、上传入库与管理 API（2026-10-24）；为照搬 homepage 的 OIDC，沿用其 `net/http`、SQLite 与配置方式。阶段 4 已照搬 homepage 的 OIDC 并实现播放端只读曲库 API（2026-10-24），见 [Sonora API 约定](api.md)；喜爱、歌单与历史尚未实现，下文其余契约不假定接口已经存在。阶段顺序是建议。
+Go 服务已在阶段 1 实现管理员初始化、上传入库与管理 API（2026-10-24）；为照搬 homepage 的 OIDC，沿用其 `net/http`、SQLite 与配置方式。阶段 4 已照搬 homepage 的 OIDC，并实现播放端的曲库、喜爱、歌单与历史 API（2026-10-24），见 [Sonora API 约定](api.md)；播放状态等其余契约尚未实现。阶段顺序是建议。
 
 ## 2. 调研依据与证据边界
 

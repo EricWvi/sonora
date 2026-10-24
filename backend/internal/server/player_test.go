@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -122,5 +123,92 @@ func TestPlayerCatalog(t *testing.T) {
 	if rec.Code != http.StatusPartialContent || rec.Body.String() != "fLaC" ||
 		rec.Header().Get("Content-Type") != "audio/flac" {
 		t.Fatalf("audio range: %d %q %s", rec.Code, rec.Body.String(), rec.Header())
+	}
+}
+
+func TestListenerDataIsPerUser(t *testing.T) {
+	ts := newTest(t)
+	ts.setup()
+	a := decodeBody[store.IngestResult](t, ts.upload("a.flac", sample(t, "tagged.flac"), "")).Track
+	b := decodeBody[store.IngestResult](t, ts.upload("b.mp3", sample(t, "tagged.mp3"), "")).Track
+	ts.cookie = ""
+	ts.signIn("alice", "Alice")
+	alice := ts.listener
+
+	if rec := ts.do("PUT", playerAPI+"likes/"+itoa(a.ID), ""); rec.Code != http.StatusNoContent {
+		t.Fatalf("like: %d %s", rec.Code, rec.Body)
+	}
+	if rec := ts.do("PUT", playerAPI+"likes/999", ""); rec.Code != http.StatusNotFound {
+		t.Fatalf("like missing: %d", rec.Code)
+	}
+	if rec := ts.do("POST", playerAPI+"history", `{"trackId":`+itoa(b.ID)+`}`); rec.Code != http.StatusNoContent {
+		t.Fatalf("record play: %d %s", rec.Code, rec.Body)
+	}
+	if rec := ts.do("POST", playerAPI+"history", `{}`); rec.Code != http.StatusBadRequest {
+		t.Fatalf("record play without track: %d", rec.Code)
+	}
+	rec := ts.do("POST", playerAPI+"playlists", `{"name":"跑步"}`)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create playlist: %d %s", rec.Code, rec.Body)
+	}
+	pl := decodeBody[store.Playlist](t, rec)
+	rec = ts.do("POST", playerAPI+"playlists/"+itoa(pl.ID)+"/tracks", `{"trackIds":[`+itoa(a.ID)+`,`+itoa(b.ID)+`]}`)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"added":2`) {
+		t.Fatalf("add to playlist: %d %s", rec.Code, rec.Body)
+	}
+	rec = ts.do("PUT", playerAPI+"playlists/"+itoa(pl.ID)+"/order", `{"trackIds":[`+itoa(b.ID)+`]}`)
+	if rec.Code != http.StatusConflict || errorCode(t, rec) != "conflict" {
+		t.Fatalf("stale reorder: %d %s", rec.Code, rec.Body)
+	}
+	rec = ts.do("PUT", playerAPI+"playlists/"+itoa(pl.ID)+"/order", `{"trackIds":[`+itoa(b.ID)+`,`+itoa(a.ID)+`]}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("reorder: %d %s", rec.Code, rec.Body)
+	}
+	tracks := decodeBody[store.Page[playerTrack]](t, ts.do("GET", playerAPI+"playlists/"+itoa(pl.ID)+"/tracks", ""))
+	if tracks.Total != 2 || tracks.Items[0].ID != b.ID {
+		t.Fatalf("playlist tracks = %+v", tracks)
+	}
+	req := httptest.NewRequest("POST", playerAPI+"playlists", strings.NewReader(`{"name":"x"}`))
+	req.Header.Set("Origin", "https://evil.test")
+	if rec := ts.send(req); rec.Code != http.StatusForbidden {
+		t.Fatalf("cross-origin create: %d", rec.Code)
+	}
+
+	// Bob sees none of it and cannot touch Alice's playlist.
+	ts.signIn("bob", "Bob")
+	for path, want := range map[string]string{
+		"likes":     `"total":0`,
+		"likes/ids": `"ids":[]`,
+		"history":   `"total":0`,
+		"playlists": `"total":0`,
+	} {
+		if rec := ts.do("GET", playerAPI+path, ""); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), want) {
+			t.Errorf("bob %s: %d %s", path, rec.Code, rec.Body)
+		}
+	}
+	for _, c := range []struct{ method, path, body string }{
+		{"GET", "playlists/" + itoa(pl.ID), ""},
+		{"GET", "playlists/" + itoa(pl.ID) + "/tracks", ""},
+		{"POST", "playlists/" + itoa(pl.ID) + "/tracks", `{"trackIds":[` + itoa(a.ID) + `]}`},
+		{"DELETE", "playlists/" + itoa(pl.ID), ""},
+	} {
+		if rec := ts.do(c.method, playerAPI+c.path, c.body); rec.Code != http.StatusNotFound {
+			t.Errorf("bob %s %s: %d", c.method, c.path, rec.Code)
+		}
+	}
+
+	ts.listener = alice
+	ids := decodeBody[map[string][]int64](t, ts.do("GET", playerAPI+"likes/ids", ""))["ids"]
+	history := decodeBody[store.Page[playerHistoryEntry]](t, ts.do("GET", playerAPI+"history", ""))
+	if len(ids) != 1 || ids[0] != a.ID || history.Total != 1 || history.Items[0].Track.ID != b.ID {
+		t.Fatalf("alice likes %v, history %+v", ids, history)
+	}
+	for _, path := range []string{"likes/" + itoa(a.ID), "history/" + itoa(b.ID), "playlists/" + itoa(pl.ID) + "/tracks/" + itoa(a.ID)} {
+		if rec := ts.do("DELETE", playerAPI+path, ""); rec.Code != http.StatusNoContent && rec.Code != http.StatusOK {
+			t.Fatalf("delete %s: %d %s", path, rec.Code, rec.Body)
+		}
+	}
+	if rec := ts.do("DELETE", playerAPI+"playlists/"+itoa(pl.ID), ""); rec.Code != http.StatusNoContent {
+		t.Fatalf("delete playlist: %d", rec.Code)
 	}
 }

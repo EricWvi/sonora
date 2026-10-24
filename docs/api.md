@@ -99,4 +99,24 @@
 - 艺术家 `{id, name, trackCount, albumCount}`。
 - `artists` 与 `cover` 的形态和管理 API 一致：`[{id, name}]` 与 `{name, thumbhash}`。
 
-喜爱、歌单与播放历史尚未实现。
+## 播放端用户数据
+
+喜爱、歌单与播放历史属于当前登录的用户，同样需要播放端会话。别人的歌单一律返回 404，不区分“不存在”与“无权访问”。管理端删除歌曲时，它会从所有人的喜爱、歌单与历史中消失。
+
+| 方法与路径 | 说明 |
+| --- | --- |
+| `GET likes` | 喜爱的歌曲，最近喜爱的在前，分页 |
+| `GET likes/ids` | `{ids}`：全部喜爱歌曲的 ID，供播放端在任意列表中标记喜爱状态 |
+| `PUT likes/{trackId}`、`DELETE likes/{trackId}` | 喜爱 / 取消，幂等，204；歌曲不存在时喜爱返回 404 |
+| `GET history` | `{items: [{track, playedAt}], total}`，最近播放的在前；同一首歌只保留一条，重播移到最前；每人最多保留 500 首，与 SPlayer 一致 |
+| `POST history` | `{trackId}` 记录一次播放，204。什么时候算一次播放由播放端决定 |
+| `DELETE history`、`DELETE history/{trackId}` | 清空 / 删除一条，204 |
+| `GET playlists` | 自己的歌单，新建的在前；`q` 匹配歌单名 |
+| `POST playlists` | `{name, description}` 新建，201。名称 1–100 个字符，简介最多 1000 个字符 |
+| `GET/PUT/DELETE playlists/{id}` | 详情 / 修改 `{name, description}` / 删除 |
+| `GET playlists/{id}/tracks` | 歌单中的歌曲，按歌单顺序，分页 |
+| `POST playlists/{id}/tracks` | `{trackIds}` 按给定顺序追加到末尾，已在歌单中的跳过；返回 `{added, playlist}`。任一歌曲不存在时整体失败（404）；每个歌单最多 10000 首 |
+| `DELETE playlists/{id}/tracks/{trackId}` | 移出歌单，返回歌单 |
+| `PUT playlists/{id}/order` | `{trackIds}` 为歌单的全部歌曲的新顺序。与服务端现有歌曲不一致时返回 409 `conflict`，说明客户端的副本已过期，应刷新后重试 |
+
+歌单为 `{id, name, description, cover, trackCount, durationMs, createdAt, updatedAt}`。同一首歌在一个歌单中只出现一次。`cover` 取歌单中第一首有封面的歌曲的封面，都没有时为 `null`；歌单暂不支持自定义封面。
