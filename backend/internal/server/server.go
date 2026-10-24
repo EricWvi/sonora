@@ -1,5 +1,5 @@
-// Package server exposes the library over the admin API and serves the
-// embedded player and admin console.
+// Package server exposes the library over the admin and player APIs and
+// serves the embedded player and admin console.
 package server
 
 import (
@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"sonora/internal/admin"
+	"sonora/internal/auth"
 	"sonora/internal/media"
 	"sonora/internal/store"
 )
@@ -34,9 +35,11 @@ type server struct {
 	opts  Options
 }
 
-// New returns the HTTP handler for the admin API, the admin console under
-// /admin/ and the player at the root.
-func New(st *store.Store, authn *admin.Service, player, console fs.FS, opts Options) (http.Handler, error) {
+// New returns the HTTP handler for the admin API and the admin console
+// under /admin/, the player's sign-in under /auth/, the player API under
+// /api/v1/ and the player at the root. authn guards the admin API, listeners
+// the player API.
+func New(st *store.Store, authn *admin.Service, listeners *auth.Service, player, console fs.FS, opts Options) (http.Handler, error) {
 	s := &server{store: st, opts: opts}
 	playerStatic, err := newStatic(player, "player not built; run scripts/build.sh")
 	if err != nil {
@@ -50,6 +53,11 @@ func New(st *store.Store, authn *admin.Service, player, console fs.FS, opts Opti
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/version", s.getVersion)
 	authn.Register(mux)
+	listeners.Register(mux)
+
+	playerAPI := http.NewServeMux()
+	s.registerPlayer(playerAPI)
+	mux.Handle(PlayerAPIPrefix, listeners.Require(playerAPI))
 
 	// Everything registered on private needs an admin session.
 	private := http.NewServeMux()

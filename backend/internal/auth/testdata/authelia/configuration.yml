@@ -1,0 +1,62 @@
+# Authelia fixture for the contract test. The test fills in the port and
+# the JWKS signing key placeholders; every secret here is test-only.
+server:
+  address: tcp://0.0.0.0:9091/
+  tls:
+    certificate: /config/tls-cert.pem
+    key: /config/tls-key.pem
+log:
+  level: info
+ntp:
+  disable_startup_check: true
+identity_validation:
+  reset_password:
+    jwt_secret: sonora-test-reset-jwt-secret-only
+authentication_backend:
+  file:
+    path: /config/users.yml
+access_control:
+  default_policy: one_factor
+session:
+  secret: sonora-test-session-secret-not-for-production
+  cookies:
+    - domain: sonora.test
+      authelia_url: https://auth.sonora.test:@PORT@
+      default_redirection_url: https://sonora.test
+storage:
+  encryption_key: sonora-test-storage-encryption-key-only
+  local:
+    path: /config/db.sqlite3
+notifier:
+  filesystem:
+    filename: /config/notifications.txt
+identity_providers:
+  oidc:
+    hmac_secret: sonora-test-oidc-hmac-secret-only
+    jwks:
+      - key_id: sonora-test
+        algorithm: RS256
+        use: sig
+        key: |
+@SIGNING_KEY@
+    clients:
+      - client_id: sonora
+        client_name: Sonora Contract Test
+        # sonora-test-client-secret
+        client_secret: '$pbkdf2-sha512$310000$dcgEruYot5zqa00KGnst8Q$M3G9piPYqiWjKZRWGkuDlLzpPpXH8lPfNZalXWZQ0jMT6Z8LOUhyrRVKaSggxE7tZzywKUmO3rLef6z.T1qDsg'
+        public: false
+        authorization_policy: one_factor
+        consent_mode: implicit
+        require_pkce: true
+        pkce_challenge_method: S256
+        redirect_uris:
+          - https://sonora.test/auth/callback
+        scopes:
+          - openid
+          - profile
+          - email
+        grant_types:
+          - authorization_code
+        response_types:
+          - code
+        token_endpoint_auth_method: client_secret_basic

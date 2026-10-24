@@ -102,7 +102,7 @@ tasks:
       - pnpm typecheck:admin
 
   lint:go:
-    desc: Check gofmt and run go vet for release and dev builds
+    desc: Check gofmt and run go vet for release, dev and authelia-tagged builds
     dir: backend
     silent: true
     cmds:
@@ -115,6 +115,7 @@ tasks:
         fi
       - go vet ./...
       - go vet -tags dev ./...
+      - go vet -tags authelia ./internal/auth
 
   test:
     desc: Run all checks, Go tests and web builds
@@ -130,6 +131,12 @@ tasks:
     cmds:
       - go test ./...
       - go test -tags dev ./internal/config
+
+  test:contract:
+    desc: Run the Authelia contract test using locally prepared images (never pulls)
+    dir: backend
+    cmds:
+      - go test -tags authelia ./internal/auth
 
   # Development servers
   run:web:

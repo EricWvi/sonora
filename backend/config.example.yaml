@@ -9,3 +9,12 @@ media_dir: "/media"
 # Origin browsers use to reach Sonora. Requests that change state must
 # come from it. The admin console lives at <public_url>/admin/.
 public_url: "https://music.example.com"
+
+# Authelia signs listeners in to the player. Register the client with the
+# redirect URI <public_url>/auth/callback, PKCE (S256) and the scopes
+# openid, profile and email. Prefer passing the secret through the
+# SONORA_OIDC_CLIENT_SECRET environment variable.
+oidc:
+  issuer: "https://auth.example.com"
+  client_id: "sonora"
+  client_secret: ""

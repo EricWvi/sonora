@@ -18,9 +18,7 @@ func execSQL(query string) migration {
 
 // migrations are applied in order; PRAGMA user_version records progress.
 // Never edit a released migration, append a new one instead.
-//
-// The users and sessions tables are left to the player's OIDC sign-in,
-// which is copied from homepage in phase 4.
+
 var migrations = []migration{
 	execSQL(`
 	CREATE TABLE admins (
@@ -163,6 +161,29 @@ var migrations = []migration{
 		name      TEXT PRIMARY KEY,
 		thumbhash TEXT NOT NULL
 	) WITHOUT ROWID;
+	`),
+
+	// Listeners of the player, signed in through OIDC. Copied from
+	// homepage: sessions never expire, a row lives until the user signs
+	// out.
+	execSQL(`
+	CREATE TABLE users (
+		id         INTEGER PRIMARY KEY,
+		issuer     TEXT NOT NULL,
+		subject    TEXT NOT NULL,
+		name       TEXT NOT NULL DEFAULT '',
+		email      TEXT NOT NULL DEFAULT '',
+		created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+		UNIQUE (issuer, subject)
+	);
+
+	CREATE TABLE sessions (
+		token_hash   TEXT    PRIMARY KEY,
+		user_id      INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+		created_at   INTEGER NOT NULL,
+		last_seen_at INTEGER NOT NULL
+	);
+	CREATE INDEX sessions_user ON sessions (user_id);
 	`),
 }
 

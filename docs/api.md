@@ -1,11 +1,11 @@
 # Sonora API 约定
 
-更新日期：2026-10-24。本文记录阶段 1 已实现的管理 API 及其约定；播放端 API（阶段 4）沿用同一套约定。实现见 [server.go](../backend/internal/server/server.go) 与 [admin.go](../backend/internal/admin/admin.go)。
+更新日期：2026-10-24。本文记录已实现的管理 API（阶段 1）、播放端登录与播放端 API（阶段 4）及其通用约定。实现见 [server.go](../backend/internal/server/server.go)、[player.go](../backend/internal/server/player.go)、[admin.go](../backend/internal/admin/admin.go) 与 [auth.go](../backend/internal/auth/auth.go)。
 
 ## 通用约定
 
-- **版本**：版本号写在路径中。管理 API 前缀为 `/admin/api/v1/`，播放端 API 计划使用 `/api/v1/`。不兼容的修改改用 `v2`，同一版本内只做向后兼容的增加。服务版本见 `GET /api/version`。
-- **错误**：所有错误响应的正文为 `{"error": "给人看的说明", "code": "machine_code"}`。客户端先按 HTTP 状态分支，`code` 区分同一状态下的不同情况。阶段 4 照搬的 homepage 认证代码只返回 `error`，客户端不能依赖每个错误都带 `code`。
+- **版本**：版本号写在路径中。管理 API 前缀为 `/admin/api/v1/`，播放端 API 前缀为 `/api/v1/`。不兼容的修改改用 `v2`，同一版本内只做向后兼容的增加。服务版本见 `GET /api/version`。
+- **错误**：所有错误响应的正文为 `{"error": "给人看的说明", "code": "machine_code"}`。客户端先按 HTTP 状态分支，`code` 区分同一状态下的不同情况。照搬自 homepage 的播放端认证（`/auth/` 及播放端 API 的 401/403）只返回 `error`，客户端不能依赖每个错误都带 `code`。
 - **身份**：媒体以整数 ID 标识。ID 由 `AUTOINCREMENT` 分配，删除后不复用。文件路径、存储布局和内容哈希不出现在任何响应中；封面以内容哈希文件名引用，只能经 `covers/{name}` 读取。
 - **分页**：列表接受 `offset`、`limit`（默认 50，上限 500），返回 `{"items": [...], "total": n}`。
 - **写请求**：非 GET 请求若带 `Origin` 头，必须等于配置的 `public_url`，否则返回 403 `bad_origin`。
@@ -13,7 +13,7 @@
 | 状态 | code | 场景 |
 | --- | --- | --- |
 | 400 | `bad_request` / `invalid` | 请求格式错误 / 输入不合法（说明可直接展示） |
-| 401 | `unauthenticated` | 没有会话或会话已过期 |
+| 401 | `unauthenticated` | 没有管理会话或会话已过期（播放端为不带 `code` 的 401，见下文） |
 | 401 | `invalid_credentials` | 用户名或密码错误 |
 | 403 | `not_initialized` | 尚未创建管理员时访问其他管理接口 |
 | 403 | `invalid_token` | 初始化 token 缺失或错误 |
@@ -62,3 +62,41 @@
 歌曲、专辑及歌曲所属专辑的封面为 `cover: {name, thumbhash}`，没有封面时为 `null`。`thumbhash` 是 [ThumbHash](https://evanw.github.io/thumbhash/) 的标准 base64，客户端解码为模糊占位图，在缩略图加载完成前显示；图片无法解码时为空字符串。
 
 歌曲、专辑响应中的艺术家是有序数组 `artists: [{id, name}]`，歌曲所属专辑为 `album: {id, title, artists, cover}`；没有艺术家时为空数组。按 `artistId` 筛选歌曲时，包括该艺术家参与的歌曲和其专辑中的歌曲。
+
+## 播放端登录
+
+照搬 `../homepage` 的 OIDC 实现（参考提交 `f188285`），只改了包路径、Cookie 名称、配置键名和页面标题。
+
+| 方法与路径 | 说明 |
+| --- | --- |
+| `GET /auth/login` | 跳转到 Authelia；授权码流程加 PKCE（S256），scope `openid profile email`。Authelia 不可达时返回 503 页面 |
+| `GET /auth/callback` | 校验 state、ID token（签名、issuer、audience、有效期、nonce）后建立会话，跳回 `/` |
+| `POST /auth/logout` | 只结束本浏览器的会话，不退出 Authelia，204 |
+
+会话 Cookie 为 `sonora_session`，`Path=/`、`HttpOnly`、`SameSite=Lax`，https 时带 `Secure`。服务端会话不过期，直到退出；使用中每天续发一次 Cookie，避免浏览器 400 天上限。用户按 `(issuer, subject)` 识别，名称与邮箱每次登录时刷新。开发模式不走 OIDC，所有请求都以写死的用户 `listener` 登录，`/auth/login` 直接跳回 `/`。
+
+未登录访问播放端 API 返回 401 `{"error": "未登录"}`，播放端应跳转 `/auth/login`；跨站写请求返回 403。管理会话与播放端会话互不通用。
+
+## 播放端 API
+
+全部需要播放端会话。播放端看不到只与管理有关的字段：原文件名、文件大小、入库时间、歌词正文（另有接口）都不出现在列表与详情中。列表的分页、`q` 搜索和排序与管理 API 相同：歌曲新入库在前，按专辑筛选时按碟号与音轨号；专辑按标题；艺术家按名称。
+
+| 方法与路径 | 说明 |
+| --- | --- |
+| `GET me` | 当前用户 `{name, email}` |
+| `GET tracks` | `q`（匹配标题、专辑名、艺术家名）、`albumId`、`artistId` |
+| `GET tracks/{id}` | 歌曲详情 |
+| `GET tracks/{id}/lyrics` | `{lyrics}`，原样返回 LRC 或纯文本，没有歌词时为空字符串；解析由播放端完成 |
+| `GET tracks/{id}/audio` | 音频流，支持 Range |
+| `GET albums`、`GET albums/{id}` | 列表（`q`、`artistId`）/ 详情 |
+| `GET artists`、`GET artists/{id}` | 列表（`q`）/ 详情；艺术家的歌曲与专辑用 `tracks?artistId=`、`albums?artistId=` 获取 |
+| `GET covers/{name}` | 与管理 API 相同，支持 `?size=96` 与 `?size=300` |
+
+数据形态：
+
+- 歌曲 `{id, title, artists, album, trackNo, discNo, year, durationMs, format, cover, hasLyrics}`。`album` 为 `{id, title, artists}` 或 `null`；`cover` 是歌曲实际显示的封面，单曲封面优先，否则为专辑封面，都没有时为 `null`。
+- 专辑 `{id, title, artists, year, cover, trackCount, durationMs}`。
+- 艺术家 `{id, name, trackCount, albumCount}`。
+- `artists` 与 `cover` 的形态和管理 API 一致：`[{id, name}]` 与 `{name, thumbhash}`。
+
+喜爱、歌单与播放历史尚未实现。

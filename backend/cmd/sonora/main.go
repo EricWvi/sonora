@@ -1,5 +1,5 @@
-// Command sonora serves the music library, its admin API, the admin
-// console and the player from a single process.
+// Command sonora serves the music library, its admin and player APIs, the
+// admin console and the player from a single process.
 package main
 
 import (
@@ -17,6 +17,7 @@ import (
 
 	"sonora"
 	"sonora/internal/admin"
+	"sonora/internal/auth"
 	"sonora/internal/config"
 	"sonora/internal/devmode"
 	"sonora/internal/server"
@@ -73,7 +74,15 @@ func run(configPath string) error {
 		printSetupBanner(os.Stdout, cfg.PublicURL, token)
 	}
 
-	handler, err := server.New(st, authn, sonora.Player(), sonora.Admin(), server.Options{Version: version})
+	listeners := auth.New(st, auth.Config{
+		PublicURL:    cfg.PublicURL,
+		Issuer:       cfg.OIDC.Issuer,
+		ClientID:     cfg.OIDC.ClientID,
+		ClientSecret: cfg.OIDC.ClientSecret,
+		DevUser:      devUser(cfg),
+	})
+
+	handler, err := server.New(st, authn, listeners, sonora.Player(), sonora.Admin(), server.Options{Version: version})
 	if err != nil {
 		return err
 	}
@@ -100,6 +109,15 @@ func run(configPath string) error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	return srv.Shutdown(shutdownCtx)
+}
+
+// devUser is the listener every player request signs in as in
+// development mode, which skips OIDC.
+func devUser(cfg config.Config) string {
+	if cfg.Dev {
+		return devmode.Username
+	}
+	return ""
 }
 
 // seedDevAdmin creates the fixed development admin on a fresh data dir.

@@ -1,6 +1,6 @@
 # Development configuration used by `task run:server` (needs -tags dev).
 # Signs in with the fixed accounts from internal/devmode and skips the
-# admin setup token. A release binary refuses to start with it.
+# admin setup token and OIDC. A release binary refuses to start with it.
 listen: "127.0.0.1:14560"
 data_dir: "./.data/data"
 media_dir: "./.data/media"

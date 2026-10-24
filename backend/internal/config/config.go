@@ -17,6 +17,10 @@ import (
 	"sonora/internal/devmode"
 )
 
+// ClientSecretEnv overrides oidc.client_secret so the secret can stay out
+// of the config file.
+const ClientSecretEnv = "SONORA_OIDC_CLIENT_SECRET"
+
 // Config is the application configuration.
 type Config struct {
 	// Listen is the HTTP listen address, e.g. ":14560".
@@ -28,11 +32,21 @@ type Config struct {
 	MediaDir string `yaml:"media_dir"`
 	// PublicURL is the origin browsers use to reach the service, e.g.
 	// "https://music.example.com". Requests that change state must come
-	// from this origin.
+	// from this origin. It also forms the OIDC redirect URI
+	// <public_url>/auth/callback.
 	PublicURL string `yaml:"public_url"`
-	// Dev signs in with fixed accounts and skips the admin setup token.
-	// Only a binary built with -tags dev accepts it.
+	// OIDC signs listeners in to the player.
+	OIDC OIDC `yaml:"oidc"`
+	// Dev signs in with fixed accounts, skipping the admin setup token and
+	// OIDC. Only a binary built with -tags dev accepts it.
 	Dev bool `yaml:"dev"`
+}
+
+// OIDC configures the identity provider (Authelia).
+type OIDC struct {
+	Issuer       string `yaml:"issuer"`
+	ClientID     string `yaml:"client_id"`
+	ClientSecret string `yaml:"client_secret"`
 }
 
 // Default returns the configuration used when no file is present.
@@ -61,6 +75,9 @@ func Load(path string) (Config, error) {
 			return cfg, fmt.Errorf("parse config %s: %w", path, err)
 		}
 	}
+	if secret := os.Getenv(ClientSecretEnv); secret != "" {
+		cfg.OIDC.ClientSecret = secret
+	}
 	return cfg, cfg.validate()
 }
 
@@ -88,6 +105,9 @@ func (c Config) validate() error {
 	if c.PublicURL == "" || err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" ||
 		(u.Path != "" && u.Path != "/") {
 		return errors.New("config: public_url must be an origin such as https://music.example.com")
+	}
+	if c.OIDC.Issuer == "" || c.OIDC.ClientID == "" || c.OIDC.ClientSecret == "" {
+		return fmt.Errorf("config: oidc.issuer, oidc.client_id and oidc.client_secret (or %s) are required unless dev is set", ClientSecretEnv)
 	}
 	return nil
 }

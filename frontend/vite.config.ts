@@ -15,7 +15,15 @@ export default defineConfig({
     Components({ resolvers: [NaiveUiResolver()], dts: "components.d.ts" }),
   ],
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
-  server: { host: "127.0.0.1", port: 14559, strictPort: true },
+  server: {
+    host: "127.0.0.1",
+    port: 14559,
+    strictPort: true,
+    proxy: {
+      "/api": "http://127.0.0.1:14560",
+      "/auth": "http://127.0.0.1:14560",
+    },
+  },
   build: {
     rollupOptions: {
       output: {

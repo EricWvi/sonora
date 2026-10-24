@@ -20,6 +20,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"sonora/internal/admin"
+	"sonora/internal/auth"
 	"sonora/internal/store"
 )
 
@@ -37,6 +38,8 @@ type testServer struct {
 	now      time.Time
 	// cookie is sent on every request made with do.
 	cookie string
+	// listener is the player session sent on every request, if set.
+	listener string
 }
 
 func newTest(t *testing.T) *testServer {
@@ -71,7 +74,12 @@ func (ts *testServer) restart() {
 		"favicon.svg":     {Data: []byte("<svg/>")},
 		".gitkeep":        {Data: nil},
 	}
-	h, err := New(ts.store, authn, player, console, Options{Version: "test"})
+	// The identity provider is never reached: tests start player sessions
+	// in the store directly, as a completed callback would.
+	listeners := auth.New(ts.store, auth.Config{
+		PublicURL: origin, Issuer: "http://127.0.0.1:1", ClientID: "sonora", ClientSecret: "secret",
+	})
+	h, err := New(ts.store, authn, listeners, player, console, Options{Version: "test"})
 	if err != nil {
 		ts.t.Fatal(err)
 	}
@@ -81,6 +89,9 @@ func (ts *testServer) restart() {
 func (ts *testServer) send(req *http.Request) *httptest.ResponseRecorder {
 	if ts.cookie != "" {
 		req.AddCookie(&http.Cookie{Name: "sonora_admin_session", Value: ts.cookie})
+	}
+	if ts.listener != "" {
+		req.AddCookie(&http.Cookie{Name: "sonora_session", Value: ts.listener})
 	}
 	rec := httptest.NewRecorder()
 	ts.ServeHTTP(rec, req)
