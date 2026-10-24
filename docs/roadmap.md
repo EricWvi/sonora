@@ -1,6 +1,6 @@
 # Sonora 重写路线图
 
-更新日期：2026-10-23。状态：已完成独立工程与前端展示初始化，首发范围已确定，其余阶段按验收条件推进。
+更新日期：2026-10-24。状态：已完成独立工程与前端展示初始化，阶段 1（Go 服务基础与管理后台）已实现，其余阶段按验收条件推进。
 
 ## 1. 目标与已确定的约束
 
@@ -26,7 +26,7 @@ Eric 已明确：Web 前端技术栈按照 SPlayer，明确舍弃 Electron，后
 - **标志图形暂时复用；所有 SPlayer 名称与文字换成 Sonora。**
 - **视觉基线直接截取本机参考实例，页面数据来自网易云。** SPlayer 的本地模式页面只在 Electron 中显示，Sonora 播放端页面以结构相同的参考页面为基线。管理后台在 SPlayer 中没有对应界面，不受复刻约束，采用 Naive UI 默认风格。
 
-Go 服务尚无代码；为照搬 homepage 的 OIDC，沿用其 `net/http`、SQLite 与配置方式，接口协议待定，下文定义客户端所需契约，不假定接口已经存在。阶段顺序是建议。
+Go 服务已在阶段 1 实现管理员初始化、上传入库与管理 API（2026-10-24）；为照搬 homepage 的 OIDC，沿用其 `net/http`、SQLite 与配置方式。播放端 API 尚未实现，下文定义播放端所需契约，不假定其接口已经存在。阶段顺序是建议。
 
 ## 2. 调研依据与证据边界
 
@@ -34,7 +34,7 @@ Go 服务尚无代码；为照搬 homepage 的 OIDC，沿用其 `net/http`、SQL
 - 本地参照：`http://localhost:25884`。本次已通过真实 Chromium 确认首页能打开；未带 Cookie 时显示“未登录”，注入用户提供的 Cookie 后登录状态接口返回有效资料，右上角显示账号名。首启协议弹窗存在。
 - 本次没有逐页完成真实交互验收，没有实测桌面打包、各音频引擎、音频输出设备或所有私有流媒体协议；下文有关这些能力的描述是源码发现，不是运行通过的结论。
 - 源码调研详见 [SPlayer 调研记录](splayer-research.md)。外部技术依据限于 Vue 和 Playwright 的官方资料，链接附在相关段落。
-- 当前已有 `frontend/` 独立工程（沿用 SPlayer 前端技术栈）和 `backend/` Go 服务占位目录。初始展示包含布局、导航、主题及空态，尚未接入自研服务与播放；不能据此认定播放端阶段 2 或阶段 3 的完整验收已经通过。
+- 当前已有 `frontend/` 独立工程（沿用 SPlayer 前端技术栈）、`admin/` 管理后台和 `backend/` Go 服务（阶段 1）。初始展示包含布局、导航、主题及空态，尚未接入自研服务与播放；不能据此认定播放端阶段 2 或阶段 3 的完整验收已经通过。
 
 ## 3. 重写要解决的具体问题
 
@@ -63,7 +63,7 @@ Sonora 前端以 Web 应用运行。明确舍弃 Electron，不继承主进程�
 
 严格复刻的对象是 SPlayer 的 Web 界面样式。原生标题栏、系统托盘、桌面歌词和窗口行为不在继承范围内；不能把样式一致解释为需要复用桌面运行方式。
 
-`backend/` 当前仅保留占位文件。后续以 Go 实现 Sonora 服务，负责接收管理后台上传的音频并入库、标签与封面读取、曲库索引、歌单/喜爱/历史等用户数据、歌词以及支持 Range 的音频流，并为管理后台提供独立的管理 API。文件路径只在服务内部使用，不出现在播放端 API 中。服务以容器运行，媒体存储卷与数据卷分别挂载；播放端使用照搬自 `../homepage` 的 OIDC 登录与会话；管理 API 使用管理员的独立会话。为原样复用该代码，Go 服务沿用 homepage 的标准库 `net/http`、modernc SQLite 与 YAML 配置。API 在阶段 1 确定，本次不生成服务代码。
+`backend/` 是 Go 实现的 Sonora 服务，负责接收管理后台上传的音频并入库、标签与封面读取、曲库索引、歌单/喜爱/历史等用户数据、歌词以及支持 Range 的音频流，并为管理后台提供独立的管理 API。文件路径只在服务内部使用，不出现在播放端 API 中。服务以容器运行，媒体存储卷与数据卷分别挂载；播放端使用照搬自 `../homepage` 的 OIDC 登录与会话；管理 API 使用管理员的独立会话。为原样复用该代码，Go 服务沿用 homepage 的标准库 `net/http`、modernc SQLite 与 YAML 配置。管理 API 与通用约定已在阶段 1 确定，见 [Sonora API 约定](api.md)。
 
 ## 5. 拟议模块与数据契约
 
@@ -186,8 +186,17 @@ frontend/
     style/              # 原项目全局样式和组件样式
     views/              # 首页及空态展示
   public/fonts/         # 参考项目字体资源
+admin/                  # 管理后台，Naive UI 默认风格
+  src/views/            # 初始化、登录、概况、上传、歌曲、专辑、艺术家
 backend/
-  .gitkeep              # Go 服务占位，暂无业务代码
+  cmd/sonora/           # 服务入口
+  internal/admin/       # 初始化 token、管理员登录与会话
+  internal/config/      # YAML 配置
+  internal/devmode/     # 开发构建（-tags dev）的写死账号
+  internal/media/       # 格式识别、时长、标签、封面与歌词读取
+  internal/server/      # 管理 API 与两份前端产物托管
+  internal/store/       # SQLite、曲库模型、上传入库、封面文件
+  web/                  # 构建时嵌入的 player 与 admin 产物
 reference/SPlayer/      # 原项目参照，不作为 Sonora 运行依赖
 docs/
   phase/                # 各阶段工作包与状态
@@ -211,9 +220,11 @@ docs/
 
 ## 11. 下一批可执行任务
 
-- [ ] 初始化 `backend/` Go 模块，沿用 homepage 的 `net/http`、SQLite 与配置方式，接入 Taskfile。
-- [ ] 实现初始化 token、管理员首次初始化、登录与开发模式写死账号。
-- [ ] 确定曲库模型，实现上传入库与管理 API。
-- [ ] 初始化 `admin/` 与 pnpm workspace，完成初始化页、登录、上传和元数据维护界面。
+- [x] 初始化 `backend/` Go 模块，沿用 homepage 的 `net/http`、SQLite 与配置方式，接入 Taskfile。（2026-10-24，见[阶段 1](phase/phase-1-admin.md)）
+- [x] 实现初始化 token、管理员首次初始化、登录与开发模式写死账号。
+- [x] 确定曲库模型，实现上传入库与管理 API。
+- [x] 初始化 `admin/` 与 pnpm workspace，完成初始化页、登录、上传和元数据维护界面。
+- [ ] 用真实曲库验证多格式、大曲库上传。
+- [ ] 阶段 4：照搬 homepage 的 OIDC，实现播放端 API 与音频流。
 
 本文件完成表示调研与路线图已交付，不表示以上实施任务已经完成。

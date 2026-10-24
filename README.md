@@ -4,20 +4,24 @@ Sonora 是以 SPlayer 为界面参照重新实现的音乐播放器。
 
 ## 开发
 
-使用 Node.js 22.12+、pnpm 10.28.1 和 [Task](https://taskfile.dev/)；若本机没有 `pnpm` 命令，先运行 `corepack enable pnpm`。项目命令统一收录在 [Taskfile.yml](Taskfile.yml)，运行 `task --list` 查看。
+使用 Node.js 22.12+、pnpm 10.28.1、Go 1.26 和 [Task](https://taskfile.dev/)；若本机没有 `pnpm` 命令，先运行 `corepack enable pnpm`。项目命令统一收录在 [Taskfile.yml](Taskfile.yml)，运行 `task --list` 查看。
 
 ```bash
 task install
-task run:web
+task run:server   # Go 服务，开发模式，127.0.0.1:14560
+task run:admin    # 管理后台，http://127.0.0.1:14561/admin/ ，账号 admin / admin
+task run:web      # 播放端，http://localhost:14559
 ```
 
-浏览器访问地址为 `http://localhost:14559`。`task format` 格式化前端，`task lint` 检查格式、ESLint 和类型，`task build` 生成 Web 构建，`task clean` 清理 `frontend/dist`。`task test` 执行当前全部检查和生产构建；目前尚无单元测试，后端占位目录也不执行 Go 检查。
+开发模式只在 `go run -tags dev` 构建中可用：跳过初始化 token，使用写死的管理员 `admin` / `admin`，数据写在 `backend/.data/`。`task format` 格式化全部代码；`task lint` 检查前端与管理后台的格式、ESLint、类型以及 Go 的 gofmt 与 `go vet`；`task test` 在此之上运行 Go 测试并构建两份前端；`task build` 生成嵌入两份前端的发布二进制 `release/sonora`；`task clean` 清理构建产物。
 
-`frontend/` 使用 SPlayer 的 Web 前端技术栈：Vue 3、TypeScript、Naive UI、Pinia、Vue Router、VueUse、SCSS、Vite；包管理使用 pnpm。**明确舍弃 Electron，不继承原项目的桌面宿主、主进程、预加载、IPC 和打包行为。** 业务、原生音频模块和网易依赖未迁入。`backend/` 为 Go 服务的占位目录，尚未初始化 Go 模块或接口。
+工程组成：
 
-当前只完成前端展示初始化：原样式主框架、首页空态、菜单导航、明暗主题和窄屏抽屉。搜索仅展示空结果，账号入口显示未登录；没有接入音乐服务、账号或播放功能。标志图形暂时复用 SPlayer，界面名称已改为 Sonora。完整页面复刻及逐状态视觉验收仍按路线图推进，不能将此次初始化视为全站复刻完成。复用资源及许可证见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+- `frontend/`：播放端，使用 SPlayer 的 Web 前端技术栈：Vue 3、TypeScript、Naive UI、Pinia、Vue Router、VueUse、SCSS、Vite。**明确舍弃 Electron，不继承原项目的桌面宿主、主进程、预加载、IPC 和打包行为。** 业务、原生音频模块和网易依赖未迁入。
+- `admin/`：管理后台，Vue 3、TypeScript、Naive UI 默认风格，与 `frontend/` 组成 pnpm workspace。
+- `backend/`：Go 服务，标准库 `net/http`、modernc SQLite 与 YAML 配置，与 `../homepage` 一致。
 
-验证范围为格式、lint、类型、Web 构建及真实 Chromium 展示检查。
+当前进度：阶段 1 已完成 Go 服务的管理员初始化、上传入库与管理 API，以及管理后台界面，见[阶段 1](docs/phase/phase-1-admin.md)。播放端只完成展示初始化：原样式主框架、首页空态、菜单导航、明暗主题和窄屏抽屉；尚未接入音乐服务、账号或播放功能。标志图形暂时复用 SPlayer，界面名称已改为 Sonora。完整页面复刻及逐状态视觉验收仍按路线图推进。复用资源及许可证见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 ## 项目方向
 
@@ -51,3 +55,5 @@ task run:web
 - [阶段计划](docs/phase/README.md)：各阶段的当前状态、工作包与退出证据。
 - [SPlayer 调研记录](docs/splayer-research.md)：原项目的源码证据、耦合点与重写风险。
 - [SPlayer 浏览器会话](docs/splayer-session.md)：本机凭据位置和无头浏览器的统一加载方式。
+- [Sonora API 约定](docs/api.md)：管理 API、错误格式与版本约定。
+- [部署 Sonora](docs/deployment.md)：配置、数据卷与首次初始化。
