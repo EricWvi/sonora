@@ -41,6 +41,17 @@ export interface DataSource {
   playlists(query?: Pick<ListQuery, "q">): Promise<Page<Playlist>>;
   playlist(id: number): Promise<Playlist>;
   playlistTracks(id: number, query?: ListQuery): Promise<Page<Track>>;
+  /** 喜爱歌曲，幂等。 */
+  like(trackId: number): Promise<void>;
+  /** 取消喜爱，幂等。 */
+  unlike(trackId: number): Promise<void>;
+  /** 记录一次播放；什么时候算一次播放由播放控制器决定。 */
+  recordPlay(trackId: number): Promise<void>;
+  /**
+   * 音频地址的 HTTP 状态，0 表示服务不可达。音频元素出错时只给出 MediaError，
+   * 播放控制器用它区分未登录、歌曲已删除与网络问题。
+   */
+  audioStatus(trackId: number): Promise<number>;
   /** 结束本浏览器的会话，不退出 Authelia。 */
   logout(): Promise<void>;
   /** 不指定尺寸时为原图；尺寸为长边像素，见 docs/api.md 的 `covers/{name}`。 */
@@ -60,10 +71,23 @@ function withQuery(path: string, query: object = {}): string {
   return search ? `${path}?${search}` : path;
 }
 
-async function request<T>(method: string, path: string): Promise<T> {
+async function request<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(path, { method, cache: "no-store" });
+    res = await fetch(path, {
+      method,
+      cache: "no-store",
+      ...(body === undefined
+        ? {}
+        : {
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          }),
+    });
   } catch {
     throw new ApiError(0, "无法连接服务器");
   }
@@ -82,6 +106,11 @@ async function request<T>(method: string, path: string): Promise<T> {
 const get = <T>(path: string, query?: object) =>
   request<T>("GET", withQuery(api + path, query));
 
+// 写请求成功时为 204，没有正文。
+const send = async (method: string, path: string, body?: unknown) => {
+  await request<null>(method, api + path, body);
+};
+
 const httpSource: DataSource = {
   me: () => get("me"),
   tracks: (query) => get("tracks", query),
@@ -97,6 +126,21 @@ const httpSource: DataSource = {
   playlists: (query) => get("playlists", { ...query, limit: 500 }),
   playlist: (id) => get(`playlists/${id}`),
   playlistTracks: (id, query) => get(`playlists/${id}/tracks`, query),
+  like: (trackId) => send("PUT", `likes/${trackId}`),
+  unlike: (trackId) => send("DELETE", `likes/${trackId}`),
+  recordPlay: (trackId) => send("POST", "history", { trackId }),
+  async audioStatus(trackId) {
+    try {
+      const res = await fetch(httpSource.audioUrl(trackId), {
+        headers: { Range: "bytes=0-0" },
+        cache: "no-store",
+      });
+      await res.body?.cancel();
+      return res.status;
+    } catch {
+      return 0;
+    }
+  },
   async logout() {
     let res: Response;
     try {
@@ -133,6 +177,9 @@ async function createSource(): Promise<{
 const created = await createSource();
 
 export const source = created.source;
+
+/** 是否在使用 fixture；fixture 没有音频，播放器换成不出声的引擎，也不保存队列。 */
+export const usingFixture = source !== httpSource;
 
 /**
  * fixture 指定的播放器初始状态，代替浏览器中保存的队列与播放位置；

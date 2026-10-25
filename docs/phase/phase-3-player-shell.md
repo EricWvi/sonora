@@ -4,7 +4,7 @@
 
 ## 当前事实
 
-`frontend/` 已有主框架（[AppLayout.vue](../../frontend/src/layout/AppLayout.vue)）、侧栏菜单、顶部导航、明暗主题和窄屏抽屉；界面名称已改为 Sonora，标志图形沿用 SPlayer。菜单、路由与顶栏用户入口已按首发范围重建（3.1）。页面模板（3.4）已完成：首页、歌曲、专辑、艺术家、各详情页与搜索都由 `DataSource` 取数，fixture 与 Go 服务都可用；写操作（喜欢、歌单编辑与排序、清空最近播放）只提示，在阶段 4.4 与 5 接入。播放器展示层（底部播放栏、播放队列抽屉、全屏播放器，3.5）已完成，由 fixture 驱动、不出声；截图对照工具见 3.6。
+`frontend/` 已有主框架（[AppLayout.vue](../../frontend/src/layout/AppLayout.vue)）、侧栏菜单、顶部导航、明暗主题和窄屏抽屉；界面名称已改为 Sonora，标志图形沿用 SPlayer。菜单、路由与顶栏用户入口已按首发范围重建（3.1）。页面模板（3.4）已完成：首页、歌曲、专辑、艺术家、各详情页与搜索都由 `DataSource` 取数，fixture 与 Go 服务都可用；写操作（歌单编辑与排序、清空最近播放）只提示，在阶段 5 接入；喜欢与播放在阶段 4.4 接入（2026-10-25）。播放器展示层（底部播放栏、播放队列抽屉、全屏播放器，3.5）已完成，由 fixture 驱动、不出声；截图对照工具见 3.6。
 
 数据只经 [api/source.ts](../../frontend/src/api/source.ts) 的 `DataSource` 读取，它覆盖播放端 API 的全部读取接口。开发服务器上以 `?fixture=<场景>` 打开时换成 [fixtures](../../frontend/src/fixtures/index.ts)，不需要 Go 服务；`&player=<状态>` 再指定播放器的初始状态（`source.ts` 导出的 `fixturePlayer`），例如 `http://127.0.0.1:14559/?fixture=baseline&player=yoru-paused#/`。场景与状态见 3.3。生产构建不含 fixture（已用 `vite build` 检查产物）。
 

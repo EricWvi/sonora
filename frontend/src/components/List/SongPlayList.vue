@@ -196,7 +196,8 @@ import { removeBrackets } from "@/utils/format";
 import { useDragSort } from "@/composables/List/useDragSort";
 
 // 照搬 SPlayer components/List/SongPlayList.vue。歌名取 Track 的 title；Sonora 的歌曲
-// 都带艺术家数组，去掉电台与艺术家为字符串的分支。
+// 都带艺术家数组，去掉电台与艺术家为字符串的分支。队列允许重复入队，列表项按条目
+// （entryId）区分，SPlayer 按歌曲 id。
 
 const dataStore = useDataStore();
 const statusStore = useStatusStore();
@@ -210,7 +211,7 @@ const playListData = computed(() => {
   return dataStore.playList.map((item) => {
     return {
       ...item,
-      key: item.id,
+      key: item.entryId,
     };
   });
 });

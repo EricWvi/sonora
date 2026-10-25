@@ -11,6 +11,18 @@ export const msToTime = (milliseconds: number): string => {
 };
 
 /**
+ * 毫秒转为秒
+ * @param milliseconds 毫秒
+ * @param decimalPlaces 保留的小数位数
+ */
+export const msToS = (
+  milliseconds: number,
+  decimalPlaces: number = 2,
+): number => {
+  return Number((milliseconds / 1000).toFixed(decimalPlaces));
+};
+
+/**
  * 计算进度条百分比
  * @param currentTime 当前时间
  * @param duration 总时长

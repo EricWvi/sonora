@@ -459,13 +459,32 @@ function librarySource(lib: Library): DataSource {
       reply(() =>
         page(sortTracks(ownPlaylist(id).trackIds.map(track), query), query),
       ),
+    // 写操作只改内存中的数据，刷新页面后恢复原样。
+    like: (trackId) =>
+      reply(() => {
+        track(trackId);
+        if (!lib.likes.includes(trackId)) lib.likes.unshift(trackId);
+      }),
+    unlike: (trackId) =>
+      reply(() => {
+        lib.likes = lib.likes.filter((id) => id !== trackId);
+      }),
+    recordPlay: (trackId) =>
+      reply(() => {
+        track(trackId);
+        lib.history = [
+          { trackId, playedAt: new Date().toISOString() },
+          ...lib.history.filter((e) => e.trackId !== trackId),
+        ];
+      }),
+    audioStatus: () => reply(() => 200),
     logout: () => Promise.resolve(),
     // baseline 带有网易按 100、300、1024 缩放的图，没有对应尺寸时用原图。
     coverUrl: (cover, size) =>
       (size && lib.coverUrls[cover.name.replace(/(\.\w+)$/, `-${size}$1`)]) ||
       (lib.coverUrls[cover.name] ?? ""),
-    // fixture 没有音频。
-    audioUrl: () => "",
+    // fixture 没有音频，播放器用不出声的引擎，地址只用来区分歌曲。
+    audioUrl: (trackId) => `fixture:audio/${trackId}`,
   };
 }
 

@@ -9,7 +9,8 @@
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "build": "pnpm typecheck && vite build"
+    "build": "pnpm typecheck && vite build",
+    "test": "vitest run"
   },
   "dependencies": {
     "@applemusic-like-lyrics/core": "0.5.1",
@@ -47,6 +48,7 @@
     "unplugin-auto-import": "^21.0.0",
     "unplugin-vue-components": "^32.1.0",
     "vite": "^7.3.5",
+    "vitest": "^5.0.5",
     "vue-tsc": "^3.3.3"
   }
 }

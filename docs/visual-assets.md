@@ -27,6 +27,7 @@
 | 字体大小工具 | `src/utils/style.ts` | 12 | 照搬 | 已照搬，另照搬歌词字体配置 `utils/lyric/lyricFontConfig.ts`（2026-10-25） |
 | 播放器：底部播放栏、全屏播放器、封面、歌词、背景、控制栏、频谱 | `src/components/Player/` | 6097 | 严格复刻，去掉评论、音质与网易相关元素（[阶段 2 决定](phase/phase-2-player-baseline.md#播放器里与-sonora-不对应的元素)） | 底部播放栏与全屏播放器（`FullPlayer.vue`、`PlayerMenu.vue`、`PlayerControl.vue`、`PlayerMeta/`、`PlayerLyric/`、`PlayerSpectrum.vue`）已照搬，截图对照见阶段 3.5（2026-10-25）。不迁入 `FullPlayerMobile.vue`、`PlayerComment.vue`、`PersonalFM.vue` |
 | AMLL 封装：歌词播放器、流动背景 | `src/components/AMLL/` | 512 | 严格复刻 | 已照搬（阶段 3.5，2026-10-25） |
+| 音频分析：频谱与低频音量（全屏播放器的频谱、背景随低频响应） | `src/core/audio-player/` 中的 `AudioEffectManager.ts`、`BaseAudioPlayer.ts`、`AudioElementPlayer.ts`、`IPlaybackEngine.ts` | 1320 | 照搬 Web Audio 引擎，去掉 MPV、FFmpeg 与自动混音 | 已照搬（阶段 4.4，2026-10-25），分析器参数与低频音量的计算不变 |
 | 播放队列抽屉 | `src/components/List/SongPlayList.vue`、`src/composables/List/useDragSort.ts` | 786 | 严格复刻 | 已照搬，去掉电台分支；截图对照逐像素一致（阶段 3.5，2026-10-25） |
 | 歌词解析 | `src/utils/lyric/` | 1914 | 照搬 LRC、TTML 相关部分；去掉 YRC、QRC 与在线歌词源 | 已照搬 `parseLrc.ts`、`lyricParser.ts`（去掉 QRC 与 `lyricLinesToTTML`）、`parseTTML.ts`、`lyricStripper.ts`、`lyricFormat.ts`，处理流程见 `core/player/LyricManager.ts`（2026-10-25） |
 | 歌曲列表、详情页头部 | `src/components/List/SongList.vue`、`ListDetail.vue` | 1425 | 视觉语言一致，结构按阶段 2 决定 | 已照搬（阶段 3.4，2026-10-25）：排序改由服务端完成，去掉电台、大小列、移动端菜单、播放量、标签与评论；增加碟号分组标题与专辑年份、总时长、歌单创建与更新时间等信息项（待 Eric 确认）。另照搬右键菜单 `SongListMenu.vue`、`useSongMenu.ts`（条目按阶段 2）与 `CoverList.vue`、`ArtistList.vue` |

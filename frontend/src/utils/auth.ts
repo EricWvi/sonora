@@ -1,15 +1,49 @@
+import { ApiError, loginUrl, source } from "@/api/source";
 import type { Track } from "@/api/types";
+import { useDataStore } from "@/stores";
+import { debounce, type DebouncedFunc } from "lodash-es";
 
-// 照搬 SPlayer utils/auth.ts 中的喜欢入口。写入服务端在阶段 4.4 接入，之前只提示。
+// 照搬 SPlayer utils/auth.ts 中的喜欢入口；其余写操作在阶段 5 接入，之前只提示。
 
 /**
- * 喜欢或取消喜欢歌曲
- * @param _song 歌曲
- * @param _like 是否喜欢
+ * 喜欢或取消喜欢歌曲。服务端确认后才更新喜爱状态，失败时保持原样（路线图 5.1）
+ * @param song 歌曲
+ * @param like 是否喜欢
  */
-export const toLikeSong = async (_song: Track, _like: boolean) => {
-  window.$message.info("喜欢将在后续阶段接入");
-};
+export const toLikeSong: DebouncedFunc<
+  (song: Track, like: boolean) => Promise<void>
+> = debounce(
+  async (song: Track, like: boolean): Promise<void> => {
+    const dataStore = useDataStore();
+    const { id } = song;
+    try {
+      if (like) await source.like(id);
+      else await source.unlike(id);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        location.assign(loginUrl);
+        return;
+      }
+      window.$message.error(`${like ? "喜欢" : "取消"}音乐时发生错误`);
+      console.error("❌ 更新喜欢歌曲时失败:", error);
+      return;
+    }
+    // 请求期间可能有其他修改，按确认时的列表更新
+    const likeList = dataStore.userLikeData.songs;
+    const exists = likeList.includes(id);
+    if (like && !exists) {
+      dataStore.userLikeData.songs = [id, ...likeList];
+      window.$message.success("已添加到我喜欢的音乐");
+    } else if (!like && exists) {
+      dataStore.userLikeData.songs = likeList.filter((s) => s !== id);
+      window.$message.success("已取消喜欢");
+    } else if (like && exists) {
+      window.$message.info("我喜欢的音乐中已存在该歌曲");
+    }
+  },
+  300,
+  { leading: true, trailing: false },
+);
 
 /**
  * 从歌单中删除歌曲。写入服务端在阶段 5 接入，之前只提示

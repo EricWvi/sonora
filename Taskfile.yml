@@ -118,10 +118,11 @@ tasks:
       - go vet -tags authelia ./internal/auth
 
   test:
-    desc: Run all checks, Go tests and web builds
+    desc: Run all checks, Go and player unit tests, and web builds
     cmds:
       - task: lint
       - task: test:go
+      - task: test:frontend
       - task: build:frontend
       - task: build:admin
 
@@ -131,6 +132,12 @@ tasks:
     cmds:
       - go test ./...
       - go test -tags dev ./internal/config
+
+  test:frontend:
+    desc: Run the player's unit tests (playback controller and queue, vitest)
+    dir: frontend
+    cmds:
+      - pnpm test {{.CLI_ARGS}}
 
   test:visual:
     desc: Compare the player with the SPlayer reference screenshots (this machine only, see docs/phase/phase-3-player-shell.md 3.6)

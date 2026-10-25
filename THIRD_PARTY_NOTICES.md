@@ -19,7 +19,9 @@
 - `frontend/src/components/Search/`：原搜索框、搜索建议与搜索历史，建议改为曲库搜索。
 - `frontend/src/views/History.vue`、`frontend/src/views/List/`、`frontend/src/views/Artist/`、`frontend/src/views/Search/`、`frontend/src/views/Home/`：原最近播放、专辑与歌单详情、我喜欢、艺术家详情、搜索结果与首页，按 Sonora 的页面清单改编。
 - `frontend/src/utils/meta.ts`、`auth.ts`：原排序选项、图片工具栏与喜欢等入口（保留部分）。
-- `frontend/src/core/player/`：按原播放控制器与歌词管理改编，方法名与处理流程沿用原项目。
+- `frontend/src/core/player/`：按原播放控制器、播放模式管理、媒体会话与歌词管理改编，方法名与处理流程沿用原项目。
+- `frontend/src/core/audio-player/`：原 Web Audio 播放引擎（`BaseAudioPlayer`、`AudioElementPlayer`、`AudioEffectManager`、`IPlaybackEngine` 与 `core/automix/SharedAudioContext.ts`），去掉 Sonora 不用的引擎与自动混音。
+- `frontend/src/utils/TypedEventTarget.ts`：原项目收录的类型安全 EventTarget，来自 [typescript-event-target](https://github.com/DerZade/typescript-event-target)（Copyright (c) 2022 Jonas "DerZade" Schade，MIT 许可证），未作修改。
 - 主布局、导航和首页展示结构按原项目对应实现改编，业务逻辑重新实现。
 
 2026-10-23 确定：标志图形暂时复用；界面中的 SPlayer 名称与文字均替换为 Sonora。Sonora 不迁入网易来源、认证或业务接口。各依赖的许可证仍以各包声明为准。
