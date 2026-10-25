@@ -30,7 +30,7 @@
         <n-input
           v-model:value="keyword"
           class="search-input"
-          placeholder="搜索音乐 / 视频"
+          placeholder="搜索音乐"
           round
           clearable
           :input-props="{ 'aria-label': '搜索音乐' }"
@@ -41,17 +41,7 @@
       </div>
       <div v-if="isDesktop" class="nav-drag" />
       <n-flex align="center">
-        <div class="user">
-          <div class="avatar">
-            <n-avatar round
-              ><SvgIcon name="Person" :depth="3" :size="26"
-            /></n-avatar>
-          </div>
-          <n-flex v-if="isDesktop" :wrap="false" class="user-data" size="small">
-            <n-text class="name text-hidden">未登录</n-text>
-            <SvgIcon class="down" name="DropDown" :depth="3" />
-          </n-flex>
-        </div>
+        <UserMenu />
         <n-dropdown
           :options="themeOptions"
           trigger="click"
@@ -87,7 +77,7 @@
                 ><Logo /><n-text>Sonora</n-text></n-flex
               ></template
             >
-            <SidebarMenu :collapsed="false" @navigate="showAside = false" />
+            <SidebarMenu :collapsed="false" @menu-click="showAside = false" />
           </n-drawer-content>
         </n-drawer>
       </n-flex>
@@ -98,6 +88,7 @@
 <script setup lang="ts">
 import Logo from "./Logo.vue";
 import SidebarMenu from "./SidebarMenu.vue";
+import UserMenu from "./UserMenu.vue";
 import SvgIcon from "@/components/Global/SvgIcon.vue";
 import { useAppearanceStore } from "@/stores/appearance";
 
@@ -123,4 +114,3 @@ function search(): void {
 
 <style lang="scss" scoped src="@/style/nav.scss"></style>
 <style lang="scss" scoped src="@/style/search.scss"></style>
-<style lang="scss" scoped src="@/style/user.scss"></style>

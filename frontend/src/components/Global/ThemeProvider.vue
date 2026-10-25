@@ -9,7 +9,17 @@
     preflight-style-disabled
   >
     <n-global-style />
-    <slot />
+    <n-loading-bar-provider>
+      <n-dialog-provider>
+        <n-notification-provider>
+          <n-message-provider :max="1" placement="bottom">
+            <n-modal-provider>
+              <slot />
+            </n-modal-provider>
+          </n-message-provider>
+        </n-notification-provider>
+      </n-dialog-provider>
+    </n-loading-bar-provider>
   </n-config-provider>
 </template>
 

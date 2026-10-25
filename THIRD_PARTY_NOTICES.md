@@ -7,6 +7,8 @@
 - `frontend/src/style/`：原全局样式、动画及布局/导航/菜单/搜索/用户组件样式。
 - `frontend/src/components/Layout/Logo.vue`、`frontend/src/components/Global/SvgIcon.vue`：原标志与图标展示实现。
 - `frontend/src/assets/icons/`、`frontend/public/fonts/`：参考项目对应 SVG 图标与 Logo 字体。
+- `frontend/public/images/`：默认封面与艺术家图片（`album.jpg`、`song.jpg`、`artist.jpg`）。
+- `frontend/src/views/Status/404.vue`、`500.vue`：原状态页。
 - 主题生成、主布局、导航和首页展示结构按原项目对应实现改编，业务逻辑重新实现。
 
 2026-10-23 确定：标志图形暂时复用；界面中的 SPlayer 名称与文字均替换为 Sonora。Sonora 不迁入网易来源、认证或业务接口。各依赖的许可证仍以各包声明为准。
@@ -22,7 +24,6 @@
 `frontend/src/assets/icons/` 的图标复制自 SPlayer，其中可确认来源的属于以下图标集（核对方法见[视觉资源与许可清单](docs/visual-assets.md#4-图标)）：
 
 - [Google Material Icons](https://github.com/google/material-design-icons)、[Material Symbols](https://github.com/google/material-design-icons)：Copyright Google LLC，Apache License 2.0。
-- [Phosphor Icons](https://github.com/phosphor-icons/core)：Copyright (c) 2023 Phosphor Icons，MIT 许可证。
 
 其余图标来源尚未确认，按 SPlayer 的 AGPL-3.0 处理。
 

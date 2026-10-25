@@ -53,11 +53,17 @@ import AppNav from "@/components/Layout/AppNav.vue";
 import SidebarMenu from "@/components/Layout/SidebarMenu.vue";
 import Logo from "@/components/Layout/Logo.vue";
 import { useAppearanceStore } from "@/stores/appearance";
+import { useUserStore } from "@/stores/user";
 
 const router = useRouter();
 const appearance = useAppearanceStore();
 const isDesktop = useMediaQuery("(min-width: 1024px)");
 const isMobile = useMediaQuery("(max-width: 639.98px)");
+
+// 服务不可达时保留空的用户与歌单，页面各自显示错误状态（阶段 3.4）。
+void useUserStore()
+  .load()
+  .catch((error: unknown) => console.error("加载用户数据失败", error));
 </script>
 
 <style lang="scss" scoped src="@/style/layout.scss"></style>

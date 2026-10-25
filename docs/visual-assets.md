@@ -78,7 +78,7 @@ SPlayer 的 147 个图标在 `src/assets/icons/`，由 `SvgIcon.vue` 内联渲�
 
 **署名要求：** IconaMoon 的 CC-BY-4.0 要求注明作者、许可证与修改情况。Sonora 复制 `Repeat`、`RepeatSong`、`Shuffle` 时，在 THIRD_PARTY_NOTICES.md 加入 IconaMoon（作者 Dariush Habibpour，<https://github.com/dariushhpg1/IconaMoon>）的署名。Apache-2.0 与 MIT 的图标集同样在该文件中列出版权与许可证。
 
-`frontend/src/assets/icons/` 现有 17 个图标，与 SPlayer 的文件逐字节一致：Google Material Icons 7 个（`Add`、`Favorite`、`Menu`、`NavigateBefore`、`NavigateNext`、`Person`、`Star`）、Material Symbols 3 个（`Home`、`PlaylistAddCheck`、`Search`）、Material Symbols Light 1 个（`DropDown`）、Phosphor 1 个（`HeartBit`），近似项 4 个（`History`、`PlaylistAdd`、`Record`、`Settings`），未确认 1 个（`Discover`）。
+`frontend/src/assets/icons/` 现有 17 个图标，与 SPlayer 的文件逐字节一致（2026-10-25 阶段 3.1 重建侧栏后）：Google Material Icons 7 个（`Add`、`Favorite`、`Menu`、`Music`、`NavigateBefore`、`NavigateNext`、`Person`）、Material Symbols 3 个（`Home`、`PlayList`、`Search`）、Material Symbols Light 1 个（`DropDown`），近似项 5 个（`Artist`、`History`、`PlaylistAdd`、`Power`、`Settings`），未确认 1 个（`Album`）。侧栏的歌曲、专辑、艺术家图标沿用 SPlayer 流媒体页面标签的 `Music`、`Album`、`Artist`。
 
 ## 5. 字体
 
@@ -95,18 +95,18 @@ SPlayer 的 147 个图标在 `src/assets/icons/`，由 `SvgIcon.vue` 内联渲�
 
 | 文件 | 尺寸 | SPlayer 用途 | Sonora |
 | --- | --- | --- | --- |
-| `song.jpg` | 500×500 | 歌曲默认封面与封面加载占位 | 使用（歌单、我喜欢的默认封面也用它，见阶段 2 详情页头部） |
-| `album.jpg` | 633×633 | 专辑默认封面 | 使用 |
-| `artist.jpg` | 300×300 | 艺术家默认图片 | 使用（没有上传艺术家图片时） |
+| `song.jpg` | 500×500 | 歌曲默认封面与封面加载占位 | 使用（歌单、我喜欢的默认封面也用它，见阶段 2 详情页头部）；已复制到 `frontend/public/images/` |
+| `album.jpg` | 633×633 | 专辑默认封面 | 使用（侧栏歌单没有封面时也用它，与 SPlayer 一致）；已复制 |
+| `artist.jpg` | 300×300 | 艺术家默认图片 | 使用（没有上传艺术家图片时）；已复制 |
 | `record.png` | 60×60 | 唱片播放器样式 | 使用 |
 | `pointer.png` | 251×409 | 唱片播放器的唱针 | 使用 |
-| `avatar.jpg` | 100×100 | 默认头像 | 视顶栏用户入口的设计决定 |
+| `avatar.jpg` | 100×100 | 默认头像 | 不使用：顶栏用户入口沿用 SPlayer 未登录时的 `Person` 图标头像（OIDC 不提供头像） |
 | `video.jpg`、`vip.png`、`annual.png`、`avatar/` | — | 视频、网易会员、年度报告、关于页的贡献者头像 | 不使用 |
 
 `public/icons/` 是应用图标与 favicon，属于 SPlayer 标志。阶段 2 已决定标志图形暂时复用。
 
 ## 7. 与 THIRD_PARTY_NOTICES.md 的同步
 
-2026-10-25 已补：Logo 字体 Poppins Medium 的 OFL 声明，全文放在 `frontend/public/fonts/OFL.txt`；`frontend/src/assets/icons/` 中 Google Material Icons、Material Symbols 与 Phosphor 的版权与许可证。
+2026-10-25 已补：Logo 字体 Poppins Medium 的 OFL 声明，全文放在 `frontend/public/fonts/OFL.txt`；`frontend/src/assets/icons/` 中 Google Material Icons、Material Symbols 与 Phosphor 的版权与许可证。阶段 3.1 删除 `HeartBit` 后不再含 Phosphor 图标，该声明已移除，复制 `SortDown`、`SortUp` 时再加回。
 
 阶段 3 引入播放器时还需加入：AMLL（AGPL-3.0-only）、IconaMoon（CC-BY-4.0，含署名）、Material Design Icons、Fluent UI System Icons（若使用）、PixiJS、SortableJS 与 `@imsyy/color-utils`。

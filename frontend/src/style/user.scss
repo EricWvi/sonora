@@ -42,9 +42,6 @@
     background-color: rgba(var(--primary), 0.12);
   }
 }
-.vip-img {
-  height: 18px;
-}
 .user-menu {
   display: flex;
   justify-content: center;
@@ -54,73 +51,9 @@
       font-weight: bold;
       max-width: 220px;
     }
-    .n-tag {
-      height: 18px;
+    .email {
       font-size: 12px;
-      pointer-events: none;
-    }
-  }
-  .like-num {
-    display: flex;
-    justify-content: space-around;
-    .num-item {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      font-size: 16px;
-      font-weight: bold;
-      cursor: pointer;
-      .n-text {
-        font-size: 12px;
-        font-weight: normal;
-        margin-top: 4px;
-      }
-    }
-  }
-  .account-list {
-    .subtitle {
-      font-size: 12px;
-      text-align: center;
-      margin-bottom: 8px;
-      display: block;
-    }
-    .account-item {
-      display: flex;
-      align-items: center;
-      padding: 6px 8px;
-      margin-bottom: 8px;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background-color 0.2s;
-      position: relative;
-      .account-name {
-        margin-left: 8px;
-        font-size: 13px;
-        flex: 1;
-      }
-      .delete-btn {
-        opacity: 0;
-        padding: 4px;
-        border-radius: 4px;
-        display: flex;
-        align-items: center;
-        transition:
-          background-color 0.2s,
-          color 0.2s;
-        &:hover {
-          background-color: rgba(var(--primary), 0.1);
-          color: var(--primary-color);
-        }
-      }
-      &:hover {
-        background-color: rgba(var(--primary), 0.08);
-        .delete-btn {
-          opacity: 1;
-        }
-      }
-    }
-    .add-account {
-      border-radius: 8px;
+      max-width: 220px;
     }
   }
   .n-divider {

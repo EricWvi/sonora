@@ -1,3 +1,4 @@
+<!-- 占位页面：各页面模板在阶段 3.4 实现 -->
 <template>
   <div class="empty-page">
     <n-h1>{{ route.meta.title }}</n-h1>
