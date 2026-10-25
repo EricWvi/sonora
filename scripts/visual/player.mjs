@@ -23,10 +23,12 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 
 import {
+  backgroundOf,
   clipFor,
   hideMain,
   mergeManifest,
   setStore,
+  settingsFor,
   settled,
   states,
 } from "../baseline/player-states.mjs";
@@ -73,7 +75,7 @@ async function openState(browser, state) {
     timezoneId: "Asia/Shanghai",
     colorScheme: "light",
   });
-  const settings = { ...baseSettings, ...state.settings };
+  const settings = settingsFor(baseSettings, state);
   await context.addInitScript(
     ([origin, settings]) => {
       if (location.origin !== origin || localStorage.getItem("sonora-setting"))
@@ -148,6 +150,8 @@ try {
         caret: "hide",
       });
       entry.file = file;
+      if (state.animations === "allow")
+        entry.background = await backgroundOf(ctx.page);
       if (ctx.errors.length) entry.pageErrors = ctx.errors;
       console.log(`ok   ${state.id}`);
     } catch (err) {

@@ -62,6 +62,10 @@
     <SongPlayList />
     <!-- 全局播放器 -->
     <MainPlayer :style="followScroll" />
+    <!-- 全屏播放器 -->
+    <PlayerProvider>
+      <FullPlayer />
+    </PlayerProvider>
   </div>
 </template>
 
@@ -71,6 +75,8 @@ import SidebarMenu from "@/components/Layout/SidebarMenu.vue";
 import Logo from "@/components/Layout/Logo.vue";
 import MainPlayer from "@/components/Player/MainPlayer.vue";
 import SongPlayList from "@/components/List/SongPlayList.vue";
+import FullPlayer from "@/components/Player/FullPlayer.vue";
+import PlayerProvider from "@/components/Global/PlayerProvider.vue";
 import { initPlayer } from "@/core/player/PlayerController";
 import { useMusicStore, useStatusStore, useUserStore } from "@/stores";
 

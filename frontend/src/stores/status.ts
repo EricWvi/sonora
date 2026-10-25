@@ -141,6 +141,47 @@ export const useStatusStore = defineStore("status", {
       return Math.floor(offsetTime * 1000);
     },
     /**
+     * 设置指定歌曲的偏移
+     * @param songId 歌曲 id
+     * @param offset 偏移量（单位：毫秒，正值为歌词提前）
+     */
+    setSongOffset(songId?: number, offset: number = 0) {
+      if (!songId) return;
+      if (!this.currentTimeOffsetMap) this.currentTimeOffsetMap = {};
+      // 将毫秒转换为秒存储（保留2位小数）
+      const offsetSeconds = offset / 1000;
+      const fixed = Number(offsetSeconds.toFixed(2));
+      if (fixed === 0) {
+        // 为 0 时移除记录，避免占用空间
+        delete this.currentTimeOffsetMap[songId];
+      } else {
+        this.currentTimeOffsetMap[songId] = fixed;
+      }
+    },
+    /**
+     * 调整指定歌曲的偏移（增量）
+     * @param songId 歌曲 id
+     * @param delta 偏移增量（单位：毫秒，默认 500ms，正值为歌词提前）
+     */
+    incSongOffset(songId?: number, delta: number = 500) {
+      if (!songId) return;
+      const current = this.getSongOffset(songId);
+      const next = current + delta;
+      if (next === 0) {
+        delete this.currentTimeOffsetMap[songId];
+      } else {
+        this.setSongOffset(songId, next);
+      }
+    },
+    /** 重置指定歌曲的偏移为 0 */
+    resetSongOffset(songId?: number) {
+      if (!songId) return;
+      // 直接删除该歌曲记录
+      if (this.currentTimeOffsetMap && songId in this.currentTimeOffsetMap) {
+        delete this.currentTimeOffsetMap[songId];
+      }
+    },
+    /**
      * 切换循环模式
      * 顺序: List -> One -> Off -> List
      */

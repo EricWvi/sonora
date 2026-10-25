@@ -173,6 +173,8 @@ export const states = [
     seek: YORU_LINE,
     settings: { playerType: type, playerBackgroundType: bg },
     full: true,
+    // Without a background the page behind shows through (hideMain).
+    hideMain: bg === "none",
   })),
   {
     id: "full-cover-blur-dark",
@@ -241,6 +243,142 @@ export const states = [
     full: true,
     // AMLL animates lines with JS springs, which CSS animation control
     // does not stop; give them time to settle.
+    settle: 3000,
+  },
+
+  // Appearance and lyric settings (phase 3.2): each state moves several
+  // settings off their defaults, so a match shows each one takes effect.
+  {
+    id: "set-bar",
+    song: "yoru",
+    seek: YORU_LINE,
+    playing: true,
+    settings: {
+      timeFormat: "remaining-total",
+      showPlaylistCount: false,
+      hideMiniPlayerCover: true,
+      barLyricShow: false,
+    },
+    clip: "bar",
+  },
+  {
+    id: "set-lrc-layout",
+    song: "yoru",
+    seek: YORU_LINE,
+    settings: {
+      playerStyleRatio: 60,
+      playerFollowCoverColor: false,
+      lyricsPosition: "center",
+      lyricFontSizeMode: "fixed",
+      lyricFontSize: 36,
+      lyricTranFontSize: 18,
+      lyricRomaFontSize: 14,
+      lyricFontWeight: 400,
+      swapTranRoma: true,
+      lyricsBlur: true,
+      lyricsBlendMode: "plus-lighter",
+      lyricHorizontalOffset: 40,
+      lyricsScrollOffset: 0.5,
+      LyricFont: "Noto Sans CJK SC",
+      englishLyricFont: "DejaVu Serif",
+    },
+    full: true,
+  },
+  {
+    id: "set-lrc-right",
+    song: "yoru",
+    seek: YORU_LINE,
+    settings: {
+      lyricAlignRight: true,
+      lyricsPosition: "flex-end",
+      hideBracketedContent: true,
+      fullscreenPlayerElements: {
+        like: false,
+        addToPlaylist: false,
+        copyLyric: false,
+        lyricOffset: false,
+        lyricSettings: false,
+      },
+    },
+    full: true,
+  },
+  {
+    id: "set-fullscreen-color",
+    song: "yoru",
+    seek: YORU_LINE,
+    settings: {
+      playerType: "fullscreen",
+      playerFullscreenGradient: 50,
+      playerBackgroundType: "color",
+    },
+    full: true,
+  },
+  {
+    id: "set-yrc",
+    song: "guren",
+    seek: GUREN_WORD,
+    settings: {
+      lyricAlignRight: true,
+      lyricFontSizeMode: "fixed",
+      lyricFontSize: 36,
+      lyricHorizontalOffset: 40,
+      japaneseLyricFont: "Noto Sans CJK SC",
+    },
+    full: true,
+  },
+  {
+    id: "set-yrc-off",
+    song: "guren",
+    seek: GUREN_WORD,
+    settings: { showWordLyrics: false },
+    full: true,
+  },
+  {
+    id: "set-yrc-amll",
+    song: "guren",
+    seek: GUREN_WORD,
+    settings: {
+      useAMLyrics: true,
+      hidePassedLines: true,
+      wordFadeWidth: 1,
+      showWordsRoma: false,
+      lyricAlignRight: true,
+      lyricsScrollOffset: 0.5,
+      lyricHorizontalOffset: 40,
+      lyricFontSizeMode: "fixed",
+      lyricFontSize: 36,
+      lyricFontWeight: 400,
+      LyricFont: "Noto Sans CJK SC",
+    },
+    full: true,
+    settle: 3000,
+  },
+  {
+    // Compared by renderer input, like full-cover-animation-*.
+    id: "set-animation",
+    song: "yoru",
+    seek: YORU_LINE,
+    settings: {
+      playerBackgroundType: "animation",
+      playerBackgroundFps: 60,
+      playerBackgroundFlowSpeed: 2,
+      playerBackgroundRenderScale: 1,
+      playerBackgroundPause: true,
+    },
+    full: true,
+    animations: "allow",
+  },
+  {
+    id: "set-lrc-amll",
+    song: "yoru",
+    seek: YORU_LINE,
+    settings: {
+      useAMLyrics: true,
+      swapTranRoma: true,
+      showRoma: false,
+      countDownShow: false,
+    },
+    full: true,
     settle: 3000,
   },
 ];
@@ -327,6 +465,55 @@ export async function clipFor(page, state) {
       return round(await page.locator(".n-drawer").boundingBox());
   }
   return undefined;
+}
+
+// A state's settings over the base settings. Object settings such as
+// fullscreenPlayerElements merge key by key, so a state that turns some
+// elements off keeps what the base turns off.
+export function settingsFor(base, state) {
+  const settings = { ...base };
+  for (const [key, value] of Object.entries(state.settings ?? {}))
+    settings[key] =
+      value && typeof value === "object" && !Array.isArray(value)
+        ? { ...base[key], ...value }
+        : value;
+  return settings;
+}
+
+// The flowing background renders by wall-clock time, so its frames are
+// not compared pixel by pixel. Both sides run the same AMLL renderer; what
+// can differ is its input: the props BackgroundRender receives and the
+// image behind the album URL, hashed so NetEase and fixture URLs compare.
+export async function backgroundOf(page) {
+  return page.evaluate(async () => {
+    const find = (vnode) => {
+      if (!vnode || typeof vnode !== "object") return null;
+      const c = vnode.component;
+      if (c) {
+        if (c.type.__name === "BackgroundRender") return c.props;
+        return find(c.subTree);
+      }
+      if (vnode.suspense) return find(vnode.suspense.activeBranch);
+      if (Array.isArray(vnode.children))
+        for (const child of vnode.children) {
+          const found = find(child);
+          if (found) return found;
+        }
+      return null;
+    };
+    const props = find(document.querySelector("#app")._vnode);
+    if (!props) return null;
+    // renderer is a class, minified in SPlayer's build; both use the default.
+    const { album, renderer: _renderer, ...rest } = props;
+    const bytes = await (await fetch(album)).arrayBuffer();
+    const hash = await crypto.subtle.digest("SHA-256", bytes);
+    return {
+      ...JSON.parse(JSON.stringify(rest)),
+      albumSha256: [...new Uint8Array(hash)]
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join(""),
+    };
+  });
 }
 
 // A run with --only captures some states again; the manifest keeps the

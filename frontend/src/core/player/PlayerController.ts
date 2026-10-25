@@ -145,6 +145,19 @@ class PlayerController {
     if (play) await this.play();
   }
 
+  /** 获取频谱数据。音频在阶段 4.4 接入，之前没有数据 */
+  public getSpectrumData(): Uint8Array | null {
+    return null;
+  }
+
+  /**
+   * 获取低频音量 [0.0-1.0]
+   * 用于驱动背景动画等视觉效果。音频在阶段 4.4 接入，之前为 1
+   */
+  public getLowFrequencyVolume(): number {
+    return 1;
+  }
+
   /** 清空播放列表 */
   public async cleanPlayList() {
     const dataStore = useDataStore();

@@ -34,12 +34,14 @@ import { parseArgs } from "node:util";
 
 import { prepareSPlayerSession } from "../splayer-session.mjs";
 import {
+  backgroundOf,
   clipFor,
   GUREN_WORD,
   hideMain,
   mergeManifest,
   PINIA,
   setStore,
+  settingsFor,
   settled,
   songs,
   states,
@@ -152,7 +154,7 @@ async function newContext(browser, state) {
     colorScheme: "light",
   });
   await prepareSPlayerSession(context, base);
-  const settings = { ...baseSettings, ...state.settings };
+  const settings = settingsFor(baseSettings, state);
   await context.addInitScript(
     ([origin, settings]) => {
       if (location.origin !== origin || localStorage.getItem("setting-store"))
@@ -286,9 +288,10 @@ async function snapshot(browser) {
     if (picUrl) {
       const res = await page.request.get(picUrl);
       await writeFile(join(dir, `${key}-cover.jpg`), await res.body());
-      // The sizes SPlayer asks for (coverSize s, m, l), as NetEase scales
-      // them; Sonora's fixture serves these for ?size=.
-      for (const size of [100, 300, 1024]) {
+      // The sizes SPlayer asks for (coverSize s, m, l, xl), as NetEase
+      // scales them; Sonora's fixture serves these for ?size= and, for xl,
+      // as the original.
+      for (const size of [100, 300, 1024, 1920]) {
         const res = await page.request.get(`${picUrl}?param=${size}y${size}`);
         await writeFile(
           join(dir, `${key}-cover-${size}.jpg`),
@@ -382,7 +385,7 @@ try {
       seek: state.seek ?? null,
       playing: !!state.playing,
       full: !!state.full,
-      settings: { ...baseSettings, ...state.settings },
+      settings: settingsFor(baseSettings, state),
     };
     let ctx;
     try {
@@ -403,6 +406,8 @@ try {
       });
       entry.file = file;
       entry.state = await readState(ctx.page);
+      if (state.animations === "allow")
+        entry.background = await backgroundOf(ctx.page);
       if (!fontsRecorded && state.full) {
         manifest.environment.fonts = await fontsOf(ctx.page, [
           ".main-player .name",

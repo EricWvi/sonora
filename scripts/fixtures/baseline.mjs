@@ -104,7 +104,12 @@ for (const [key, song] of Object.entries(songs)) {
   // Covers are named like the server names them: the first 16 bytes of
   // the SHA-256, hex. No ThumbHash encoder here, so the placeholder is
   // empty, as for an image the server cannot decode.
-  const image = await readFile(join(data, `${key}-cover.jpg`));
+  // SPlayer's largest cover (coverSize xl, the full-screen cover style)
+  // is NetEase's 1920 px rendition, where Sonora shows the original; the
+  // fixture's original is that rendition when the snapshot has it.
+  const image = await readFile(join(data, `${key}-cover-1920.jpg`)).catch(() =>
+    readFile(join(data, `${key}-cover.jpg`)),
+  );
   const name =
     createHash("sha256").update(image).digest("hex").slice(0, 32) + ".jpg";
   await writeFile(join(out, "covers", name), image);

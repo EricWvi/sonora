@@ -22,11 +22,11 @@
 | --- | --- | --- | --- | --- |
 | 全局样式与动画 | `src/style/`（`main.scss`、`animate.scss`） | 795 | 照搬 | 已复制到 `frontend/src/style/`，另拆出布局、导航、菜单等文件 |
 | Naive UI 主题覆盖、明暗与主题色 | `src/components/Global/Provider.vue` | 324 | 照搬 | 已照搬，去掉自定义背景图与代码注入；生成结果与原项目一致（阶段 3.2） |
-| 播放器主题覆盖（封面色） | `src/components/Global/PlayerProvider.vue` | 78 | 照搬 | 未开始 |
+| 播放器主题覆盖（封面色） | `src/components/Global/PlayerProvider.vue` | 78 | 照搬 | 已照搬（阶段 3.5，2026-10-25） |
 | 封面取色与配色方案 | `src/utils/color.ts`、`src/assets/data/themeColor.json` | 325 | 照搬 | 已照搬，去掉任务栏歌词取色；生成结果与原项目一致（阶段 3.2） |
-| 字体大小工具 | `src/utils/style.ts` | 12 | 照搬 | 未开始 |
-| 播放器：底部播放栏、全屏播放器、封面、歌词、背景、控制栏、频谱 | `src/components/Player/` | 6097 | 严格复刻，去掉评论、音质与网易相关元素（[阶段 2 决定](phase/phase-2-player-baseline.md#播放器里与-sonora-不对应的元素)） | 底部播放栏已照搬（`MainPlayer.vue`、`PlayerRightMenu.vue`、`PlayerSlider.vue`），截图对照见阶段 3.5（2026-10-25）；其余未开始 |
-| AMLL 封装：歌词播放器、流动背景 | `src/components/AMLL/` | 512 | 严格复刻 | 未开始 |
+| 字体大小工具 | `src/utils/style.ts` | 12 | 照搬 | 已照搬，另照搬歌词字体配置 `utils/lyric/lyricFontConfig.ts`（2026-10-25） |
+| 播放器：底部播放栏、全屏播放器、封面、歌词、背景、控制栏、频谱 | `src/components/Player/` | 6097 | 严格复刻，去掉评论、音质与网易相关元素（[阶段 2 决定](phase/phase-2-player-baseline.md#播放器里与-sonora-不对应的元素)） | 底部播放栏与全屏播放器（`FullPlayer.vue`、`PlayerMenu.vue`、`PlayerControl.vue`、`PlayerMeta/`、`PlayerLyric/`、`PlayerSpectrum.vue`）已照搬，截图对照见阶段 3.5（2026-10-25）。不迁入 `FullPlayerMobile.vue`、`PlayerComment.vue`、`PersonalFM.vue` |
+| AMLL 封装：歌词播放器、流动背景 | `src/components/AMLL/` | 512 | 严格复刻 | 已照搬（阶段 3.5，2026-10-25） |
 | 播放队列抽屉 | `src/components/List/SongPlayList.vue`、`src/composables/List/useDragSort.ts` | 786 | 严格复刻 | 已照搬，去掉电台分支；截图对照逐像素一致（阶段 3.5，2026-10-25） |
 | 歌词解析 | `src/utils/lyric/` | 1914 | 照搬 LRC、TTML 相关部分；去掉 YRC、QRC 与在线歌词源 | 已照搬 `parseLrc.ts`、`lyricParser.ts`（去掉 QRC 与 `lyricLinesToTTML`）、`parseTTML.ts`、`lyricStripper.ts`、`lyricFormat.ts`，处理流程见 `core/player/LyricManager.ts`（2026-10-25） |
 | 歌曲列表、详情页头部 | `src/components/List/SongList.vue`、`ListDetail.vue` | 1425 | 视觉语言一致，结构按阶段 2 决定 | 未开始 |
@@ -45,10 +45,10 @@
 | `@material/material-color-utilities` | 主题色与封面取色（`themeFromSourceColor`、`QuantizerCelebi`、`Score`） | 0.4.0 | Apache-2.0 | 已用，同版本 |
 | `@imsyy/color-utils` | `rgbToHex` | 1.0.2 | package.json 写 ISC，包内 LICENSE 是 MIT 全文 | 已用，同版本（2026-10-25） |
 | `lodash-es` | `chunk`（封面取色）及 SPlayer 各处的 `debounce`、`cloneDeep` 等 | 4.18.1 | MIT | 已用，同版本（2026-10-25） |
-| `@applemusic-like-lyrics/core` | AMLL 歌词播放器与流动背景 | 0.5.1 | AGPL-3.0-only | 待引入；最新为 0.6.0，先锁定 0.5.1 |
+| `@applemusic-like-lyrics/core` | AMLL 歌词播放器与流动背景 | 0.5.1 | AGPL-3.0-only | 已用，同版本（2026-10-25）；最新为 0.6.0。它的依赖 `@ungap/structured-clone` 解析为 1.4.0（SPlayer 锁定 1.3.1，ISC），`bezier-easing`、`deep-freeze`、`gl-matrix` 与 SPlayer 相同 |
 | `@applemusic-like-lyrics/lyric` | LRC、TTML 等歌词解析 | 1.0.1 | AGPL-3.0-only | 已用，同版本（2026-10-25），播放端用它解析 TTML，fixture 脚本用它转换歌词。其依赖 `@applemusic-like-lyrics/ttml` 1.0.1（AGPL-3.0-only）与 SPlayer 相同，`pako` 解析为 2.2.0（SPlayer 锁定 2.1.0，MIT AND Zlib，用于 QRC 解压，与视觉无关） |
-| `@pixi/app`、`@pixi/core`、`@pixi/display`、`@pixi/sprite`、`@pixi/filter-blur`、`@pixi/filter-color-matrix` | AMLL 的对等依赖 | 7.4.3 | MIT | 随 AMLL 引入 |
-| `@pixi/filter-bulge-pinch` | AMLL 的对等依赖 | 5.1.1 | MIT | 随 AMLL 引入 |
+| `@pixi/app`、`@pixi/core`、`@pixi/display`、`@pixi/sprite`、`@pixi/filter-blur`、`@pixi/filter-color-matrix` | AMLL 的对等依赖 | 7.4.3 | MIT | 已用，同版本（2026-10-25） |
+| `@pixi/filter-bulge-pinch` | AMLL 的对等依赖 | 5.1.1 | MIT | 已用，同版本（2026-10-25） |
 | `sortablejs` | 设置中首页栏目的拖动排序（经 `@vueuse/integrations` 的 `useSortable`） | 1.15.7 | MIT | 阶段 5 接入设置时引入。播放队列与歌曲列表的拖动排序用 SPlayer 自己的 `useDragSort`，不依赖它 |
 | `@vueuse/core` | 组合式工具（自动隐藏计时、媒体查询等） | 14.3.0 | MIT | 已用 |
 | `dayjs` | 播放时间显示（`msToTime`） | 1.11.21 | MIT | 已用，同版本（2026-10-25） |
@@ -80,7 +80,7 @@ SPlayer 的 147 个图标在 `src/assets/icons/`，由 `SvgIcon.vue` 内联渲�
 
 **署名要求：** IconaMoon 的 CC-BY-4.0 要求注明作者、许可证与修改情况。Sonora 复制 `Repeat`、`RepeatSong`、`Shuffle` 时，在 THIRD_PARTY_NOTICES.md 加入 IconaMoon（作者 Dariush Habibpour，<https://github.com/dariushhpg1/IconaMoon>）的署名。Apache-2.0 与 MIT 的图标集同样在该文件中列出版权与许可证。
 
-`frontend/src/assets/icons/` 现有 41 个图标，与 SPlayer 的文件逐字节一致（2026-10-25 阶段 3.5 队列抽屉后，`cmp` 核对）：Google Material Icons 16 个（`Add`、`DarkTheme`、`Delete`、`Favorite`、`FavoriteBorder`、`FormatList`、`LightTheme`、`Menu`、`Music`、`NavigateBefore`、`NavigateNext`、`Pause`、`Person`、`Play`、`SkipNext`、`SkipPrev`）、Material Symbols 11 个（`AddList`、`Copy`、`DeleteSweep`、`Eq`、`Expand`、`Home`、`PlayList`、`Search`、`VolumeDown`、`VolumeMute`、`VolumeUp`）、Material Symbols Light 1 个（`DropDown`）、IconaMoon 3 个（`Repeat`、`RepeatSong`、`Shuffle`），近似项 7 个（`Artist`、`AutoTheme`、`History`、`PlaylistAdd`、`Power`、`Settings`、`VolumeOff`），未确认 3 个（`Album`、`Controls`、`Location`）。侧栏的歌曲、专辑、艺术家图标沿用 SPlayer 流媒体页面标签的 `Music`、`Album`、`Artist`。
+`frontend/src/assets/icons/` 现有 47 个图标，与 SPlayer 的文件逐字节一致（2026-10-25 阶段 3.5 全屏播放器后，`cmp` 核对）：Google Material Icons 16 个（`Add`、`DarkTheme`、`Delete`、`Favorite`、`FavoriteBorder`、`FormatList`、`LightTheme`、`Menu`、`Music`、`NavigateBefore`、`NavigateNext`、`Pause`、`Person`、`Play`、`SkipNext`、`SkipPrev`）、Material Symbols 11 个（`AddList`、`Copy`、`DeleteSweep`、`Eq`、`Expand`、`Home`、`PlayList`、`Search`、`VolumeDown`、`VolumeMute`、`VolumeUp`）、Material Symbols Light 1 个（`DropDown`）、Material Design Icons 1 个（`TextPlay`）、IconaMoon 3 个（`Repeat`、`RepeatSong`、`Shuffle`），近似项 8 个（`Artist`、`AutoTheme`、`History`、`PlaylistAdd`、`Power`、`Replay5`、`Settings`、`VolumeOff`），未确认 7 个（`Album`、`Controls`、`Down`、`Forward5`、`Fullscreen`、`FullscreenExit`、`Location`）。侧栏的歌曲、专辑、艺术家图标沿用 SPlayer 流媒体页面标签的 `Music`、`Album`、`Artist`。
 
 ## 5. 字体
 
@@ -100,8 +100,8 @@ SPlayer 的 147 个图标在 `src/assets/icons/`，由 `SvgIcon.vue` 内联渲�
 | `song.jpg` | 500×500 | 歌曲默认封面与封面加载占位 | 使用（歌单、我喜欢的默认封面也用它，见阶段 2 详情页头部）；已复制到 `frontend/public/images/` |
 | `album.jpg` | 633×633 | 专辑默认封面 | 使用（侧栏歌单没有封面时也用它，与 SPlayer 一致）；已复制 |
 | `artist.jpg` | 300×300 | 艺术家默认图片 | 使用（没有上传艺术家图片时）；已复制 |
-| `record.png` | 60×60 | 唱片播放器样式 | 使用 |
-| `pointer.png` | 251×409 | 唱片播放器的唱针 | 使用 |
+| `record.png` | 60×60 | 无（SPlayer 源码中没有引用，2026-10-25 核对） | 不使用 |
+| `pointer.png` | 251×409 | 唱片播放器的唱针 | 使用；已复制 |
 | `avatar.jpg` | 100×100 | 默认头像 | 不使用：顶栏用户入口沿用 SPlayer 未登录时的 `Person` 图标头像（OIDC 不提供头像） |
 | `video.jpg`、`vip.png`、`annual.png`、`avatar/` | — | 视频、网易会员、年度报告、关于页的贡献者头像 | 不使用 |
 
@@ -111,4 +111,4 @@ SPlayer 的 147 个图标在 `src/assets/icons/`，由 `SvgIcon.vue` 内联渲�
 
 2026-10-25 已补：Logo 字体 Poppins Medium 的 OFL 声明，全文放在 `frontend/public/fonts/OFL.txt`；`frontend/src/assets/icons/` 中 Google Material Icons、Material Symbols 与 Phosphor 的版权与许可证。阶段 3.1 删除 `HeartBit` 后不再含 Phosphor 图标，该声明已移除，复制 `SortDown`、`SortUp` 时再加回。
 
-阶段 3 引入播放器时还需加入：AMLL（AGPL-3.0-only）、IconaMoon（CC-BY-4.0，含署名）、Material Design Icons、Fluent UI System Icons（若使用）、PixiJS 与 SortableJS。`@imsyy/color-utils` 与 `lodash-es` 已在阶段 3.2 加入。
+`@imsyy/color-utils` 与 `lodash-es` 已在阶段 3.2 加入；IconaMoon 的署名在阶段 3.5 底部播放栏时加入；AMLL core、PixiJS 与 Material Design Icons 在阶段 3.5 全屏播放器时加入（2026-10-25）。SortableJS 在阶段 5 接入设置时加入；Fluent UI System Icons 目前没有使用。
