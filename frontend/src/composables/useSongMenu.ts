@@ -3,16 +3,12 @@ import type { Track } from "@/api/types";
 import { useMusicStore } from "@/stores";
 import { usePlayerController } from "@/core/player/PlayerController";
 import { renderIcon, copyData } from "@/utils/helper";
-import {
-  openCopySongInfo,
-  openJumpArtist,
-  openPlaylistAdd,
-} from "@/utils/modal";
+import { openJumpArtist, openPlaylistAdd } from "@/utils/modal";
 import { deleteSongs } from "@/utils/auth";
 
 /**
  * 歌曲菜单。照搬 SPlayer composables/useSongMenu.ts，条目按阶段 2 的“歌曲列表”：
- * 立即播放、下一首播放、添加到歌单、更多操作（复制歌曲名称、复制更多信息）、
+ * 立即播放、下一首播放、添加到歌单、更多操作（复制歌曲名称）、
  * 从歌单中删除（在自己的歌单中时）、查看专辑、查看艺术家、同名搜索（在曲库中搜索）。
  * SPlayer 没有“查看专辑”与“查看艺术家”，图标沿用其 Album 与 Artist。
  * 菜单项的显示设置（contextMenuOptions）不迁入。
@@ -72,14 +68,6 @@ export const useSongMenu = () => {
               onClick: () => copyData(song.title),
             },
             icon: renderIcon("Copy", { size: 18 }),
-          },
-          {
-            key: "copy-song-info",
-            label: "复制更多信息",
-            props: {
-              onClick: () => openCopySongInfo(song.id),
-            },
-            icon: renderIcon("FormatList", { size: 18 }),
           },
         ],
       },

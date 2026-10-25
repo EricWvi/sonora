@@ -3,8 +3,7 @@ import { NScrollbar } from "naive-ui";
 import router from "@/router";
 import { isFunction } from "lodash-es";
 
-// 照搬 SPlayer utils/modal.ts 中播放器用到的入口。弹窗（选择艺术家、复制更多信息、
-// 均衡器、复制歌词、设置）在阶段 5 接入，之前只提示。
+// 照搬 SPlayer utils/modal.ts 中播放器用到的入口。设置弹窗在阶段 5 接入，之前只提示。
 
 const pending = (name: string) =>
   window.$message.info(`${name}将在后续阶段接入`);
@@ -19,7 +18,18 @@ export const openJumpArtist = async (data: ArtistRef[], id?: number) => {
     router.push({ name: "artist", query: { id } });
     return;
   }
-  pending("选择歌手");
+  const { default: JumpArtist } =
+    await import("@/components/Modal/JumpArtist.vue");
+  const modal = window.$modal.create({
+    preset: "card",
+    transformOrigin: "center",
+    autoFocus: false,
+    style: { width: "600px" },
+    title: "跳转到歌手",
+    content: () => {
+      return h(JumpArtist, { artist: data, onClose: () => modal.destroy() });
+    },
+  });
 };
 
 // 添加到歌单
@@ -55,15 +65,39 @@ export const openCreatePlaylist = async () => {
   });
 };
 
-// 复制更多信息
-export const openCopySongInfo = async (_songId: number) =>
-  pending("复制更多信息");
-
 // 均衡器
-export const openEqualizer = async () => pending("均衡器");
+export const openEqualizer = async () => {
+  const { default: Equalizer } =
+    await import("@/components/Modal/Equalizer.vue");
+  window.$modal.create({
+    preset: "card",
+    transformOrigin: "center",
+    autoFocus: false,
+    style: { width: "620px" },
+    title: "均衡器",
+    content: () => {
+      return h(Equalizer);
+    },
+  });
+};
 
 // 复制歌词
-export const openCopyLyrics = async () => pending("复制歌词");
+export const openCopyLyrics = async () => {
+  const { default: CopyLyrics } =
+    await import("@/components/Modal/CopyLyrics.vue");
+  const modal = window.$modal.create({
+    preset: "card",
+    transformOrigin: "center",
+    autoFocus: false,
+    style: { width: "500px" },
+    title: "复制歌词",
+    content: () => {
+      return h(CopyLyrics, {
+        onClose: () => modal.destroy(),
+      });
+    },
+  });
+};
 
 /**
  * 打开设置

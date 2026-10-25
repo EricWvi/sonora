@@ -223,11 +223,7 @@ import {
 import { useTimeFormat } from "@/composables/useTimeFormat";
 import { useSwipe } from "@vueuse/core";
 import { copyData, coverLoaded, renderIcon } from "@/utils/helper";
-import {
-  openCopySongInfo,
-  openJumpArtist,
-  openPlaylistAdd,
-} from "@/utils/modal";
+import { openJumpArtist, openPlaylistAdd } from "@/utils/modal";
 import { removeBrackets } from "@/utils/format";
 import type { DropdownOption } from "naive-ui";
 
@@ -277,14 +273,6 @@ const songMoreOptions = computed<DropdownOption[]>(() => {
             onClick: () => copyData(song.title),
           },
           icon: renderIcon("Copy", { size: 18 }),
-        },
-        {
-          key: "copy-song-info",
-          label: "复制更多信息",
-          props: {
-            onClick: () => openCopySongInfo(song.id),
-          },
-          icon: renderIcon("FormatList", { size: 18 }),
         },
       ],
     },

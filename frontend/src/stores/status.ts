@@ -218,6 +218,28 @@ export const useStatusStore = defineStore("status", {
         this.shuffleMode = "off";
       }
     },
+    /**
+     * 设置 EQ 开关
+     * @param enabled 是否开启
+     */
+    setEqEnabled(enabled: boolean) {
+      this.eqEnabled = enabled;
+    },
+    /**
+     * 设置 EQ 10 段增益（dB）
+     * @param bands 长度 10 的 dB 数组
+     */
+    setEqBands(bands: number[]) {
+      if (Array.isArray(bands) && bands.length === 10) {
+        this.eqBands = [...bands];
+      }
+    },
+    /**
+     * 设置 EQ 预设名
+     */
+    setEqPreset(preset: string) {
+      this.eqPreset = preset;
+    },
     /** 重置播放状态 */
     resetPlayStatus() {
       this.$patch({
