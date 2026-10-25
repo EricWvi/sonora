@@ -16,6 +16,7 @@
     "@imsyy/color-utils": "1.0.2",
     "@material/material-color-utilities": "^0.4.0",
     "@vueuse/core": "^14.3.0",
+    "dayjs": "1.11.21",
     "lodash-es": "^4.18.1",
     "naive-ui": "2.43.2",
     "pinia": "^3.0.4",

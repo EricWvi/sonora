@@ -62,6 +62,8 @@ export type PlayerState = {
   index: number;
   playing: boolean;
   positionMs: number;
+  /** 音频的实际时长；省略时取当前曲目的 `durationMs`，音频载入后以音频为准。 */
+  durationMs?: number;
 };
 
 /** 当前曲目；队列为空时为 null。 */

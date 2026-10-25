@@ -27,6 +27,7 @@ type PlayerFixture = {
   index: number;
   positionMs: number;
   playing: boolean;
+  durationMs?: number;
 };
 
 type Library = {
@@ -452,7 +453,10 @@ function librarySource(lib: Library): DataSource {
         page(sortTracks(ownPlaylist(id).trackIds.map(track), query), query),
       ),
     logout: () => Promise.resolve(),
-    coverUrl: (cover) => lib.coverUrls[cover.name] ?? "",
+    // baseline 带有网易按 100、300、1024 缩放的图，没有对应尺寸时用原图。
+    coverUrl: (cover, size) =>
+      (size && lib.coverUrls[cover.name.replace(/(\.\w+)$/, `-${size}$1`)]) ||
+      (lib.coverUrls[cover.name] ?? ""),
     // fixture 没有音频。
     audioUrl: () => "",
   };
@@ -533,6 +537,7 @@ export async function createFixture(
       index: player.index,
       playing: player.playing,
       positionMs: player.positionMs,
+      durationMs: player.durationMs,
     },
   };
 }

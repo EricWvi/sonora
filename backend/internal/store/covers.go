@@ -33,7 +33,9 @@ const MaxCoverBytes = 10 << 20
 const maxCoverPixels = 25_000_000
 
 // CoverSizes are the thumbnail edge lengths served besides the original.
-var CoverSizes = []int{96, 300}
+// 100, 300 and 1024 are the player's small, medium and large covers,
+// SPlayer's coverSize s, m and l.
+var CoverSizes = []int{96, 100, 300, 1024}
 
 var coverName = regexp.MustCompile(`^[0-9a-f]{32}\.(jpg|png|webp)$`)
 

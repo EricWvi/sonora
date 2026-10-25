@@ -406,10 +406,12 @@ func TestLibraryEndpoints(t *testing.T) {
 	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "image/jpeg" {
 		t.Fatalf("cover: %d %s", rec.Code, rec.Header())
 	}
-	rec = ts.do("GET", api+"covers/"+cover.Name+"?size=96", "")
-	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "image/jpeg" ||
-		!strings.Contains(rec.Header().Get("Cache-Control"), "immutable") {
-		t.Fatalf("cover thumb: %d %s", rec.Code, rec.Header())
+	for _, size := range []string{"96", "100", "300", "1024"} {
+		rec = ts.do("GET", api+"covers/"+cover.Name+"?size="+size, "")
+		if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "image/jpeg" ||
+			!strings.Contains(rec.Header().Get("Cache-Control"), "immutable") {
+			t.Fatalf("cover thumb %s: %d %s", size, rec.Code, rec.Header())
+		}
 	}
 	for _, size := range []string{"97", "big"} {
 		if rec := ts.do("GET", api+"covers/"+cover.Name+"?size="+size, ""); rec.Code != http.StatusBadRequest {

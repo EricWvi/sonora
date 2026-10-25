@@ -108,6 +108,15 @@ for (const [key, song] of Object.entries(songs)) {
   const name =
     createHash("sha256").update(image).digest("hex").slice(0, 32) + ".jpg";
   await writeFile(join(out, "covers", name), image);
+  // NetEase's own thumbnails at the sizes the player asks for, so the
+  // fixture shows the very pixels the reference showed.
+  for (const size of [100, 300, 1024]) {
+    const thumb = name.replace(/\.jpg$/, `-${size}.jpg`);
+    await writeFile(
+      join(out, "covers", thumb),
+      await readFile(join(data, `${key}-cover-${size}.jpg`)),
+    );
+  }
   const cover = { name, thumbhash: "" };
 
   const al = netease.album.album;
@@ -167,6 +176,9 @@ for (const [key, song] of Object.entries(songs)) {
     queue: player.playList.map((s) => trackIds.get(s.id)),
     index: player.status.playIndex,
     positionMs: song.seek,
+    // What the audio element reported, which the player shows once the
+    // audio loads; the track's own duration comes from NetEase's metadata.
+    durationMs: player.status.duration,
   };
   if (player.playSong.id !== song.id || player.status.currentTime !== song.seek)
     throw new Error(`${key}: the reference player is on another song or time`);

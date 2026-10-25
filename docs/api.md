@@ -57,7 +57,7 @@
 | `GET artists`、`GET/PUT artists/{id}` | 列表（`q`）/ 详情 / 重命名 `{name}` |
 | `POST artists/{id}/merge` | `{sourceIds}`；合并后艺术家组合相同的同名专辑一并合并；目标没有图片时沿用来源的图片 |
 | `PUT/DELETE artists/{id}/image` | 艺术家图片，请求体为图片原始字节，存储与缩略图同封面 |
-| `GET covers/{name}` | 封面或艺术家图片的原图，按内容哈希命名，可长期缓存。`?size=96` 或 `?size=300` 返回长边不超过该值的 JPEG 缩略图，首次请求时生成；原图已不大于该尺寸或无法解码时返回原图；其他尺寸 400 |
+| `GET covers/{name}` | 封面或艺术家图片的原图，按内容哈希命名，可长期缓存。`?size=` 取 `96`、`100`、`300` 或 `1024`，返回长边不超过该值的 JPEG 缩略图，首次请求时生成；原图已不大于该尺寸或无法解码时返回原图；其他尺寸 400 |
 
 歌词有两种格式，由内容判断，与文件扩展名无关：以 `<` 开头的是 TTML，必须是根元素为 `tt` 的合法 XML，否则返回 400；其余都按 LRC（含逐字与增强型 LRC，由播放端区分）。音频内嵌的歌词按 LRC 处理。歌曲的 `lyricsFormat` 为 `lrc` 或 `ttml`，没有歌词时为空字符串。
 
@@ -94,7 +94,7 @@
 | `GET tracks/{id}/audio` | 音频流，支持 Range |
 | `GET albums`、`GET albums/{id}` | 列表（`q`、`artistId`、`sort`、`order`）/ 详情；首页“最近添加的专辑”用 `sort=createTime&order=desc` |
 | `GET artists`、`GET artists/{id}` | 列表（`q`）/ 详情；艺术家的歌曲与专辑用 `tracks?artistId=`、`albums?artistId=` 获取 |
-| `GET covers/{name}` | 封面与艺术家图片，与管理 API 相同，支持 `?size=96` 与 `?size=300` |
+| `GET covers/{name}` | 封面与艺术家图片，与管理 API 相同，支持同样的 `?size=`。播放端按 SPlayer 的封面尺寸取 `100`（小图：底部栏、背景与取色）、`300`、`1024`（全屏播放器的大封面），2026-10-25 增加 `100` 与 `1024` |
 
 数据形态：
 

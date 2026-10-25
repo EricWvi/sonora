@@ -1,9 +1,22 @@
 <template>
   <div id="app-layout">
-    <n-layout id="main" has-sider>
+    <n-layout
+      id="main"
+      :class="{
+        'show-player': musicStore.isHasPlayer && statusStore.showPlayBar,
+        'show-full-player': statusStore.showFullPlayer,
+      }"
+      has-sider
+    >
       <n-layout-sider
         v-if="isDesktop"
         id="main-sider"
+        :style="{
+          height:
+            musicStore.isHasPlayer && statusStore.showPlayBar
+              ? 'calc(100vh - 80px)'
+              : '100vh',
+        }"
         :content-style="{ overflow: 'hidden', height: '100%', padding: '0' }"
         :native-scrollbar="false"
         :collapsed="statusStore.menuCollapsed"
@@ -45,6 +58,8 @@
         </n-layout>
       </n-layout>
     </n-layout>
+    <!-- 全局播放器 -->
+    <MainPlayer :style="followScroll" />
   </div>
 </template>
 
@@ -52,18 +67,33 @@
 import AppNav from "@/components/Layout/AppNav.vue";
 import SidebarMenu from "@/components/Layout/SidebarMenu.vue";
 import Logo from "@/components/Layout/Logo.vue";
-import { useStatusStore } from "@/stores/status";
-import { useUserStore } from "@/stores/user";
+import MainPlayer from "@/components/Player/MainPlayer.vue";
+import { initPlayer } from "@/core/player/PlayerController";
+import { useMusicStore, useStatusStore, useUserStore } from "@/stores";
 
 const router = useRouter();
+const musicStore = useMusicStore();
 const statusStore = useStatusStore();
 const isDesktop = useMediaQuery("(min-width: 1024px)");
+
+// 窗口窄于 990px 时 #app 横向滚动，固定定位的播放器随之平移；不滚动时不设 transform。
+const { x: scrollX } = useScroll(() =>
+  document.querySelector<HTMLElement>("#app"),
+);
+const followScroll = computed(() =>
+  scrollX.value > 0
+    ? { transform: `translateX(${-scrollX.value}px)` }
+    : undefined,
+);
 const isMobile = useMediaQuery("(max-width: 639.98px)");
 
 // 服务不可达时保留空的用户与歌单，页面各自显示错误状态（阶段 3.4）。
 void useUserStore()
   .load()
   .catch((error: unknown) => console.error("加载用户数据失败", error));
+void initPlayer().catch((error: unknown) =>
+  console.error("载入播放器失败", error),
+);
 </script>
 
 <style lang="scss" scoped src="@/style/layout.scss"></style>

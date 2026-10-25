@@ -11,6 +11,14 @@
 //   node scripts/baseline/splayer-player.mjs [--run NAME] [--only REGEX]
 //       [--viewport 1440x1000] [--base http://127.0.0.1:25884] [--data-only]
 //
+// --sonora captures the reference the way Sonora is to look: SPlayer's own
+// settings hide what Eric decided Sonora does not show (the quality tag
+// and quality switch, the tag row under the title, the comment and
+// download buttons), and the song alias is cleared. Playing states stop
+// at their seek point and are marked playing in the store, and the page
+// behind the bar is hidden where a clip takes it in. Sonora's screenshots
+// are compared with this set; the plain run stays the record of SPlayer.
+//
 // --data-only saves only the data snapshot and what the player holds for
 // each song (data/<song>-player.json), without screenshots or a manifest.
 //
@@ -25,6 +33,17 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 
 import { prepareSPlayerSession } from "../splayer-session.mjs";
+import {
+  clipFor,
+  GUREN_WORD,
+  hideMain,
+  PINIA,
+  setStore,
+  settled,
+  songs,
+  states,
+  YORU_LINE,
+} from "./player-states.mjs";
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const { chromium } = await import(
@@ -44,26 +63,12 @@ const { values: args } = parseArgs({
     viewport: { type: "string", default: "1440x1000" },
     base: { type: "string", default: "http://127.0.0.1:25884" },
     "data-only": { type: "boolean", default: false },
+    sonora: { type: "boolean", default: false },
   },
 });
 const [width, height] = args.viewport.split("x").map(Number);
 const base = args.base;
 const out = join(repo, ".local/baseline/splayer", args.run);
-
-// --- data ---------------------------------------------------------------
-
-// The songs the states play. Each is reached by playing its album and
-// switching to it, as a listener would.
-const songs = {
-  // THE BOOK, track 8: LRC with translation and romaji, no word timing.
-  yoru: { album: 99079344, id: 1500151583, index: 7 },
-  // 紅蓮華 single: word-by-word (YRC) with translation and romaji.
-  guren: { album: 78702707, id: 1360592706, index: 0 },
-};
-
-// Seek points fall mid-line so a paused player shows a settled lyric.
-const YORU_LINE = 54_000; // 52.408–56.848 どこか儚い空気を纏う君は
-const GUREN_WORD = 25_600; // 心 at 25.230–25.950, half lit
 
 // Settings every state starts from. The schema version and agreement
 // version keep SPlayer from migrating them or opening the agreement.
@@ -76,207 +81,17 @@ const baseSettings = {
   autoHidePlayerMeta: false,
 };
 
-// --- states -------------------------------------------------------------
-
-const states = [
-  // Bottom bar
-  { id: "bar-paused-start", song: "yoru", seek: 0, clip: "bar" },
-  { id: "bar-paused", song: "yoru", seek: YORU_LINE, clip: "bar" },
-  {
-    id: "bar-playing",
-    song: "yoru",
-    seek: YORU_LINE,
-    playing: true,
-    clip: "bar",
-  },
-  {
-    id: "bar-paused-dark",
-    song: "yoru",
-    seek: YORU_LINE,
-    settings: { themeMode: "dark" },
-    clip: "bar",
-  },
-  {
-    // Naive UI's slider shows the tooltip over its handle.
-    id: "bar-progress-hover",
-    song: "yoru",
-    seek: YORU_LINE,
-    clip: "zone",
-    async act(page) {
-      await page.locator(".main-player .n-slider-handle").hover();
-      await page.waitForTimeout(600);
-    },
-  },
-  {
-    id: "bar-progress-drag",
-    song: "yoru",
-    seek: YORU_LINE,
-    clip: "zone",
-    async act(page) {
-      const handle = await page
-        .locator(".main-player .n-slider-handle")
-        .boundingBox();
-      const rail = await page.locator(".main-player .n-slider").boundingBox();
-      await page.mouse.move(
-        handle.x + handle.width / 2,
-        handle.y + handle.height / 2,
-      );
-      await page.mouse.down();
-      await page.mouse.move(
-        rail.x + rail.width * 0.4,
-        handle.y + handle.height / 2,
-        { steps: 10 },
-      );
-      await page.waitForTimeout(600);
-      // Released after the screenshot when the context closes.
-    },
-  },
-  {
-    id: "bar-volume-hover",
-    song: "yoru",
-    seek: YORU_LINE,
-    clip: "zone",
-    async act(page) {
-      // PlayerRightMenu: other controls, volume, queue.
-      await page.locator(".main-player .right-menu .menu-icon").nth(1).hover();
-      await page.waitForTimeout(800);
-    },
-  },
-
-  // Queue drawer
-  {
-    id: "queue-open",
-    song: "yoru",
-    seek: YORU_LINE,
-    clip: "drawer",
-    async act(page) {
-      await setStore(page, "status", { playListShow: true });
-      await page.locator(".n-drawer .song-node").first().waitFor();
-      await page.waitForTimeout(800);
-    },
-  },
-  {
-    id: "queue-hover",
-    song: "yoru",
-    seek: YORU_LINE,
-    clip: "drawer",
-    async act(page) {
-      await setStore(page, "status", { playListShow: true });
-      const item = page.locator(".n-drawer .song-node").nth(2);
-      await item.waitFor();
-      await page.waitForTimeout(800);
-      await item.hover();
-      await page.waitForTimeout(400);
-    },
-  },
-  {
-    id: "queue-empty",
-    song: null,
-    clip: "drawer",
-    async act(page) {
-      await setStore(page, "status", { playListShow: true });
-      await page.locator(".n-drawer").waitFor();
-      await page.waitForTimeout(800);
-    },
-  },
-
-  // Full-screen player: styles and backgrounds
-  ...[
-    ["cover", "blur"],
-    ["cover", "color"],
-    ["cover", "none"],
-    ["record", "blur"],
-    ["fullscreen", "blur"],
-  ].map(([type, bg]) => ({
-    id: `full-${type}-${bg}`,
-    song: "yoru",
-    seek: YORU_LINE,
-    settings: { playerType: type, playerBackgroundType: bg },
-    full: true,
-  })),
-  {
-    id: "full-cover-blur-dark",
-    song: "yoru",
-    seek: YORU_LINE,
-    settings: { themeMode: "dark" },
-    full: true,
-  },
-  {
-    id: "full-cover-blur-playing",
-    song: "yoru",
-    seek: YORU_LINE,
-    playing: true,
-    full: true,
-  },
-  {
-    id: "full-cover-blur-hidden",
-    song: "yoru",
-    seek: YORU_LINE,
-    settings: { autoHidePlayerMeta: true },
-    full: true,
-    async act(page) {
-      // Leave the player idle until the controls hide (3 s in SPlayer).
-      await page.mouse.move(width / 2, height / 2);
-      await page.waitForTimeout(4000);
-    },
-  },
-  ...[0, 2000].map((t) => ({
-    id: `full-cover-animation-t${t}`,
-    song: "yoru",
-    seek: YORU_LINE,
-    settings: { playerBackgroundType: "animation" },
-    full: true,
-    // The flowing background is a canvas; frames are compared by time.
-    animations: "allow",
-    async act(page) {
-      await page.waitForTimeout(1500 + t);
-    },
-  })),
-
-  // Full-screen player: lyrics
-  {
-    id: "full-lrc-plain",
-    song: "yoru",
-    seek: YORU_LINE,
-    settings: { showTran: false, showRoma: false },
-    full: true,
-  },
-  {
-    id: "full-lrc-amll",
-    song: "yoru",
-    seek: YORU_LINE,
-    settings: { useAMLyrics: true },
-    full: true,
-    // AMLL animates lines with JS springs, which CSS animation control
-    // does not stop; give them time to settle.
-    settle: 3000,
-  },
-  { id: "full-yrc", song: "guren", seek: GUREN_WORD, full: true },
-  {
-    id: "full-yrc-amll",
-    song: "guren",
-    seek: GUREN_WORD,
-    settings: { useAMLyrics: true },
-    full: true,
-    // AMLL animates lines with JS springs, which CSS animation control
-    // does not stop; give them time to settle.
-    settle: 3000,
-  },
-];
+// Settings that hide what Sonora removes (--sonora).
+const sonoraSettings = {
+  showPlayerQuality: false,
+  showPlayMeta: false,
+  fullscreenPlayerElements: { comments: false, download: false },
+};
+if (args.sonora) Object.assign(baseSettings, sonoraSettings);
 
 // --- helpers --------------------------------------------------------------
 
-// pinia reaches every SPlayer store; the reference build keeps
-// __vue_app__ on #app.
-const PINIA = `document.querySelector("#app").__vue_app__.config.globalProperties.$pinia`;
 const CONTROLLER = `window.__SPLAYER_PLAYER_CONTROLLER__`;
-
-async function setStore(page, store, patch) {
-  await page.evaluate(
-    ([pinia, store, patch]) => eval(pinia)._s.get(store).$patch(patch),
-    [PINIA, store, patch],
-  );
-}
 
 async function readState(page) {
   return page.evaluate((pinia) => {
@@ -315,39 +130,6 @@ async function audioStill(page) {
     await page.waitForTimeout(300);
   }
   throw new Error("audio keeps playing after pause");
-}
-
-// settled waits for web fonts and the images in view; lazy images below
-// the fold never load.
-async function settled(page) {
-  await page.evaluate(async () => {
-    await document.fonts.ready;
-    const inView = (i) => {
-      const r = i.getBoundingClientRect();
-      return (
-        r.width > 0 &&
-        r.bottom > 0 &&
-        r.top < innerHeight &&
-        r.right > 0 &&
-        r.left < innerWidth
-      );
-    };
-    const pending = [...document.images].filter(
-      (i) => !i.complete && inView(i),
-    );
-    await Promise.race([
-      Promise.all(
-        pending.map(
-          (i) =>
-            new Promise(
-              (r) =>
-                i.addEventListener("load", r) || i.addEventListener("error", r),
-            ),
-        ),
-      ),
-      new Promise((r) => setTimeout(r, 10_000)),
-    ]);
-  });
 }
 
 async function openState(browser, state) {
@@ -412,7 +194,10 @@ async function prepareState(context, state) {
       ([c, t]) => eval(c).setSeek(t),
       [CONTROLLER, state.seek],
     );
-    if (!state.playing) {
+    // --sonora pauses playing states too and only marks them playing
+    // below: the UI reads the store, and a running clock would leave the
+    // screenshot at whatever time it was taken.
+    if (!state.playing || args.sonora) {
       await page.evaluate((c) => eval(c).pause(), CONTROLLER);
       await waitUntil(page, "pause", (s) => !s.playing);
       // pause() fades out and stops the audio from a timer, and a seek
@@ -426,6 +211,12 @@ async function prepareState(context, state) {
       await audioStill(page);
     }
   }
+  // Sonora has no song alias (--sonora).
+  if (args.sonora && state.song)
+    await setStore(page, "music", { playSong: { alia: "" } });
+  if (args.sonora && state.playing)
+    await setStore(page, "status", { playStatus: true });
+  if (args.sonora && state.hideMain) await hideMain(page);
   // Rest the pointer where it hovers nothing.
   await page.mouse.move(width / 2, 2);
   if (state.full) {
@@ -445,33 +236,6 @@ async function prepareState(context, state) {
   if (state.settle) await page.waitForTimeout(state.settle);
   if (state.act) await state.act(page);
   return { page, errors };
-}
-
-// Clips keep the player and leave out the page behind it, which shows
-// NetEase content that changes between runs (hot searches, recommendations).
-//   bar     the bottom bar
-//   zone    the bottom bar and the 180 px above it, where the progress
-//           tooltip and the volume popover open
-//   drawer  the queue drawer
-//   (none)  the whole viewport, for the full-screen player
-async function clipFor(page, state) {
-  const round = (b) => ({
-    x: Math.round(b.x),
-    y: Math.round(b.y),
-    width: Math.round(b.width),
-    height: Math.round(b.height),
-  });
-  switch (state.clip) {
-    case "bar": {
-      const box = await page.locator(".main-player").boundingBox();
-      return round({ x: 0, y: box.y, width, height: box.height });
-    }
-    case "zone":
-      return { x: 0, y: height - 260, width, height: 260 };
-    case "drawer":
-      return round(await page.locator(".n-drawer").boundingBox());
-  }
-  return undefined;
 }
 
 // fontsOf reports the platform fonts Chrome used to render each element,
@@ -521,6 +285,15 @@ async function snapshot(browser) {
     if (picUrl) {
       const res = await page.request.get(picUrl);
       await writeFile(join(dir, `${key}-cover.jpg`), await res.body());
+      // The sizes SPlayer asks for (coverSize s, m, l), as NetEase scales
+      // them; Sonora's fixture serves these for ?size=.
+      for (const size of [100, 300, 1024]) {
+        const res = await page.request.get(`${picUrl}?param=${size}y${size}`);
+        await writeFile(
+          join(dir, `${key}-cover-${size}.jpg`),
+          await res.body(),
+        );
+      }
     }
   }
   await context.close();
@@ -590,6 +363,7 @@ const manifest = {
     locale: "zh-CN",
   },
   songs,
+  sonora: args.sonora,
   baseSettings,
   states: [],
 };
@@ -597,10 +371,9 @@ try {
   if (!args["data-only"])
     await mkdir(join(out, args.viewport), { recursive: true });
   await snapshot(browser);
-  if (args["data-only"]) states.length = 0;
   const only = args.only ? new RegExp(args.only) : null;
   let fontsRecorded = false;
-  for (const state of states) {
+  for (const state of args["data-only"] ? [] : states) {
     if (only && !only.test(state.id)) continue;
     const entry = {
       id: state.id,

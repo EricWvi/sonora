@@ -1,10 +1,10 @@
 # 阶段 3：播放端视觉外壳
 
-状态：进行中，3.1、3.3 已完成，3.2 的 Provider、最小宽度与取色已完成（2026-10-25）。前置：阶段 2 的页面清单（已确定）；播放器部分需要阶段 2 的播放器参考图。参照路线图：[样式还原与验收方法](../roadmap.md#6-样式还原与验收方法)。
+状态：进行中，3.1、3.3 已完成，3.2 的 Provider、最小宽度与取色已完成，3.5 的底部播放栏完成并与原项目截图对照（2026-10-25）。前置：阶段 2 的页面清单（已确定）；播放器部分需要阶段 2 的播放器参考图。参照路线图：[样式还原与验收方法](../roadmap.md#6-样式还原与验收方法)。
 
 ## 当前事实
 
-`frontend/` 已有主框架（[AppLayout.vue](../../frontend/src/layout/AppLayout.vue)）、侧栏菜单、顶部导航、明暗主题和窄屏抽屉；界面名称已改为 Sonora，标志图形沿用 SPlayer。菜单、路由与顶栏用户入口已按首发范围重建（3.1）。各页面仍是占位（[EmptyView.vue](../../frontend/src/views/EmptyView.vue)）；没有播放器、卡片、歌曲列表或视觉比较工具。
+`frontend/` 已有主框架（[AppLayout.vue](../../frontend/src/layout/AppLayout.vue)）、侧栏菜单、顶部导航、明暗主题和窄屏抽屉；界面名称已改为 Sonora，标志图形沿用 SPlayer。菜单、路由与顶栏用户入口已按首发范围重建（3.1）。各页面仍是占位（[EmptyView.vue](../../frontend/src/views/EmptyView.vue)）；没有卡片与歌曲列表。播放器目前只有底部播放栏（3.5），由 fixture 驱动、不出声；截图对照工具见 3.6。
 
 数据只经 [api/source.ts](../../frontend/src/api/source.ts) 的 `DataSource` 读取，它覆盖播放端 API 的全部读取接口。开发服务器上以 `?fixture=<场景>` 打开时换成 [fixtures](../../frontend/src/fixtures/index.ts)，不需要 Go 服务；`&player=<状态>` 再指定播放器的初始状态（`source.ts` 导出的 `fixturePlayer`），例如 `http://127.0.0.1:14559/?fixture=baseline&player=yoru-paused#/`。场景与状态见 3.3。生产构建不含 fixture（已用 `vite build` 检查产物）。
 
@@ -21,10 +21,10 @@
 ### 3.2 主题与视觉相关代码
 
 - [x] 对照 [Provider.vue](../../reference/SPlayer/src/components/Global/Provider.vue) 补齐 Naive UI 主题覆盖、字体与全局配置。[Provider.vue](../../frontend/src/components/Global/Provider.vue) 照搬原文件，只去掉自定义背景图（阶段 2 保留的主题配置只有主题色与封面取色）与自定义代码注入；`window.$message` 等全局工具一并挂载。设置与状态迁入 [setting.ts](../../frontend/src/stores/setting.ts)、[status.ts](../../frontend/src/stores/status.ts)，字段名与默认值照搬 SPlayer，只保留阶段 2 的设置表中的项；顶栏设置菜单的明暗切换照搬（跟随系统 → 浅色 → 深色），主题配置与全局设置的弹窗在阶段 5 接入。原项目的 `watch` 不监听 `themeVariant`，Sonora 保持一致。
-- [x] 最小窗口宽度 990px（2026-10-25 确定）：窗口更窄时页面保持 990px 宽、出现横向滚动；不引入 SPlayer 在 `max-width: 989.98px` 下的移动版全屏播放器与移动布局。实现：`#app` 横向滚动，`#app-layout` 最小宽度 990px。运行确认：`900×800` 时 `#app` 的 `scrollWidth` 为 990、`clientWidth` 为 900，`990×800` 无滚动。固定定位的播放栏与全屏播放器在 3.5 加入后，需再确认它们在窄于 990px 时随页面滚动而不是贴着视口。
+- [x] 最小窗口宽度 990px（2026-10-25 确定）：窗口更窄时页面保持 990px 宽、出现横向滚动；不引入 SPlayer 在 `max-width: 989.98px` 下的移动版全屏播放器与移动布局。实现：`#app` 横向滚动，`#app-layout` 最小宽度 990px。运行确认：`900×800` 时 `#app` 的 `scrollWidth` 为 990、`clientWidth` 为 900，`990×800` 无滚动。底部播放栏已确认（3.5）：窄于 990px 时保持 990px 宽并随页面滚动；全屏播放器加入后再确认。
 - [x] 复刻主题色与封面取色链路（[color.ts](../../reference/SPlayer/src/utils/color.ts)），以固定封面验证生成的 CSS 变量与原项目一致。运行确认（2026-10-25）：对照脚本 [scripts/baseline/theme.mjs](../../scripts/baseline/theme.mjs) 在参考实例与 Sonora 中各跑同一组 118 个用例，比较 body 上的 CSS 变量、`songCoverTheme`，以及 Naive UI `ConfigProvider` 实际收到的 `theme` 与 `themeOverrides`。用例覆盖 20 个预设、纯色与自定义颜色（明暗 × 是否全局着色），6 个主题变体，4 张封面（两首基线歌曲的封面，以及生成的灰色图和渐变图）的封面取色，关闭“播放器跟随封面主色”和自定义全局字体。结果：118 个用例全部一致，重复一轮仍一致；结果在 `.local/baseline/splayer/2026-10-25/theme/`。
   - 取色本身有随机性：material-color-utilities 的 `QuantizerWsmeans` 在初始簇不足时用 `Math.random()` 补点，同一张照片封面在 SPlayer 中多次取色，某个通道会差 1（三轮测得两种结果；纯色图与渐变图不受影响）。脚本在取色前把两边的 `Math.random` 换成同一个种子的序列，再做精确比较。实际使用中，原项目与 Sonora 有同样的 ±1 波动。
-  - 参考实例取色时直接调用播放控制器的 `afterPlaySetup`，封面请求由 Playwright 拦截并返回固定图片；Sonora 从 Vite 开发服务器导入 `utils/color.ts` 调用 `getCoverColor`。封面使用的尺寸（SPlayer 用网易的小图 `coverSize.s`）在 3.5 接入播放器时决定，对应 `covers/{name}?size=`。
+  - 参考实例取色时直接调用播放控制器的 `afterPlaySetup`，封面请求由 Playwright 拦截并返回固定图片；Sonora 从 Vite 开发服务器导入 `utils/color.ts` 调用 `getCoverColor`。封面尺寸已在 3.5 确定：服务端增加 `100` 与 `1024` 两档缩略图，播放器按 SPlayer 的 `coverSize` 取 s=100（底部栏、背景与取色）、m=300、l=1024，xl 用原图（Eric 确认，2026-10-25）。
 - [ ] 复刻外观与歌词设置项对视觉的作用（设置界面在阶段 5 接入），用 fixture 切换验证。
 
 ### 3.3 Fixture 与 ViewModel
@@ -61,13 +61,27 @@
 
 ### 3.5 播放器展示层（严格复刻）
 
-- [ ] 底部播放栏、播放队列抽屉、全屏播放器（各样式与背景、AMLL 歌词渲染含逐字/翻译/音译）。只接 fixture。
+- [x] 底部播放栏。运行确认（2026-10-25）：
+  - 照搬 [MainPlayer.vue](../../frontend/src/components/Player/MainPlayer.vue)、[PlayerRightMenu.vue](../../frontend/src/components/Player/PlayerRightMenu.vue)、[PlayerSlider.vue](../../frontend/src/components/Player/PlayerComponents/PlayerSlider.vue)、TextContainer、useTimeFormat 与 v-debounce 等指令；status、music、data 三个 store 的播放器字段照搬 SPlayer，歌曲是 API 的 `Track`。去掉倍速、定时关闭、音质、桌面歌词、电台与私人 FM；“其他控制”只留均衡器，“更多”菜单按 Eric 的决定删减（见[阶段 2](phase-2-player-baseline.md#播放器里与-sonora-不对应的元素)）。均衡器、添加到歌单、复制更多信息、选择歌手的弹窗在阶段 5 接入，喜欢在阶段 4.4 接入，目前只提示。
+  - 歌词按 SPlayer 处理本地歌词的方式解析（[LyricManager.ts](../../frontend/src/core/player/LyricManager.ts)：TTML 为逐字歌词，LRC 自动识别格式，再做排除、括号替换与规范化），歌词行按 SPlayer 的 `calculateLyricIndex` 计算。[PlayerController.ts](../../frontend/src/core/player/PlayerController.ts) 沿用原方法名（播放暂停、上下一首、跳转、音量、静音、随机与循环），这一阶段只改界面状态、不播放音频；随机只切换模式，打乱队列在 4.4 接入。启动时载入 fixture 的播放器状态（`?player=`）与喜爱列表。
+  - `index.html` 去掉 `lang="zh-CN"`，与 SPlayer 一致：有 `lang` 时 Chrome 为中文选简体中文字形，SPlayer 没有 `lang`，中日文都用日文字形（基线环境记录的 Noto Sans CJK JP），歌名“夜”字因此不同。这一改动影响播放端所有中文的字形。
+  - 窄于 990px：栏保持 SPlayer 的 `position: fixed`，加 `min-width: 990px`，并按 `#app` 的横向滚动量平移；`900×800` 时宽 990、滚动 90px 后左移 90px，不滚动时不设 transform。改成相对页面定位或单独建合成层都会改变文字的渲染（与参考图出现数百个像素的差异），所以没有采用。
+  - 截图对照（`1440×1000` 的 7 个底部栏状态，参考为 `2026-10-25-sonora`，见 3.6）：`bar-paused`、`bar-paused-dark`、`bar-playing`、`bar-progress-hover`、`bar-progress-drag` 逐像素一致。两处残余差异：
+    - `bar-paused-start`：“00:00 /”在参考图中低 1 像素（333 像素）。这是参考图采集步骤造成的：参考实例换一种步骤（播放、切歌、暂停后跳到 0 秒）截出的图与 Sonora 完全一致，与 Sonora 的实现无关。Eric 确认作为例外接受（2026-10-25）。
+    - `bar-volume-hover`：进度条填充末端 2 个像素，最大差值 9，属于阶段 2 噪声表中“进度的亚像素位置”一类，Eric 已接受。
+  - 窄窗口（`1280`、`1025`、`1024`、`990` × 800 的暂停与音量弹层）：`1280` 暂停态一致；其余每张 1–9 个像素、最大差值 2–9，位于进度条末端与播放按钮的圆形边缘。两边各元素的位置逐一测量完全相同，推测与背后页面不同导致的合成分层有关，未证实；Eric 已接受（2026-10-25）。
+  - 按钮交互（播放暂停、上下一首及循环到队尾、随机、循环、静音、点击进度条跳转、“更多”菜单）在 fixture 中逐项点过，状态变化正确。
+- [ ] 播放队列抽屉、全屏播放器（各样式与背景、AMLL 歌词渲染含逐字/翻译/音译）。只接 fixture。
 - [ ] 去掉评论按钮、歌曲别名、歌名下的整行标签（音质、歌词类型 `LRC`/`YRC`/`TTML` 及歌词来源切换、`Official` 等音源标签）与音质切换。
 
 ### 3.6 依赖边界与视觉比较
 
 - [ ] 增加检查，禁止前端导入网易 API、Cookie 工具或 `reference/` 下的运行时代码。
-- [ ] 引入 Playwright 截图对照流程，复用阶段 2 的环境参数；输出参考图、实际图、差异图与结论；接入 Taskfile（例如 `task test:visual`）。
+- [ ] 引入 Playwright 截图对照流程，复用阶段 2 的环境参数；输出参考图、实际图、差异图与结论；接入 Taskfile（例如 `task test:visual`）。进展（2026-10-25）：
+  - 状态表（歌曲、跳转点、交互步骤、裁剪区域）从采集脚本抽到 [player-states.mjs](../../scripts/baseline/player-states.mjs)，参考实例与 Sonora 共用。
+  - **对照基线 `--sonora`**：[splayer-player.mjs](../../scripts/baseline/splayer-player.mjs) `--sonora` 用 SPlayer 自己的设置去掉 Eric 决定不显示的元素（`showPlayerQuality`、`showPlayMeta` 关闭，`fullscreenPlayerElements` 的评论与下载关闭），并清空歌曲别名；播放中的状态也停在跳转点，只把 store 的 `playStatus` 设为 true，避免截图时间不定；截图区域包含背后页面的状态隐藏 `#main` 与歌曲列表的浮动按钮。产物在 `.local/baseline/splayer/2026-10-25-sonora/`，原基线 `2026-10-25` 不变，仍是 SPlayer 原样的记录。
+  - [scripts/visual/player.mjs](../../scripts/visual/player.mjs) 在同样的环境与步骤下截取 Sonora（`?fixture=baseline&player=…`），产物在 `.local/visual/<run>/`，用 [diff.mjs](../../scripts/baseline/diff.mjs) 比较。fixture 的封面使用网易按 100、300、1024 缩放的原图（基线快照补采），播放器状态带上参考实例音频的实际时长。
+  - 尚未接入 Taskfile；对照需要参考实例与 `.local` 中的基线，只能在本机运行。
 
 ## 退出条件
 

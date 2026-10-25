@@ -17,6 +17,8 @@ import type { PlayerState } from "@/viewmodels";
 
 export { ApiError };
 
+export type CoverSize = 96 | 100 | 300 | 1024;
+
 /** 播放端读取数据的唯一入口。页面与 store 只通过它访问服务端，开发时可整体换成 fixture。 */
 export interface DataSource {
   me(): Promise<User>;
@@ -40,7 +42,8 @@ export interface DataSource {
   playlistTracks(id: number, query?: ListQuery): Promise<Page<Track>>;
   /** 结束本浏览器的会话，不退出 Authelia。 */
   logout(): Promise<void>;
-  coverUrl(cover: Cover, size?: 96 | 300): string;
+  /** 不指定尺寸时为原图；尺寸为长边像素，见 docs/api.md 的 `covers/{name}`。 */
+  coverUrl(cover: Cover, size?: CoverSize): string;
   audioUrl(trackId: number): string;
 }
 

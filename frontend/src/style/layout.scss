@@ -71,3 +71,10 @@
     transform: scale(0.9);
   }
 }
+
+// Sonora：窗口窄于 990px 时页面保持 990px 宽、横向滚动，播放栏同样保持 990px 宽，
+// 并由 AppLayout 按滚动量平移。仍是 SPlayer 的 position: fixed：改成相对页面定位
+// 或单独建层都会改变文字的渲染，与原项目的截图不再一致。
+#app-layout > .main-player {
+  min-width: 990px;
+}

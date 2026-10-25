@@ -25,10 +25,10 @@
 | 播放器主题覆盖（封面色） | `src/components/Global/PlayerProvider.vue` | 78 | 照搬 | 未开始 |
 | 封面取色与配色方案 | `src/utils/color.ts`、`src/assets/data/themeColor.json` | 325 | 照搬 | 已照搬，去掉任务栏歌词取色；生成结果与原项目一致（阶段 3.2） |
 | 字体大小工具 | `src/utils/style.ts` | 12 | 照搬 | 未开始 |
-| 播放器：底部播放栏、全屏播放器、封面、歌词、背景、控制栏、频谱 | `src/components/Player/` | 6097 | 严格复刻，去掉评论、音质与网易相关元素（[阶段 2 决定](phase/phase-2-player-baseline.md#播放器里与-sonora-不对应的元素)） | 未开始 |
+| 播放器：底部播放栏、全屏播放器、封面、歌词、背景、控制栏、频谱 | `src/components/Player/` | 6097 | 严格复刻，去掉评论、音质与网易相关元素（[阶段 2 决定](phase/phase-2-player-baseline.md#播放器里与-sonora-不对应的元素)） | 底部播放栏已照搬（`MainPlayer.vue`、`PlayerRightMenu.vue`、`PlayerSlider.vue`），截图对照见阶段 3.5（2026-10-25）；其余未开始 |
 | AMLL 封装：歌词播放器、流动背景 | `src/components/AMLL/` | 512 | 严格复刻 | 未开始 |
 | 播放队列抽屉 | `src/components/List/SongPlayList.vue` | 488 | 严格复刻 | 未开始 |
-| 歌词解析 | `src/utils/lyric/` | 1914 | 照搬 LRC、TTML 相关部分；去掉 YRC、QRC 与在线歌词源 | 未开始 |
+| 歌词解析 | `src/utils/lyric/` | 1914 | 照搬 LRC、TTML 相关部分；去掉 YRC、QRC 与在线歌词源 | 已照搬 `parseLrc.ts`、`lyricParser.ts`（去掉 QRC 与 `lyricLinesToTTML`）、`parseTTML.ts`、`lyricStripper.ts`、`lyricFormat.ts`，处理流程见 `core/player/LyricManager.ts`（2026-10-25） |
 | 歌曲列表、详情页头部 | `src/components/List/SongList.vue`、`ListDetail.vue` | 1425 | 视觉语言一致，结构按阶段 2 决定 | 未开始 |
 | 卡片 | `src/components/Card/` | 831 | 视觉语言一致 | 未开始 |
 | 布局、导航、侧栏、顶栏 | `src/components/Layout/`、`src/layout/` | 1505 | 视觉语言一致 | 已改编主框架、导航与主题初始化 |
@@ -46,11 +46,12 @@
 | `@imsyy/color-utils` | `rgbToHex` | 1.0.2 | package.json 写 ISC，包内 LICENSE 是 MIT 全文 | 已用，同版本（2026-10-25） |
 | `lodash-es` | `chunk`（封面取色）及 SPlayer 各处的 `debounce`、`cloneDeep` 等 | 4.18.1 | MIT | 已用，同版本（2026-10-25） |
 | `@applemusic-like-lyrics/core` | AMLL 歌词播放器与流动背景 | 0.5.1 | AGPL-3.0-only | 待引入；最新为 0.6.0，先锁定 0.5.1 |
-| `@applemusic-like-lyrics/lyric` | LRC、TTML 等歌词解析 | 1.0.1 | AGPL-3.0-only | 已加入依赖，同版本（2026-10-25）；目前只用于生成 fixture 的脚本，播放端代码尚未引用，3.5 接入后写入 THIRD_PARTY_NOTICES.md。其依赖 `@applemusic-like-lyrics/ttml` 1.0.1（AGPL-3.0-only）与 SPlayer 相同，`pako` 解析为 2.2.0（SPlayer 锁定 2.1.0，MIT AND Zlib，用于 QRC 解压，与视觉无关） |
+| `@applemusic-like-lyrics/lyric` | LRC、TTML 等歌词解析 | 1.0.1 | AGPL-3.0-only | 已用，同版本（2026-10-25），播放端用它解析 TTML，fixture 脚本用它转换歌词。其依赖 `@applemusic-like-lyrics/ttml` 1.0.1（AGPL-3.0-only）与 SPlayer 相同，`pako` 解析为 2.2.0（SPlayer 锁定 2.1.0，MIT AND Zlib，用于 QRC 解压，与视觉无关） |
 | `@pixi/app`、`@pixi/core`、`@pixi/display`、`@pixi/sprite`、`@pixi/filter-blur`、`@pixi/filter-color-matrix` | AMLL 的对等依赖 | 7.4.3 | MIT | 随 AMLL 引入 |
 | `@pixi/filter-bulge-pinch` | AMLL 的对等依赖 | 5.1.1 | MIT | 随 AMLL 引入 |
 | `sortablejs` | 播放队列与歌单拖动排序 | 1.15.7 | MIT | 待引入 |
 | `@vueuse/core` | 组合式工具（自动隐藏计时、媒体查询等） | 14.3.0 | MIT | 已用 |
+| `dayjs` | 播放时间显示（`msToTime`） | 1.11.21 | MIT | 已用，同版本（2026-10-25） |
 
 ## 4. 图标
 

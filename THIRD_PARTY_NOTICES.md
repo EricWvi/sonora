@@ -10,7 +10,10 @@
 - `frontend/public/images/`：默认封面与艺术家图片（`album.jpg`、`song.jpg`、`artist.jpg`）。
 - `frontend/src/views/Status/404.vue`、`500.vue`：原状态页。
 - `frontend/src/components/Global/Provider.vue`、`frontend/src/utils/color.ts`、`frontend/src/assets/data/themeColor.json`：原全局主题与封面取色，照搬后去掉 Sonora 不做的功能。
-- `frontend/src/stores/setting.ts`、`frontend/src/stores/status.ts`：原设置与状态的字段定义和默认值（保留部分）。
+- `frontend/src/stores/setting.ts`、`frontend/src/stores/status.ts`、`frontend/src/stores/music.ts`、`frontend/src/stores/data.ts`：原设置、状态、当前歌曲与播放列表的字段定义和默认值（保留部分）。
+- `frontend/src/components/Player/`、`frontend/src/components/Global/TextContainer.vue`、`frontend/src/composables/useTimeFormat.ts`：原播放器组件，照搬后去掉 Sonora 不做的功能。
+- `frontend/src/utils/lyric/`、`frontend/src/assets/data/exclude.ts`、`frontend/src/utils/calc.ts`、`time.ts`、`format.ts`、`helper.ts`、`instruction.ts`、`modal.ts`：原歌词解析与排除规则、歌词行计算及播放器用到的工具函数（保留部分）。
+- `frontend/src/core/player/`：按原播放控制器与歌词管理改编，方法名与处理流程沿用原项目。
 - 主布局、导航和首页展示结构按原项目对应实现改编，业务逻辑重新实现。
 
 2026-10-23 确定：标志图形暂时复用；界面中的 SPlayer 名称与文字均替换为 Sonora。Sonora 不迁入网易来源、认证或业务接口。各依赖的许可证仍以各包声明为准。
@@ -26,6 +29,7 @@
 `frontend/src/assets/icons/` 的图标复制自 SPlayer，其中可确认来源的属于以下图标集（核对方法见[视觉资源与许可清单](docs/visual-assets.md#4-图标)）：
 
 - [Google Material Icons](https://github.com/google/material-design-icons)、[Material Symbols](https://github.com/google/material-design-icons)：Copyright Google LLC，Apache License 2.0。
+- [IconaMoon](https://github.com/dariushhpg1/IconaMoon)：`Repeat.svg`、`RepeatSong.svg`、`Shuffle.svg`，作者 Dariush Habibpour，[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)。经 SPlayer 收录，Sonora 未作修改。
 
 其余图标来源尚未确认，按 SPlayer 的 AGPL-3.0 处理。
 
@@ -37,6 +41,8 @@
 - [@material/material-color-utilities](https://github.com/material-foundation/material-color-utilities)：Copyright Google LLC，Apache License 2.0。
 - [@imsyy/color-utils](https://github.com/imsyy/color-utils)：Copyright (c) 2024 imsyy，MIT 许可证（package.json 标为 ISC，以包内 LICENSE 为准）。
 - [lodash-es](https://github.com/lodash/lodash)：Copyright OpenJS Foundation and other contributors，MIT 许可证。
+- [@applemusic-like-lyrics/lyric](https://github.com/amll-dev/applemusic-like-lyrics) 及其依赖 `@applemusic-like-lyrics/ttml`：歌词解析，AGPL-3.0-only。
+- [Day.js](https://github.com/iamkun/dayjs)：Copyright (c) 2018-present, iamkun，MIT 许可证。
 
 # ThumbHash
 
