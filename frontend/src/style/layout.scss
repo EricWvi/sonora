@@ -1,5 +1,7 @@
 #app-layout {
   width: 100%;
+  // Sonora：不做移动布局，窗口窄于 990px 时页面保持 990px 宽
+  min-width: 990px;
   height: 100%;
   display: flex;
   flex-direction: column;

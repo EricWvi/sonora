@@ -40,11 +40,11 @@ declare module 'vue' {
     NResult: typeof import('naive-ui')['NResult']
     NScrollbar: typeof import('naive-ui')['NScrollbar']
     NText: typeof import('naive-ui')['NText']
+    Provider: typeof import('./src/components/Global/Provider.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SidebarMenu: typeof import('./src/components/Layout/SidebarMenu.vue')['default']
     SvgIcon: typeof import('./src/components/Global/SvgIcon.vue')['default']
-    ThemeProvider: typeof import('./src/components/Global/ThemeProvider.vue')['default']
     UserMenu: typeof import('./src/components/Layout/UserMenu.vue')['default']
   }
 }

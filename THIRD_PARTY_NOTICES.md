@@ -9,7 +9,9 @@
 - `frontend/src/assets/icons/`、`frontend/public/fonts/`：参考项目对应 SVG 图标与 Logo 字体。
 - `frontend/public/images/`：默认封面与艺术家图片（`album.jpg`、`song.jpg`、`artist.jpg`）。
 - `frontend/src/views/Status/404.vue`、`500.vue`：原状态页。
-- 主题生成、主布局、导航和首页展示结构按原项目对应实现改编，业务逻辑重新实现。
+- `frontend/src/components/Global/Provider.vue`、`frontend/src/utils/color.ts`、`frontend/src/assets/data/themeColor.json`：原全局主题与封面取色，照搬后去掉 Sonora 不做的功能。
+- `frontend/src/stores/setting.ts`、`frontend/src/stores/status.ts`：原设置与状态的字段定义和默认值（保留部分）。
+- 主布局、导航和首页展示结构按原项目对应实现改编，业务逻辑重新实现。
 
 2026-10-23 确定：标志图形暂时复用；界面中的 SPlayer 名称与文字均替换为 Sonora。Sonora 不迁入网易来源、认证或业务接口。各依赖的许可证仍以各包声明为准。
 
@@ -26,6 +28,15 @@
 - [Google Material Icons](https://github.com/google/material-design-icons)、[Material Symbols](https://github.com/google/material-design-icons)：Copyright Google LLC，Apache License 2.0。
 
 其余图标来源尚未确认，按 SPlayer 的 AGPL-3.0 处理。
+
+# 运行时依赖
+
+播放端随产物分发以下与视觉相关的 npm 包，许可证全文见各包：
+
+- [Naive UI](https://github.com/tusen-ai/naive-ui)：MIT。
+- [@material/material-color-utilities](https://github.com/material-foundation/material-color-utilities)：Copyright Google LLC，Apache License 2.0。
+- [@imsyy/color-utils](https://github.com/imsyy/color-utils)：Copyright (c) 2024 imsyy，MIT 许可证（package.json 标为 ISC，以包内 LICENSE 为准）。
+- [lodash-es](https://github.com/lodash/lodash)：Copyright OpenJS Foundation and other contributors，MIT 许可证。
 
 # ThumbHash
 

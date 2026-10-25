@@ -42,11 +42,7 @@
       <div v-if="isDesktop" class="nav-drag" />
       <n-flex align="center">
         <UserMenu />
-        <n-dropdown
-          :options="themeOptions"
-          trigger="click"
-          @select="appearance.dark = !appearance.dark"
-        >
+        <n-dropdown :options="setOptions" trigger="click" @select="setSelect">
           <n-button
             :focusable="false"
             title="设置"
@@ -90,17 +86,40 @@ import Logo from "./Logo.vue";
 import SidebarMenu from "./SidebarMenu.vue";
 import UserMenu from "./UserMenu.vue";
 import SvgIcon from "@/components/Global/SvgIcon.vue";
-import { useAppearanceStore } from "@/stores/appearance";
+import type { DropdownOption } from "naive-ui";
+import { useSettingStore } from "@/stores/setting";
 
 const router = useRouter();
-const appearance = useAppearanceStore();
+const settingStore = useSettingStore();
 const isDesktop = useMediaQuery("(min-width: 1024px)");
 const isSmallScreen = useMediaQuery("(max-width: 767.98px)");
 const keyword = ref("");
 const showAside = ref(false);
-const themeOptions = computed(() => [
-  { key: "theme", label: appearance.dark ? "浅色模式" : "深色模式" },
+// 设置菜单：沿用 SPlayer，主题配置与全局设置的弹窗在阶段 5 接入。
+const setOptions = computed<DropdownOption[]>(() => [
+  {
+    label:
+      settingStore.themeMode === "auto"
+        ? "浅色模式"
+        : settingStore.themeMode === "light"
+          ? "深色模式"
+          : "跟随系统",
+    key: "themeMode",
+    icon: () =>
+      h(SvgIcon, {
+        name:
+          settingStore.themeMode === "auto"
+            ? "LightTheme"
+            : settingStore.themeMode === "light"
+              ? "DarkTheme"
+              : "AutoTheme",
+      }),
+  },
 ]);
+
+function setSelect(key: string): void {
+  if (key === "themeMode") settingStore.setThemeMode();
+}
 
 // 搜索先展示空结果，不模拟服务端数据。
 function search(): void {

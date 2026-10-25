@@ -6,24 +6,24 @@
         id="main-sider"
         :content-style="{ overflow: 'hidden', height: '100%', padding: '0' }"
         :native-scrollbar="false"
-        :collapsed="appearance.menuCollapsed"
+        :collapsed="statusStore.menuCollapsed"
         :collapsed-width="64"
         :width="240"
         collapse-mode="width"
         show-trigger="bar"
         bordered
-        @collapse="appearance.menuCollapsed = true"
-        @expand="appearance.menuCollapsed = false"
+        @collapse="statusStore.menuCollapsed = true"
+        @expand="statusStore.menuCollapsed = false"
       >
         <div class="sider-all">
           <div
-            :class="['logo', { collapsed: appearance.menuCollapsed }]"
+            :class="['logo', { collapsed: statusStore.menuCollapsed }]"
             @click="router.push('/')"
           >
             <Logo /><n-text>Sonora</n-text>
           </div>
           <n-scrollbar style="max-height: calc(100vh - 70px)"
-            ><SidebarMenu :collapsed="appearance.menuCollapsed"
+            ><SidebarMenu :collapsed="statusStore.menuCollapsed"
           /></n-scrollbar>
         </div>
       </n-layout-sider>
@@ -52,11 +52,11 @@
 import AppNav from "@/components/Layout/AppNav.vue";
 import SidebarMenu from "@/components/Layout/SidebarMenu.vue";
 import Logo from "@/components/Layout/Logo.vue";
-import { useAppearanceStore } from "@/stores/appearance";
+import { useStatusStore } from "@/stores/status";
 import { useUserStore } from "@/stores/user";
 
 const router = useRouter();
-const appearance = useAppearanceStore();
+const statusStore = useStatusStore();
 const isDesktop = useMediaQuery("(min-width: 1024px)");
 const isMobile = useMediaQuery("(max-width: 639.98px)");
 

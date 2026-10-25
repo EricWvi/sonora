@@ -3,8 +3,8 @@
   <n-menu
     ref="menuRef"
     :value="activeKey"
-    v-model:expanded-keys="appearance.menuExpandedKeys"
-    :class="{ cover: appearance.menuShowCover }"
+    v-model:expanded-keys="settingStore.menuExpandedKeys"
+    :class="{ cover: settingStore.menuShowCover }"
     :indent="0"
     :root-indent="26"
     :collapsed="collapsed"
@@ -28,7 +28,7 @@ import {
 import { RouterLink } from "vue-router";
 import { source } from "@/api/source";
 import SvgIcon from "@/components/Global/SvgIcon.vue";
-import { useAppearanceStore } from "@/stores/appearance";
+import { useSettingStore } from "@/stores/setting";
 import { useUserStore } from "@/stores/user";
 
 const props = defineProps<{ collapsed: boolean }>();
@@ -36,7 +36,7 @@ const emit = defineEmits<{ "menu-click": [key: string | number] }>();
 
 const route = useRoute();
 const router = useRouter();
-const appearance = useAppearanceStore();
+const settingStore = useSettingStore();
 const userStore = useUserStore();
 const menuRef = ref<MenuInst | null>(null);
 
@@ -100,7 +100,7 @@ const options = computed<MenuOption[]>(() => [
     children: userStore.playlists.map((playlist) => ({
       key: playlist.id,
       label: () =>
-        appearance.menuShowCover
+        settingStore.menuShowCover
           ? h("div", { class: "pl-cover" }, [
               h(NAvatar, {
                 src: playlist.cover
@@ -112,7 +112,7 @@ const options = computed<MenuOption[]>(() => [
               h(NEllipsis, null, () => playlist.name),
             ])
           : h(NEllipsis, null, () => playlist.name),
-      icon: appearance.menuShowCover ? undefined : renderIcon("PlayList"),
+      icon: settingStore.menuShowCover ? undefined : renderIcon("PlayList"),
     })),
   },
 ]);

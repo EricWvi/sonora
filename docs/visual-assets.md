@@ -21,9 +21,9 @@
 | 部分 | SPlayer 位置 | 行数 | 复用方式 | Sonora 现状 |
 | --- | --- | --- | --- | --- |
 | 全局样式与动画 | `src/style/`（`main.scss`、`animate.scss`） | 795 | 照搬 | 已复制到 `frontend/src/style/`，另拆出布局、导航、菜单等文件 |
-| Naive UI 主题覆盖、明暗与主题色 | `src/components/Global/Provider.vue` | 324 | 照搬 | 主题生成已改编；待与原实现逐项对照生成结果 |
+| Naive UI 主题覆盖、明暗与主题色 | `src/components/Global/Provider.vue` | 324 | 照搬 | 已照搬，去掉自定义背景图与代码注入；生成结果与原项目一致（阶段 3.2） |
 | 播放器主题覆盖（封面色） | `src/components/Global/PlayerProvider.vue` | 78 | 照搬 | 未开始 |
-| 封面取色与配色方案 | `src/utils/color.ts`、`src/assets/data/themeColor.json` | 325 | 照搬 | 主题色列表已用；封面取色未开始 |
+| 封面取色与配色方案 | `src/utils/color.ts`、`src/assets/data/themeColor.json` | 325 | 照搬 | 已照搬，去掉任务栏歌词取色；生成结果与原项目一致（阶段 3.2） |
 | 字体大小工具 | `src/utils/style.ts` | 12 | 照搬 | 未开始 |
 | 播放器：底部播放栏、全屏播放器、封面、歌词、背景、控制栏、频谱 | `src/components/Player/` | 6097 | 严格复刻，去掉评论、音质与网易相关元素（[阶段 2 决定](phase/phase-2-player-baseline.md#播放器里与-sonora-不对应的元素)） | 未开始 |
 | AMLL 封装：歌词播放器、流动背景 | `src/components/AMLL/` | 512 | 严格复刻 | 未开始 |
@@ -43,7 +43,8 @@
 | --- | --- | --- | --- | --- |
 | `naive-ui` | 组件库 | 2.43.2（固定） | MIT | 已用，同版本 |
 | `@material/material-color-utilities` | 主题色与封面取色（`themeFromSourceColor`、`QuantizerCelebi`、`Score`） | 0.4.0 | Apache-2.0 | 已用，同版本 |
-| `@imsyy/color-utils` | `rgbToHex` | 1.0.2 | ISC | 待引入，或改用十几行的等价实现 |
+| `@imsyy/color-utils` | `rgbToHex` | 1.0.2 | package.json 写 ISC，包内 LICENSE 是 MIT 全文 | 已用，同版本（2026-10-25） |
+| `lodash-es` | `chunk`（封面取色）及 SPlayer 各处的 `debounce`、`cloneDeep` 等 | 4.18.1 | MIT | 已用，同版本（2026-10-25） |
 | `@applemusic-like-lyrics/core` | AMLL 歌词播放器与流动背景 | 0.5.1 | AGPL-3.0-only | 待引入；最新为 0.6.0，先锁定 0.5.1 |
 | `@applemusic-like-lyrics/lyric` | LRC、TTML 等歌词解析 | 1.0.1 | AGPL-3.0-only | 待引入 |
 | `@pixi/app`、`@pixi/core`、`@pixi/display`、`@pixi/sprite`、`@pixi/filter-blur`、`@pixi/filter-color-matrix` | AMLL 的对等依赖 | 7.4.3 | MIT | 随 AMLL 引入 |
@@ -78,7 +79,7 @@ SPlayer 的 147 个图标在 `src/assets/icons/`，由 `SvgIcon.vue` 内联渲�
 
 **署名要求：** IconaMoon 的 CC-BY-4.0 要求注明作者、许可证与修改情况。Sonora 复制 `Repeat`、`RepeatSong`、`Shuffle` 时，在 THIRD_PARTY_NOTICES.md 加入 IconaMoon（作者 Dariush Habibpour，<https://github.com/dariushhpg1/IconaMoon>）的署名。Apache-2.0 与 MIT 的图标集同样在该文件中列出版权与许可证。
 
-`frontend/src/assets/icons/` 现有 17 个图标，与 SPlayer 的文件逐字节一致（2026-10-25 阶段 3.1 重建侧栏后）：Google Material Icons 7 个（`Add`、`Favorite`、`Menu`、`Music`、`NavigateBefore`、`NavigateNext`、`Person`）、Material Symbols 3 个（`Home`、`PlayList`、`Search`）、Material Symbols Light 1 个（`DropDown`），近似项 5 个（`Artist`、`History`、`PlaylistAdd`、`Power`、`Settings`），未确认 1 个（`Album`）。侧栏的歌曲、专辑、艺术家图标沿用 SPlayer 流媒体页面标签的 `Music`、`Album`、`Artist`。
+`frontend/src/assets/icons/` 现有 20 个图标，与 SPlayer 的文件逐字节一致（2026-10-25 阶段 3.2 后）：Google Material Icons 9 个（`Add`、`DarkTheme`、`Favorite`、`LightTheme`、`Menu`、`Music`、`NavigateBefore`、`NavigateNext`、`Person`）、Material Symbols 3 个（`Home`、`PlayList`、`Search`）、Material Symbols Light 1 个（`DropDown`），近似项 6 个（`Artist`、`AutoTheme`、`History`、`PlaylistAdd`、`Power`、`Settings`），未确认 1 个（`Album`）。侧栏的歌曲、专辑、艺术家图标沿用 SPlayer 流媒体页面标签的 `Music`、`Album`、`Artist`。
 
 ## 5. 字体
 
@@ -109,4 +110,4 @@ SPlayer 的 147 个图标在 `src/assets/icons/`，由 `SvgIcon.vue` 内联渲�
 
 2026-10-25 已补：Logo 字体 Poppins Medium 的 OFL 声明，全文放在 `frontend/public/fonts/OFL.txt`；`frontend/src/assets/icons/` 中 Google Material Icons、Material Symbols 与 Phosphor 的版权与许可证。阶段 3.1 删除 `HeartBit` 后不再含 Phosphor 图标，该声明已移除，复制 `SortDown`、`SortUp` 时再加回。
 
-阶段 3 引入播放器时还需加入：AMLL（AGPL-3.0-only）、IconaMoon（CC-BY-4.0，含署名）、Material Design Icons、Fluent UI System Icons（若使用）、PixiJS、SortableJS 与 `@imsyy/color-utils`。
+阶段 3 引入播放器时还需加入：AMLL（AGPL-3.0-only）、IconaMoon（CC-BY-4.0，含署名）、Material Design Icons、Fluent UI System Icons（若使用）、PixiJS 与 SortableJS。`@imsyy/color-utils` 与 `lodash-es` 已在阶段 3.2 加入。
