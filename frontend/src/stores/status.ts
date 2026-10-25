@@ -164,6 +164,22 @@ export const useStatusStore = defineStore("status", {
         this.shuffleMode = "off";
       }
     },
+    /** 重置播放状态 */
+    resetPlayStatus() {
+      this.$patch({
+        currentTime: 0,
+        duration: 0,
+        progress: 0,
+        lyricIndex: -1,
+        playStatus: false,
+        playLoading: false,
+        playListShow: false,
+        showFullPlayer: false,
+        playIndex: -1,
+        repeatMode: "off",
+        shuffleMode: "off",
+      });
+    },
   },
   // 持久化。播放队列与位置（`currentTime`、`playIndex` 等）在阶段 4.4 接入播放时一并保存。
   persist: {

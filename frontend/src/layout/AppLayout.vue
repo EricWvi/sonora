@@ -58,6 +58,8 @@
         </n-layout>
       </n-layout>
     </n-layout>
+    <!-- 播放列表 -->
+    <SongPlayList />
     <!-- 全局播放器 -->
     <MainPlayer :style="followScroll" />
   </div>
@@ -68,6 +70,7 @@ import AppNav from "@/components/Layout/AppNav.vue";
 import SidebarMenu from "@/components/Layout/SidebarMenu.vue";
 import Logo from "@/components/Layout/Logo.vue";
 import MainPlayer from "@/components/Player/MainPlayer.vue";
+import SongPlayList from "@/components/List/SongPlayList.vue";
 import { initPlayer } from "@/core/player/PlayerController";
 import { useMusicStore, useStatusStore, useUserStore } from "@/stores";
 

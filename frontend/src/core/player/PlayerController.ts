@@ -145,6 +145,99 @@ class PlayerController {
     if (play) await this.play();
   }
 
+  /** 清空播放列表 */
+  public async cleanPlayList() {
+    const dataStore = useDataStore();
+    const statusStore = useStatusStore();
+    const musicStore = useMusicStore();
+    // 重置状态
+    statusStore.resetPlayStatus();
+    musicStore.resetMusicData();
+    useLyricManager().resetSongLyric();
+    // 清空播放列表
+    await dataStore.setPlayList([]);
+    await dataStore.clearOriginalPlayList();
+  }
+
+  /**
+   * 移除指定歌曲
+   * @param index 歌曲索引
+   */
+  public removeSongIndex(index: number) {
+    const dataStore = useDataStore();
+    const statusStore = useStatusStore();
+    // 获取数据
+    const { playList } = dataStore;
+    // 若超出播放列表
+    if (index >= playList.length) return;
+    // 仅剩一首
+    if (playList.length === 1) {
+      this.cleanPlayList();
+      return;
+    }
+    // 是否为当前播放歌曲
+    const isCurrentPlay = statusStore.playIndex === index;
+    // 若将移除最后一首
+    if (index === playList.length - 1) {
+      statusStore.playIndex = 0;
+    }
+    // 若为当前播放之后
+    else if (statusStore.playIndex > index) {
+      statusStore.playIndex--;
+    }
+    // 移除指定歌曲
+    const newPlaylist = [...playList];
+    newPlaylist.splice(index, 1);
+    dataStore.setPlayList(newPlaylist);
+    // 若为当前播放
+    if (isCurrentPlay) {
+      const song = newPlaylist[statusStore.playIndex];
+      if (song) this.setupSong(song, 0);
+    }
+  }
+
+  /**
+   * 移动歌曲
+   * @param fromIndex 移动前索引
+   * @param toIndex 移动后索引
+   */
+  public async moveSong(fromIndex: number, toIndex: number) {
+    const dataStore = useDataStore();
+    const statusStore = useStatusStore();
+    // 若索引相同
+    if (fromIndex === toIndex) return;
+    // 若索引超出播放列表
+    if (fromIndex < 0 || fromIndex >= dataStore.playList.length) return;
+    if (toIndex < 0 || toIndex >= dataStore.playList.length) return;
+    // 复制播放列表
+    const list = [...dataStore.playList];
+    const [movedSong] = list.splice(fromIndex, 1);
+    list.splice(toIndex, 0, movedSong);
+    // 计算新的播放索引
+    let newPlayIndex = statusStore.playIndex;
+    if (statusStore.playIndex === fromIndex) {
+      newPlayIndex = toIndex;
+    } else if (
+      fromIndex < statusStore.playIndex &&
+      toIndex >= statusStore.playIndex
+    ) {
+      newPlayIndex--;
+    } else if (
+      fromIndex > statusStore.playIndex &&
+      toIndex <= statusStore.playIndex
+    ) {
+      newPlayIndex++;
+    }
+    // 更新播放索引
+    statusStore.playIndex = newPlayIndex;
+    // 更新播放列表
+    await dataStore.setPlayList(list);
+    // 若为随机播放
+    if (statusStore.shuffleMode === "off") {
+      await dataStore.setOriginalPlayList([...list]);
+    }
+  }
+
   /** 获取总时长 (ms) */
   public getDuration(): number {
     return useStatusStore().duration;

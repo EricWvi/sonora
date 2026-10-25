@@ -37,6 +37,7 @@ import {
   clipFor,
   GUREN_WORD,
   hideMain,
+  mergeManifest,
   PINIA,
   setStore,
   settled,
@@ -422,11 +423,13 @@ try {
   }
 } finally {
   manifest.finishedAt = new Date().toISOString();
-  if (!args["data-only"])
+  if (!args["data-only"]) {
+    const file = join(out, args.viewport, "manifest.json");
     await writeFile(
-      join(out, args.viewport, "manifest.json"),
-      JSON.stringify(manifest, null, 2),
+      file,
+      JSON.stringify(await mergeManifest(file, manifest), null, 2),
     );
+  }
   await browser.close();
 }
 console.log(out);

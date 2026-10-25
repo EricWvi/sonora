@@ -25,6 +25,7 @@ import { parseArgs } from "node:util";
 import {
   clipFor,
   hideMain,
+  mergeManifest,
   setStore,
   settled,
   states,
@@ -159,9 +160,10 @@ try {
   }
 } finally {
   manifest.finishedAt = new Date().toISOString();
+  const file = join(out, "manifest.json");
   await writeFile(
-    join(out, "manifest.json"),
-    JSON.stringify(manifest, null, 2),
+    file,
+    JSON.stringify(await mergeManifest(file, manifest), null, 2),
   );
   await browser.close();
 }

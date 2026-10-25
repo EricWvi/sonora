@@ -25,7 +25,9 @@ declare module 'vue' {
     NDropdown: typeof import('naive-ui')['NDropdown']
     NEmpty: typeof import('naive-ui')['NEmpty']
     NFlex: typeof import('naive-ui')['NFlex']
+    NGi: typeof import('naive-ui')['NGi']
     NGlobalStyle: typeof import('naive-ui')['NGlobalStyle']
+    NGrid: typeof import('naive-ui')['NGrid']
     NH1: typeof import('naive-ui')['NH1']
     NH3: typeof import('naive-ui')['NH3']
     NIcon: typeof import('naive-ui')['NIcon']
@@ -50,8 +52,10 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SidebarMenu: typeof import('./src/components/Layout/SidebarMenu.vue')['default']
+    SongPlayList: typeof import('./src/components/List/SongPlayList.vue')['default']
     SvgIcon: typeof import('./src/components/Global/SvgIcon.vue')['default']
     TextContainer: typeof import('./src/components/Global/TextContainer.vue')['default']
     UserMenu: typeof import('./src/components/Layout/UserMenu.vue')['default']
+    VirtualScroll: typeof import('./src/components/UI/VirtualScroll.vue')['default']
   }
 }

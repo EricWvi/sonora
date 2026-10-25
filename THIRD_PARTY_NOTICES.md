@@ -12,6 +12,7 @@
 - `frontend/src/components/Global/Provider.vue`、`frontend/src/utils/color.ts`、`frontend/src/assets/data/themeColor.json`：原全局主题与封面取色，照搬后去掉 Sonora 不做的功能。
 - `frontend/src/stores/setting.ts`、`frontend/src/stores/status.ts`、`frontend/src/stores/music.ts`、`frontend/src/stores/data.ts`：原设置、状态、当前歌曲与播放列表的字段定义和默认值（保留部分）。
 - `frontend/src/components/Player/`、`frontend/src/components/Global/TextContainer.vue`、`frontend/src/composables/useTimeFormat.ts`：原播放器组件，照搬后去掉 Sonora 不做的功能。
+- `frontend/src/components/List/SongPlayList.vue`、`frontend/src/components/UI/VirtualScroll.vue`、`frontend/src/composables/List/useDragSort.ts`：原播放队列抽屉、虚拟滚动与拖动排序。
 - `frontend/src/utils/lyric/`、`frontend/src/assets/data/exclude.ts`、`frontend/src/utils/calc.ts`、`time.ts`、`format.ts`、`helper.ts`、`instruction.ts`、`modal.ts`：原歌词解析与排除规则、歌词行计算及播放器用到的工具函数（保留部分）。
 - `frontend/src/core/player/`：按原播放控制器与歌词管理改编，方法名与处理流程沿用原项目。
 - 主布局、导航和首页展示结构按原项目对应实现改编，业务逻辑重新实现。

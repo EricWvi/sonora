@@ -2,6 +2,8 @@
 // (splayer-player.mjs) and the Sonora capture (scripts/visual/player.mjs)
 // so both take the same steps and clip the same areas.
 
+import { readFile } from "node:fs/promises";
+
 // --- data ---------------------------------------------------------------
 
 // The songs the states play. Each is reached by playing its album and
@@ -117,9 +119,40 @@ export const states = [
     },
   },
   {
+    // Held mid-drag: the drop line, the drag label and the dragged item.
+    id: "queue-drag",
+    song: "yoru",
+    seek: YORU_LINE,
+    clip: "drawer",
+    async act(page) {
+      await setStore(page, "status", { playListShow: true });
+      const nodes = page.locator(".n-drawer .song-node");
+      await nodes.nth(5).waitFor();
+      await page.waitForTimeout(800);
+      const handle = await nodes.nth(1).locator(".drag-handle").boundingBox();
+      // The lower half of the fifth item: the line falls between 5 and 6.
+      const target = await nodes.nth(4).boundingBox();
+      await page.mouse.move(
+        handle.x + handle.width / 2,
+        handle.y + handle.height / 2,
+      );
+      await page.mouse.down();
+      await page.mouse.move(
+        handle.x + handle.width / 2,
+        target.y + target.height * 0.75,
+        { steps: 10 },
+      );
+      await page.waitForTimeout(600);
+      // Released after the screenshot when the context closes.
+    },
+  },
+  {
     id: "queue-empty",
     song: null,
     clip: "drawer",
+    // Without a song there is no bar, and the page behind shows through
+    // the drawer's rounded corner (hideMain).
+    hideMain: true,
     async act(page) {
       await setStore(page, "status", { playListShow: true });
       await page.locator(".n-drawer").waitFor();
@@ -294,4 +327,22 @@ export async function clipFor(page, state) {
       return round(await page.locator(".n-drawer").boundingBox());
   }
   return undefined;
+}
+
+// A run with --only captures some states again; the manifest keeps the
+// entries of the other states from the earlier manifest, in table order.
+export async function mergeManifest(file, manifest) {
+  let earlier;
+  try {
+    earlier = JSON.parse(await readFile(file, "utf8"));
+  } catch {
+    return manifest;
+  }
+  const now = new Set(manifest.states.map((s) => s.id));
+  const kept = earlier.states.filter((s) => !now.has(s.id));
+  const order = new Map(states.map((s, i) => [s.id, i]));
+  manifest.states = [...kept, ...manifest.states].sort(
+    (a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9),
+  );
+  return manifest;
 }

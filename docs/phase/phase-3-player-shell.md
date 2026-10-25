@@ -1,10 +1,10 @@
 # 阶段 3：播放端视觉外壳
 
-状态：进行中，3.1、3.3 已完成，3.2 的 Provider、最小宽度与取色已完成，3.5 的底部播放栏完成并与原项目截图对照（2026-10-25）。前置：阶段 2 的页面清单（已确定）；播放器部分需要阶段 2 的播放器参考图。参照路线图：[样式还原与验收方法](../roadmap.md#6-样式还原与验收方法)。
+状态：进行中，3.1、3.3 已完成，3.2 的 Provider、最小宽度与取色已完成，3.5 的底部播放栏与播放队列抽屉完成并与原项目截图对照（2026-10-25）。前置：阶段 2 的页面清单（已确定）；播放器部分需要阶段 2 的播放器参考图。参照路线图：[样式还原与验收方法](../roadmap.md#6-样式还原与验收方法)。
 
 ## 当前事实
 
-`frontend/` 已有主框架（[AppLayout.vue](../../frontend/src/layout/AppLayout.vue)）、侧栏菜单、顶部导航、明暗主题和窄屏抽屉；界面名称已改为 Sonora，标志图形沿用 SPlayer。菜单、路由与顶栏用户入口已按首发范围重建（3.1）。各页面仍是占位（[EmptyView.vue](../../frontend/src/views/EmptyView.vue)）；没有卡片与歌曲列表。播放器目前只有底部播放栏（3.5），由 fixture 驱动、不出声；截图对照工具见 3.6。
+`frontend/` 已有主框架（[AppLayout.vue](../../frontend/src/layout/AppLayout.vue)）、侧栏菜单、顶部导航、明暗主题和窄屏抽屉；界面名称已改为 Sonora，标志图形沿用 SPlayer。菜单、路由与顶栏用户入口已按首发范围重建（3.1）。各页面仍是占位（[EmptyView.vue](../../frontend/src/views/EmptyView.vue)）；没有卡片与歌曲列表。播放器目前有底部播放栏与播放队列抽屉（3.5），由 fixture 驱动、不出声；截图对照工具见 3.6。
 
 数据只经 [api/source.ts](../../frontend/src/api/source.ts) 的 `DataSource` 读取，它覆盖播放端 API 的全部读取接口。开发服务器上以 `?fixture=<场景>` 打开时换成 [fixtures](../../frontend/src/fixtures/index.ts)，不需要 Go 服务；`&player=<状态>` 再指定播放器的初始状态（`source.ts` 导出的 `fixturePlayer`），例如 `http://127.0.0.1:14559/?fixture=baseline&player=yoru-paused#/`。场景与状态见 3.3。生产构建不含 fixture（已用 `vite build` 检查产物）。
 
@@ -71,7 +71,14 @@
     - `bar-volume-hover`：进度条填充末端 2 个像素，最大差值 9，属于阶段 2 噪声表中“进度的亚像素位置”一类，Eric 已接受。
   - 窄窗口（`1280`、`1025`、`1024`、`990` × 800 的暂停与音量弹层）：`1280` 暂停态一致；其余每张 1–9 个像素、最大差值 2–9，位于进度条末端与播放按钮的圆形边缘。两边各元素的位置逐一测量完全相同，推测与背后页面不同导致的合成分层有关，未证实；Eric 已接受（2026-10-25）。
   - 按钮交互（播放暂停、上下一首及循环到队尾、随机、循环、静音、点击进度条跳转、“更多”菜单）在 fixture 中逐项点过，状态变化正确。
-- [ ] 播放队列抽屉、全屏播放器（各样式与背景、AMLL 歌词渲染含逐字/翻译/音译）。只接 fixture。
+- [x] 播放队列抽屉。运行确认（2026-10-25）：
+  - 照搬 [SongPlayList.vue](../../frontend/src/components/List/SongPlayList.vue)、[VirtualScroll.vue](../../frontend/src/components/UI/VirtualScroll.vue) 与 [useDragSort.ts](../../frontend/src/composables/List/useDragSort.ts)，挂在 AppLayout 中与 SPlayer 相同的位置。歌名取 `Track.title`；Sonora 的歌曲都带艺术家数组，去掉电台与艺术家为字符串的分支。拖动排序用 SPlayer 自己的 `useDragSort`，不需要 sortablejs（SPlayer 只在设置的首页栏目管理中用它）。
+  - 控制器补上 `cleanPlayList`、`removeSongIndex`、`moveSong`，data 与 status store 补上 `setPlayList`、`originalPlayList` 与 `resetPlayStatus`，流程照搬 SPlayer，只改界面状态；队列的保存在 4.4 接入。
+  - **修正 SPlayer 的一个功能问题**：`v-debounce` 指令在挂载时绑定点击函数，之后不更新。队列项按歌曲 id 复用元素，删除或移动歌曲后点击某一项，播放的是它原来序号上的歌。参考实例上复现：删除第 3 首后点“群青”（序号 4），播放的是“ハルカ”。Sonora 的指令改为点击时调用最新绑定的函数，防抖行为不变；与视觉无关。
+  - 截图对照（参考为 `2026-10-25-sonora`）：`1440×1000` 的 `queue-open`、`queue-hover`、`queue-empty`、`queue-drag`，以及 `1280`、`1025`、`1024`、`990` × 800 的 `queue-open`，全部逐像素一致；`1440×1000` 重复三轮仍一致。`queue-drag` 是新加的状态（拖住第 2 首的手柄移到第 5、6 首之间，显示落点线、拖动标签与半透明的原项）。同一轮回归中底部栏的结果与 3.5 记录的例外相同。
+  - 交互在 fixture 中逐项点过：拖动排序（含拖动当前曲目，当前序号随之更新）、删除当前曲目之前、之后与当前曲目本身、点击切歌并关闭抽屉、“当前播放”滚动到当前曲目、清空列表（确认对话框后底部栏隐藏、提示“播放列表已清空”），页面没有报错。
+  - 窄于 990px 时抽屉固定在视口右侧，不随页面横向滚动：它是带遮罩的浮层，SPlayer 中同样贴着视口；`900×800` 滚动前后都在 `x=500–900`。
+- [ ] 全屏播放器（各样式与背景、AMLL 歌词渲染含逐字/翻译/音译）。只接 fixture。
 - [ ] 去掉评论按钮、歌曲别名、歌名下的整行标签（音质、歌词类型 `LRC`/`YRC`/`TTML` 及歌词来源切换、`Official` 等音源标签）与音质切换。
 
 ### 3.6 依赖边界与视觉比较
@@ -81,6 +88,8 @@
   - 状态表（歌曲、跳转点、交互步骤、裁剪区域）从采集脚本抽到 [player-states.mjs](../../scripts/baseline/player-states.mjs)，参考实例与 Sonora 共用。
   - **对照基线 `--sonora`**：[splayer-player.mjs](../../scripts/baseline/splayer-player.mjs) `--sonora` 用 SPlayer 自己的设置去掉 Eric 决定不显示的元素（`showPlayerQuality`、`showPlayMeta` 关闭，`fullscreenPlayerElements` 的评论与下载关闭），并清空歌曲别名；播放中的状态也停在跳转点，只把 store 的 `playStatus` 设为 true，避免截图时间不定；截图区域包含背后页面的状态隐藏 `#main` 与歌曲列表的浮动按钮。产物在 `.local/baseline/splayer/2026-10-25-sonora/`，原基线 `2026-10-25` 不变，仍是 SPlayer 原样的记录。
   - [scripts/visual/player.mjs](../../scripts/visual/player.mjs) 在同样的环境与步骤下截取 Sonora（`?fixture=baseline&player=…`），产物在 `.local/visual/<run>/`，用 [diff.mjs](../../scripts/baseline/diff.mjs) 比较。fixture 的封面使用网易按 100、300、1024 缩放的原图（基线快照补采），播放器状态带上参考实例音频的实际时长。
+  - 只重采部分状态（`--only`）时，两个脚本的 manifest 保留其余状态的记录，按状态表排序（2026-10-25；此前会覆盖整个 manifest，`2026-10-25-sonora/1440x1000` 的 manifest 因此缺少四个底部栏状态的记录，截图仍在）。
+  - 没有歌曲时没有底部栏，背后的页面会从队列抽屉的圆角透出，`queue-empty` 因此也隐藏 `#main`（`hideMain`）。
   - 尚未接入 Taskfile；对照需要参考实例与 `.local` 中的基线，只能在本机运行。
 
 ## 退出条件
