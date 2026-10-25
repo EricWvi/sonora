@@ -4,6 +4,7 @@ import vue from "@vitejs/plugin-vue";
 import AutoImport from "unplugin-auto-import/vite";
 import Components from "unplugin-vue-components/vite";
 import { NaiveUiResolver } from "unplugin-vue-components/resolvers";
+import { boundaryPlugin } from "./boundaries.mjs";
 
 export default defineConfig({
   plugins: [
@@ -13,6 +14,7 @@ export default defineConfig({
       dts: "auto-imports.d.ts",
     }),
     Components({ resolvers: [NaiveUiResolver()], dts: "components.d.ts" }),
+    boundaryPlugin(),
   ],
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   server: {

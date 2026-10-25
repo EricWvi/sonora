@@ -1,6 +1,6 @@
 # 阶段 3：播放端视觉外壳
 
-状态：进行中，3.1、3.3 已完成，3.2 只剩页面相关设置项（随 3.4），3.5 的底部播放栏、播放队列抽屉与全屏播放器完成并与原项目截图对照（2026-10-25）。前置：阶段 2 的页面清单（已确定）；播放器部分需要阶段 2 的播放器参考图。参照路线图：[样式还原与验收方法](../roadmap.md#6-样式还原与验收方法)。
+状态：进行中，3.1、3.3、3.5、3.6 已完成，3.2 只剩页面相关设置项（随 3.4），3.4 页面模板未开始（2026-10-25）。前置：阶段 2 的页面清单（已确定）；播放器部分需要阶段 2 的播放器参考图。参照路线图：[样式还原与验收方法](../roadmap.md#6-样式还原与验收方法)。
 
 ## 当前事实
 
@@ -99,8 +99,12 @@
 
 ### 3.6 依赖边界与视觉比较
 
-- [ ] 增加检查，禁止前端导入网易 API、Cookie 工具或 `reference/` 下的运行时代码。
-- [ ] 引入 Playwright 截图对照流程，复用阶段 2 的环境参数；输出参考图、实际图、差异图与结论；接入 Taskfile（例如 `task test:visual`）。进展（2026-10-25）：
+- [x] 增加检查，禁止前端导入网易 API、Cookie 工具或 `reference/` 下的运行时代码。运行确认（2026-10-25）：规则集中在 [frontend/boundaries.mjs](../../frontend/boundaries.mjs)，分两层：
+  - ESLint（`task lint:frontend`）：`import`、`export … from`、动态 `import()` 与 `import.meta.glob` 的路径中不得出现 `reference/`、`netease`、`cookie`（后两项不区分大小写）；源码字符串中不得出现 `music.163.com`、`api/netease`、`MUSIC_U`。
+  - 构建插件（`vite build`，因此 `task build:frontend` 与 `task test` 都会执行）：加载每个模块时检查实际路径（`reference/` 目录下的文件，以及路径含 `netease`、`cookie` 的源码与依赖包），构建结束时检查 SCSS 等引入的文件，生成产物时检查网易接口地址。ESLint 看不到的样式引入与间接依赖由这一层拦截。
+  - 检查方式：临时加入 10 种违规写法（`js-cookie`、`@/utils/cookie`、导入与动态导入 `reference/` 下的文件、`import.meta.glob`、网易 API 包、`.vue` 中的网易请求模块、网易地址与 `MUSIC_U` 字符串），ESLint 全部报错，正常的动态导入不受影响；构建时临时引入 `reference/` 下的 TS 文件、SCSS `@use` 与网易地址，三种都以“依赖边界检查失败”中止。现有代码两层都通过，产物中没有 fixture。
+  - 管理后台（`admin/`）不复制 SPlayer 代码，没有接入这项检查。
+- [x] 引入 Playwright 截图对照流程，复用阶段 2 的环境参数；输出参考图、实际图、差异图与结论；接入 Taskfile（`task test:visual`）。运行确认（2026-10-25）：
   - 状态表（歌曲、跳转点、交互步骤、裁剪区域）从采集脚本抽到 [player-states.mjs](../../scripts/baseline/player-states.mjs)，参考实例与 Sonora 共用。
   - **对照基线 `--sonora`**：[splayer-player.mjs](../../scripts/baseline/splayer-player.mjs) `--sonora` 用 SPlayer 自己的设置去掉 Eric 决定不显示的元素（`showPlayerQuality`、`showPlayMeta` 关闭，`fullscreenPlayerElements` 的评论与下载关闭），并清空歌曲别名；播放中的状态也停在跳转点，只把 store 的 `playStatus` 设为 true，避免截图时间不定；截图区域包含背后页面的状态隐藏 `#main` 与歌曲列表的浮动按钮。产物在 `.local/baseline/splayer/2026-10-25-sonora/`，原基线 `2026-10-25` 不变，仍是 SPlayer 原样的记录。
   - [scripts/visual/player.mjs](../../scripts/visual/player.mjs) 在同样的环境与步骤下截取 Sonora（`?fixture=baseline&player=…`），产物在 `.local/visual/<run>/`，用 [diff.mjs](../../scripts/baseline/diff.mjs) 比较。fixture 的封面使用网易按 100、300、1024 缩放的原图（基线快照补采），播放器状态带上参考实例音频的实际时长。
@@ -109,7 +113,10 @@
   - 无背景样式（`full-cover-none`）同样会透出背后的页面（参考实例专辑页右下角的浮动按钮），也隐藏 `#main`。
   - 状态的设置在基础设置上合并，对象型设置（如 `fullscreenPlayerElements`）逐个字段合并，`--sonora` 关掉的评论与下载按钮不会被状态覆盖。
   - **流动背景的对照方法**（2026-10-25）：流动背景按真实时间渲染，不能逐像素比较。两边运行同一版本的 AMLL 渲染器，因此比较它的输入：`BackgroundRender` 实际收到的 props（帧率、流速、渲染比例、是否有歌词、低频音量、播放状态）与封面图片内容的 SHA-256。两个采集脚本在 `animations: "allow"` 的状态把它们写入 manifest 的 `background`；截图只用于人工对照。`full-cover-animation-t0`、`-t2000` 与 `set-animation` 两边相同。
-  - 尚未接入 Taskfile；对照需要参考实例与 `.local` 中的基线，只能在本机运行。
+  - **`task test:visual`**（[compare.mjs](../../scripts/visual/compare.mjs)）：在 `127.0.0.1:14571` 起一个临时 Vite（`--port` 可改，`--base` 用已有的服务），按参考目录中每个视口已有的状态截取 Sonora、逐像素比较，再按已接受的差异判定，最后停掉 Vite。结论逐个状态列为“一致”“例外”（附原因）或“不符”，有不符、缺图、页面报错或流动背景的渲染输入不同时以 1 退出。截图、差异图与 `summary.json` 在 `.local/visual/test-visual/`，每次运行先清空。可用 `-- --viewport 1440x1000 --only '^bar-'` 只跑一部分。
+  - 只能在本机运行：参考图在 `.local/baseline/splayer/2026-10-25-sonora/`（由参考实例采集），baseline fixture 在 `.local/fixtures/baseline/`，Playwright 来自 `../palace`；缺少任何一项时说明如何补齐后退出。任务本身不访问参考实例，也不读取凭据；参考图需要重采时仍手动运行 `splayer-player.mjs --sonora`。
+  - 判定规则写在 `compare.mjs` 中，只收录 Eric 已接受的差异，每条限定状态、视口、像素数与最大差值：`bar-paused-start` 的采集步骤、`bar-volume-hover` 的亚像素位置（`1440×1000` 至多 2 个像素，窄窗口的底部栏按 3.5 的记录至多 9 个像素、最大差值 9）、评论层（`full-record-blur`、窄窗口 `full-cover-blur` 与 `full-yrc`）、`set-yrc-off` 的数据差异。全屏播放器与设置状态先去掉差值不超过 2 的像素（取色 ±1 与评论层的 1–2 个像素），剩下的再按上述规则判定；取色偏移与评论层图标同时出现时（例如 `1024×800` 的 `full-yrc`，6820 个像素）也能分开处理。`diff.mjs` 的报告为此增加了按差值统计的像素数（`deltas`）。
+  - 结果：全量（`1440×1000` 34 个状态与 4 个窄视口共 20 个状态）54 个状态中 30 个一致、24 个属于例外、0 个不符，约 3 分半钟。第一轮全量中 `1440×1000` 的 `full-yrc-amll` 出现过一次 AMLL 歌词整行错位（20279 个像素，最大差值 99），单独重跑三次都只差评论层的 1 个像素。之后又跑了三轮全量，其中一轮 `set-yrc-amll` 的当前行逐字高亮与参考图不同（去掉取色偏移后 9945 个像素，最大差值 45），另一轮窄窗口 `bar-volume-hover` 出现 5 个像素（在 3.5 已接受的范围内，规则随之放宽到 9）。AMLL 的两个状态（`full-yrc-amll`、`set-yrc-amll`）偶尔截到不同的歌词帧，单独重跑都能对上，原因未查明，没有为此放宽判定；遇到时重跑该状态确认（**待查**）。
 
 ## 退出条件
 

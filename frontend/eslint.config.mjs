@@ -1,6 +1,7 @@
 import vue from "eslint-plugin-vue";
 import tsParser from "@typescript-eslint/parser";
 import tsPlugin from "@typescript-eslint/eslint-plugin";
+import { boundaryRules } from "./boundaries.mjs";
 
 export default [
   {
@@ -25,6 +26,7 @@ export default [
         "error",
         { varsIgnorePattern: "^_", argsIgnorePattern: "^_" },
       ],
+      ...boundaryRules,
     },
   },
   { files: ["**/*.ts"], languageOptions: { parser: tsParser } },

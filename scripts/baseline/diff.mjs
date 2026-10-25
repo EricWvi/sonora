@@ -5,8 +5,8 @@
 //   node scripts/baseline/diff.mjs <dir A> <dir B> [--out DIR] [--threshold N]
 //
 // A pixel differs when any channel differs by more than threshold (0–255,
-// default 0). The report lists, per file, the differing pixels and the
-// bounding box they fall in. Decoding and comparing run in Chromium's
+// default 0). The report lists, per file, the differing pixels, how many
+// differ by each amount and the bounding box they fall in. Decoding and comparing run in Chromium's
 // canvas, so no image library is needed.
 
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
@@ -83,6 +83,8 @@ try {
         let count = 0;
         let maxDelta = 0;
         let box = null;
+        // Differing pixels per largest channel difference.
+        const deltas = {};
         for (let i = 0; i < pa.length; i += 4) {
           const d = Math.max(
             Math.abs(pa[i] - pb[i]),
@@ -97,6 +99,7 @@ try {
           if (d > threshold) {
             count++;
             maxDelta = Math.max(maxDelta, d);
+            deltas[d] = (deltas[d] ?? 0) + 1;
             const p = i / 4;
             const x = p % w;
             const y = Math.floor(p / w);
@@ -122,7 +125,7 @@ try {
             s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
           png = btoa(s);
         }
-        return { pixels: w * h, count, maxDelta, box, png };
+        return { pixels: w * h, count, maxDelta, deltas, box, png };
       },
       [a.toString("base64"), b.toString("base64"), threshold],
     );

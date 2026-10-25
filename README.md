@@ -13,7 +13,7 @@ task run:admin    # 管理后台，http://127.0.0.1:14561/admin/ ，账号 admin
 task run:web      # 播放端，http://localhost:14559
 ```
 
-开发模式只在 `go run -tags dev` 构建中可用：跳过初始化 token，使用写死的管理员 `admin` / `admin`，数据写在 `backend/.data/`。`task format` 格式化全部代码；`task lint` 检查前端与管理后台的格式、ESLint、类型以及 Go 的 gofmt 与 `go vet`；`task test` 在此之上运行 Go 测试并构建两份前端；`task build` 生成嵌入两份前端的发布二进制 `release/sonora`；`task clean` 清理构建产物。
+开发模式只在 `go run -tags dev` 构建中可用：跳过初始化 token，使用写死的管理员 `admin` / `admin`，数据写在 `backend/.data/`。`task format` 格式化全部代码；`task lint` 检查前端与管理后台的格式、ESLint、类型以及 Go 的 gofmt 与 `go vet`，播放端的 ESLint 与构建同时检查依赖边界（不导入网易 API、Cookie 工具与 `reference/`）；`task test` 在此之上运行 Go 测试并构建两份前端；`task build` 生成嵌入两份前端的发布二进制 `release/sonora`；`task clean` 清理构建产物。`task test:visual` 把播放器与 SPlayer 参考图逐像素对照，依赖本机 `.local/` 中的参考图与 baseline fixture，只能在本机运行，见[阶段 3 的 3.6](docs/phase/phase-3-player-shell.md#36-依赖边界与视觉比较)。
 
 工程组成：
 

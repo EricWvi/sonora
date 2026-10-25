@@ -88,7 +88,7 @@ tasks:
       - task: lint:go
 
   lint:frontend:
-    desc: Check frontend formatting, ESLint and TypeScript
+    desc: Check frontend formatting, ESLint (with dependency boundaries) and TypeScript
     cmds:
       - pnpm format:check
       - pnpm lint
@@ -131,6 +131,27 @@ tasks:
     cmds:
       - go test ./...
       - go test -tags dev ./internal/config
+
+  test:visual:
+    desc: Compare the player with the SPlayer reference screenshots (this machine only, see docs/phase/phase-3-player-shell.md 3.6)
+    summary: |
+      Starts a throwaway Vite server on 127.0.0.1:14571, captures Sonora's
+      player with ?fixture=baseline in every viewport and state of the
+      reference, compares pixel by pixel and judges the differences against
+      the ones Eric accepted. Fails on any other difference.
+
+      Runs only on this machine. It needs:
+        - the reference screenshots in .local/baseline/splayer/2026-10-25-sonora/,
+          captured from the local SPlayer instance with
+          scripts/baseline/splayer-player.mjs --sonora (run from ../palace);
+        - the baseline fixture in .local/fixtures/baseline/
+          (node scripts/fixtures/baseline.mjs);
+        - Playwright installed in ../palace (or PLAYWRIGHT_TEST).
+      It never touches the SPlayer instance or its credentials. Output goes to
+      .local/visual/test-visual/. Pass script options after --, for example
+      task test:visual -- --viewport 1440x1000 --only '^bar-'
+    cmds:
+      - node scripts/visual/compare.mjs {{.CLI_ARGS}}
 
   test:contract:
     desc: Run the Authelia contract test using locally prepared images (never pulls)
