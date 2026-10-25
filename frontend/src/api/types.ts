@@ -74,6 +74,12 @@ export type Playlist = {
   updatedAt: string;
 };
 
+/** 新建与修改歌单的内容：名称 1–100 个字符，简介最多 1000 个字符。 */
+export type PlaylistInput = {
+  name: string;
+  description: string;
+};
+
 export type HistoryEntry = {
   track: Track;
   playedAt: string;

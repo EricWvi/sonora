@@ -16,6 +16,7 @@
 - `frontend/src/components/AMLL/`、`frontend/src/components/Global/PlayerProvider.vue`、`frontend/src/components/UI/s-image.vue`、`frontend/src/utils/style.ts`、`frontend/src/utils/lyric/lyricFontConfig.ts`：原 AMLL 歌词与背景封装、播放器主题覆盖、图片组件与歌词字体工具。
 - `frontend/src/utils/lyric/`、`frontend/src/assets/data/exclude.ts`、`frontend/src/utils/calc.ts`、`time.ts`、`format.ts`、`helper.ts`、`instruction.ts`、`modal.ts`：原歌词解析与排除规则、歌词行计算及播放器用到的工具函数（保留部分）。
 - `frontend/src/components/List/SongList.vue`、`ListDetail.vue`、`CoverList.vue`、`ArtistList.vue`、`frontend/src/components/Card/SongCard.vue`、`SongListCard.vue`、`frontend/src/components/Menu/SongListMenu.vue`、`frontend/src/composables/useSongMenu.ts`、`frontend/src/composables/List/useListDetail.ts`、`useListSearch.ts`、`useListScroll.ts`、`useListActions.ts`：原歌曲列表、详情页头部、封面与艺术家网格、卡片、歌曲右键菜单与列表组合函数。
+- `frontend/src/components/Modal/CreatePlaylist.vue`、`UpdatePlaylist.vue`、`PlaylistAdd.vue`、`frontend/src/utils/rules.ts`：原新建、编辑歌单与添加到歌单的弹窗及表单规则（保留部分）。
 - `frontend/src/components/Search/`：原搜索框、搜索建议与搜索历史，建议改为曲库搜索。
 - `frontend/src/views/History.vue`、`frontend/src/views/List/`、`frontend/src/views/Artist/`、`frontend/src/views/Search/`、`frontend/src/views/Home/`：原最近播放、专辑与歌单详情、我喜欢、艺术家详情、搜索结果与首页，按 Sonora 的页面清单改编。
 - `frontend/src/utils/meta.ts`、`auth.ts`：原排序选项、图片工具栏与喜欢等入口（保留部分）。

@@ -9,6 +9,7 @@ import type {
   Lyrics,
   Page,
   Playlist,
+  PlaylistInput,
   Track,
   TrackQuery,
   User,
@@ -47,6 +48,22 @@ export interface DataSource {
   unlike(trackId: number): Promise<void>;
   /** 记录一次播放；什么时候算一次播放由播放控制器决定。 */
   recordPlay(trackId: number): Promise<void>;
+  /** 清空最近播放。 */
+  clearHistory(): Promise<void>;
+  createPlaylist(input: PlaylistInput): Promise<Playlist>;
+  updatePlaylist(id: number, input: PlaylistInput): Promise<Playlist>;
+  deletePlaylist(id: number): Promise<void>;
+  /** 按给定顺序追加到歌单末尾，已在歌单中的跳过；`added` 是实际加入的数量。 */
+  addToPlaylist(
+    id: number,
+    trackIds: number[],
+  ): Promise<{ added: number; playlist: Playlist }>;
+  removeFromPlaylist(id: number, trackId: number): Promise<Playlist>;
+  /**
+   * 保存歌单的新顺序，`trackIds` 为歌单的全部歌曲。与服务端不一致时为 409
+   * `conflict`，说明本地的副本已过期。
+   */
+  setPlaylistOrder(id: number, trackIds: number[]): Promise<Playlist>;
   /**
    * 音频地址的 HTTP 状态，0 表示服务不可达。音频元素出错时只给出 MediaError，
    * 播放控制器用它区分未登录、歌曲已删除与网络问题。
@@ -111,6 +128,10 @@ const send = async (method: string, path: string, body?: unknown) => {
   await request<null>(method, api + path, body);
 };
 
+// 返回正文的写请求。
+const write = <T>(method: string, path: string, body?: unknown) =>
+  request<T>(method, api + path, body);
+
 const httpSource: DataSource = {
   me: () => get("me"),
   tracks: (query) => get("tracks", query),
@@ -129,6 +150,16 @@ const httpSource: DataSource = {
   like: (trackId) => send("PUT", `likes/${trackId}`),
   unlike: (trackId) => send("DELETE", `likes/${trackId}`),
   recordPlay: (trackId) => send("POST", "history", { trackId }),
+  clearHistory: () => send("DELETE", "history"),
+  createPlaylist: (input) => write("POST", "playlists", input),
+  updatePlaylist: (id, input) => write("PUT", `playlists/${id}`, input),
+  deletePlaylist: (id) => send("DELETE", `playlists/${id}`),
+  addToPlaylist: (id, trackIds) =>
+    write("POST", `playlists/${id}/tracks`, { trackIds }),
+  removeFromPlaylist: (id, trackId) =>
+    write("DELETE", `playlists/${id}/tracks/${trackId}`),
+  setPlaylistOrder: (id, trackIds) =>
+    write("PUT", `playlists/${id}/order`, { trackIds }),
   async audioStatus(trackId) {
     try {
       const res = await fetch(httpSource.audioUrl(trackId), {

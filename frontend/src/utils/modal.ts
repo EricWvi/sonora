@@ -1,9 +1,10 @@
 import type { ArtistRef, Track } from "@/api/types";
 import { NScrollbar } from "naive-ui";
 import router from "@/router";
+import { isFunction } from "lodash-es";
 
-// 照搬 SPlayer utils/modal.ts 中播放器用到的入口。弹窗（选择艺术家、添加到歌单、
-// 复制更多信息、均衡器、复制歌词、设置）在阶段 5 接入，之前只提示。
+// 照搬 SPlayer utils/modal.ts 中播放器用到的入口。弹窗（选择艺术家、复制更多信息、
+// 均衡器、复制歌词、设置）在阶段 5 接入，之前只提示。
 
 const pending = (name: string) =>
   window.$message.info(`${name}将在后续阶段接入`);
@@ -24,7 +25,34 @@ export const openJumpArtist = async (data: ArtistRef[], id?: number) => {
 // 添加到歌单
 export const openPlaylistAdd = async (data: Track[]) => {
   if (!data.length) return window.$message.warning("请正确选择歌曲");
-  pending("添加到歌单");
+  const { default: PlaylistAdd } =
+    await import("@/components/Modal/PlaylistAdd.vue");
+  const modal = window.$modal.create({
+    preset: "card",
+    transformOrigin: "center",
+    autoFocus: false,
+    style: { width: "600px" },
+    title: "添加到歌单",
+    content: () => {
+      return h(PlaylistAdd, { data, onClose: () => modal.destroy() });
+    },
+  });
+};
+
+// 新建歌单
+export const openCreatePlaylist = async () => {
+  const { default: CreatePlaylist } =
+    await import("@/components/Modal/CreatePlaylist.vue");
+  const modal = window.$modal.create({
+    preset: "card",
+    transformOrigin: "center",
+    autoFocus: false,
+    style: { width: "600px" },
+    title: "新建歌单",
+    content: () => {
+      return h(CreatePlaylist, { onClose: () => modal.destroy() });
+    },
+  });
 };
 
 // 复制更多信息
@@ -74,6 +102,33 @@ export const openDescModal = (content: string, title: string = "歌单简介") =
 
 /**
  * 编辑歌单
- * @param _id 歌单 ID
+ * @param id 歌单 ID
+ * @param data 歌单信息
+ * @param func 回调函数
  */
-export const openUpdatePlaylist = async (_id: number) => pending("编辑歌单");
+export const openUpdatePlaylist = async (
+  id: number,
+  data: { name: string; description?: string },
+  func: () => Promise<void>,
+) => {
+  const { default: UpdatePlaylist } =
+    await import("@/components/Modal/UpdatePlaylist.vue");
+  const modal = window.$modal.create({
+    preset: "card",
+    transformOrigin: "center",
+    autoFocus: false,
+    style: { width: "600px" },
+    title: "编辑歌单",
+    content: () => {
+      return h(UpdatePlaylist, {
+        id,
+        data,
+        onSuccess: () => {
+          modal.destroy();
+          // 触发回调
+          if (isFunction(func)) func();
+        },
+      });
+    },
+  });
+};

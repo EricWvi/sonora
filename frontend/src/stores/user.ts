@@ -26,6 +26,15 @@ export const useUserStore = defineStore("sonora-user", () => {
     }
   }
 
+  /** 歌单写入后重新读取侧栏与“添加到歌单”的列表。 */
+  async function loadPlaylists(): Promise<void> {
+    try {
+      playlists.value = (await source.playlists()).items;
+    } catch (error) {
+      if (!unauthorized(error)) console.error("❌ 读取歌单失败:", error);
+    }
+  }
+
   async function logout(): Promise<void> {
     await source.logout();
     user.value = null;
@@ -33,5 +42,5 @@ export const useUserStore = defineStore("sonora-user", () => {
     signedOut.value = true;
   }
 
-  return { user, playlists, signedOut, load, logout };
+  return { user, playlists, signedOut, load, loadPlaylists, logout };
 });

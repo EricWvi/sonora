@@ -92,8 +92,11 @@ export const useSongMenu = () => {
         label: "从歌单中删除",
         show: emit !== undefined && !!playlistId,
         props: {
-          // 写入在阶段 5 接入，成功后由页面从列表中移除（emit removeSong）
-          onClick: () => deleteSongs(playlistId, [song.id]),
+          onClick: () =>
+            deleteSongs(playlistId, [song.id], {
+              callback: () => emit?.("removeSong", [song.id]),
+              songName: song.title,
+            }),
         },
         icon: renderIcon("Delete"),
       },

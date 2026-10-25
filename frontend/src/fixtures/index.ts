@@ -356,6 +356,17 @@ function librarySource(lib: Library): DataSource {
     if (!found) throw notFound();
     return found;
   };
+  // 歌单内容变化后，按服务端的规则重算封面、数量与时长。
+  const touch = (found: Library["playlists"][number]) => {
+    const list = found.trackIds.map(track);
+    Object.assign(found.playlist, {
+      cover: list.find((t) => t.cover)?.cover ?? null,
+      trackCount: list.length,
+      durationMs: list.reduce((sum, t) => sum + t.durationMs, 0),
+      updatedAt: new Date().toISOString(),
+    });
+    return found.playlist;
+  };
   // 歌曲默认新入库在前。
   const newestFirst = () => [...lib.tracks].reverse();
   const byArtist = (t: Track, id: number) =>
@@ -476,6 +487,64 @@ function librarySource(lib: Library): DataSource {
           { trackId, playedAt: new Date().toISOString() },
           ...lib.history.filter((e) => e.trackId !== trackId),
         ];
+      }),
+    clearHistory: () =>
+      reply(() => {
+        lib.history = [];
+      }),
+    createPlaylist: (input) =>
+      reply(() => {
+        const now = new Date().toISOString();
+        const playlist: Playlist = {
+          id: Math.max(0, ...lib.playlists.map((p) => p.playlist.id)) + 1,
+          name: input.name,
+          description: input.description,
+          cover: null,
+          trackCount: 0,
+          durationMs: 0,
+          createdAt: now,
+          updatedAt: now,
+        };
+        lib.playlists.unshift({ playlist, trackIds: [] });
+        return playlist;
+      }),
+    updatePlaylist: (id, input) =>
+      reply(() => {
+        const found = ownPlaylist(id);
+        Object.assign(found.playlist, input);
+        return touch(found);
+      }),
+    deletePlaylist: (id) =>
+      reply(() => {
+        ownPlaylist(id);
+        lib.playlists = lib.playlists.filter((p) => p.playlist.id !== id);
+      }),
+    addToPlaylist: (id, trackIds) =>
+      reply(() => {
+        const found = ownPlaylist(id);
+        trackIds.forEach(track);
+        const fresh = [...new Set(trackIds)].filter(
+          (t) => !found.trackIds.includes(t),
+        );
+        found.trackIds.push(...fresh);
+        return { added: fresh.length, playlist: touch(found) };
+      }),
+    removeFromPlaylist: (id, trackId) =>
+      reply(() => {
+        const found = ownPlaylist(id);
+        found.trackIds = found.trackIds.filter((t) => t !== trackId);
+        return touch(found);
+      }),
+    setPlaylistOrder: (id, trackIds) =>
+      reply(() => {
+        const found = ownPlaylist(id);
+        const same =
+          trackIds.length === found.trackIds.length &&
+          [...trackIds].sort().join() === [...found.trackIds].sort().join();
+        if (!same)
+          throw new ApiError(409, "歌单已在别处修改，请刷新后重试", "conflict");
+        found.trackIds = [...trackIds];
+        return touch(found);
       }),
     audioStatus: () => reply(() => 200),
     logout: () => Promise.resolve(),

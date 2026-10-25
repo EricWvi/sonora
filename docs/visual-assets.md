@@ -36,6 +36,7 @@
 | 通用组件：图片、输入框、虚拟滚动 | `src/components/UI/` | 737 | 照搬 | 已照搬 `VirtualScroll.vue`、`s-image.vue`；`s-input.vue` 未用到（搜索框与列表内搜索在 SPlayer 中用的是 `n-input`） |
 | 搜索框、搜索建议与搜索历史 | `src/components/Search/` | 816 | 照搬，建议改为曲库搜索 | 已照搬（阶段 3.4，2026-10-25），去掉热搜榜、推荐关键词、分享链接识别与搜索框右键菜单 |
 | 页面：最近播放、专辑与歌单详情、我喜欢、艺术家详情、搜索结果、首页 | `src/views/History.vue`、`views/List/`、`views/Artist/`、`views/Search/`、`views/Home/` | — | 视觉语言一致，结构按阶段 2 决定 | 已改编（阶段 3.4，2026-10-25），列表组合函数 `useListDetail`、`useListSearch`、`useListScroll`、`useListActions` 一并照搬 |
+| 弹窗：新建、编辑歌单与添加到歌单 | `src/components/Modal/CreatePlaylist.vue`、`UpdatePlaylist.vue`、`PlaylistAdd.vue`、`src/utils/rules.ts` | 567 | 照搬 | 已照搬（阶段 5，2026-10-25）：新建用其本地歌单的表单（名称、描述），编辑去掉网易的歌单分类，添加到歌单列出自己的歌单、不含“我喜欢的音乐”；`rules.ts` 只取 `textRule` |
 | 外观与歌词设置项 | `src/components/Setting/config/appearance.ts`、`lyric.ts`、`components/LyricPreview.vue` | 1735 | 照搬保留的设置项（[阶段 2 的设置表](phase/phase-2-player-baseline.md#设置)） | 未开始 |
 
 ## 3. 运行时依赖

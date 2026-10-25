@@ -148,7 +148,7 @@ const moreOptions = computed<DropdownOption[]>(() => [
     label: "删除歌单",
     key: "delete",
     props: {
-      onClick: () => deletePlaylist(playlistId.value),
+      onClick: toDeletePlaylist,
     },
     icon: renderIcon("Delete"),
   },
@@ -226,25 +226,46 @@ const playAllSongs = useDebounceFn(() => {
   playAllSongsAction(displayData.value, `playlist-${playlistId.value}`);
 }, 300);
 
-// 编辑歌单（弹窗在阶段 5 接入）
-const updatePlaylist = () => openUpdatePlaylist(playlistId.value);
-
-// 删除歌曲：写入成功后从列表中移除
-const removeSong = (ids: number[]) => {
-  setListData(listData.value.filter((song) => !ids.includes(song.id)));
+// 编辑歌单，成功后重新读取
+const updatePlaylist = () => {
+  if (!detailData.value || !playlistId.value) return;
+  const id = playlistId.value;
+  openUpdatePlaylist(
+    id,
+    {
+      name: detailData.value.name,
+      description: detailData.value.description,
+    },
+    () => getPlaylistDetail(id),
+  );
 };
 
-// 拖拽排序：先更新视图，保存顺序在阶段 5 接入
-const handleReorder = (fromIndex: number, toIndex: number) => {
+// 删除歌单，成功后返回上一页（与 SPlayer 的本地歌单相同）
+const toDeletePlaylist = () => {
+  if (!detailData.value || !playlistId.value) return;
+  deletePlaylist(playlistId.value, () => router.back());
+};
+
+// 删除歌曲：服务端确认后从列表中移除，并更新头部的数量
+const removeSong = (ids: number[]) => {
+  setListData(listData.value.filter((song) => !ids.includes(song.id)));
+  if (detailData.value)
+    setDetailData({ ...detailData.value, count: listData.value.length });
+};
+
+// 拖拽排序：先更新视图，保存失败时重新读取歌单
+const handleReorder = async (fromIndex: number, toIndex: number) => {
   if (fromIndex === toIndex) return;
+  const id = playlistId.value;
   const newList = [...listData.value];
   const [moved] = newList.splice(fromIndex, 1);
   newList.splice(toIndex, 0, moved);
   setListData(newList);
-  savePlaylistOrder(
-    playlistId.value,
+  const saved = await savePlaylistOrder(
+    id,
     newList.map((song) => song.id),
   );
+  if (!saved && playlistId.value === id) getPlaylistDetail(id);
 };
 
 onBeforeRouteUpdate((to) => {

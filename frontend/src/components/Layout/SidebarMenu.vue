@@ -30,6 +30,7 @@ import { source } from "@/api/source";
 import SvgIcon from "@/components/Global/SvgIcon.vue";
 import { useSettingStore } from "@/stores/setting";
 import { useUserStore } from "@/stores/user";
+import { openCreatePlaylist } from "@/utils/modal";
 
 const props = defineProps<{ collapsed: boolean }>();
 const emit = defineEmits<{ "menu-click": [key: string | number] }>();
@@ -95,8 +96,10 @@ const options = computed<MenuOption[]>(() => [
           secondary: true,
           renderIcon: renderIcon("Add"),
           "aria-label": "新建歌单",
-          // 新建歌单的弹窗在阶段 5 接入。
-          onClick: (event: Event) => event.stopPropagation(),
+          onClick: (event: Event) => {
+            event.stopPropagation();
+            openCreatePlaylist();
+          },
         }),
       ]),
     children: userStore.playlists.map((playlist) => ({
