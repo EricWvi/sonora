@@ -1,12 +1,12 @@
 # 阶段 3：播放端视觉外壳
 
-状态：进行中，3.1 已完成，3.2 的 Provider、最小宽度与取色已完成（2026-10-25）。前置：阶段 2 的页面清单（已确定）；播放器部分需要阶段 2 的播放器参考图。参照路线图：[样式还原与验收方法](../roadmap.md#6-样式还原与验收方法)。
+状态：进行中，3.1、3.3 已完成，3.2 的 Provider、最小宽度与取色已完成（2026-10-25）。前置：阶段 2 的页面清单（已确定）；播放器部分需要阶段 2 的播放器参考图。参照路线图：[样式还原与验收方法](../roadmap.md#6-样式还原与验收方法)。
 
 ## 当前事实
 
 `frontend/` 已有主框架（[AppLayout.vue](../../frontend/src/layout/AppLayout.vue)）、侧栏菜单、顶部导航、明暗主题和窄屏抽屉；界面名称已改为 Sonora，标志图形沿用 SPlayer。菜单、路由与顶栏用户入口已按首发范围重建（3.1）。各页面仍是占位（[EmptyView.vue](../../frontend/src/views/EmptyView.vue)）；没有播放器、卡片、歌曲列表或视觉比较工具。
 
-数据只经 [api/source.ts](../../frontend/src/api/source.ts) 的 `DataSource` 读取。开发服务器上以 `?fixture=<场景>` 打开时换成 [fixtures](../../frontend/src/fixtures/index.ts)，不需要 Go 服务，例如 `http://127.0.0.1:14559/?fixture=library#/`；场景有 `library`、`empty`、`loading`、`unreachable`。生产构建不含 fixture（已用 `vite build` 检查产物）。3.3 在这一层上补齐 ViewModel 与其余场景。
+数据只经 [api/source.ts](../../frontend/src/api/source.ts) 的 `DataSource` 读取，它覆盖播放端 API 的全部读取接口。开发服务器上以 `?fixture=<场景>` 打开时换成 [fixtures](../../frontend/src/fixtures/index.ts)，不需要 Go 服务；`&player=<状态>` 再指定播放器的初始状态（`source.ts` 导出的 `fixturePlayer`），例如 `http://127.0.0.1:14559/?fixture=baseline&player=yoru-paused#/`。场景与状态见 3.3。生产构建不含 fixture（已用 `vite build` 检查产物）。
 
 ## 工作包
 
@@ -29,8 +29,28 @@
 
 ### 3.3 Fixture 与 ViewModel
 
-- [ ] 定义歌曲行、专辑/艺术家/歌单卡片、详情头部、播放器状态的 ViewModel，字段沿用播放端 API 的数据形态（`artists` 数组、`cover` 对象），不含文件路径，不使用网易字段。
-- [ ] fixture 可切换空曲库、有数据、加载、服务不可达、播放中/暂停；播放器 fixture 复现阶段 2 参考图中的歌曲数据。
+- [x] 定义歌曲行、专辑/艺术家/歌单卡片、详情头部、播放器状态的 ViewModel，字段沿用播放端 API 的数据形态（`artists` 数组、`cover` 对象），不含文件路径，不使用网易字段。源码确认（2026-10-25）：
+  - [api/types.ts](../../frontend/src/api/types.ts) 补齐播放端 API 的数据形态（歌曲、专辑、艺术家、历史、歌词、列表参数），与 [player.go](../../backend/internal/server/player.go) 的响应结构逐字段对应；`DataSource` 增加曲库、喜爱、历史、歌单与歌词的读取，以及 `audioUrl`。写操作（喜爱、歌单编辑、记录播放）在阶段 4、5 接入时再加。
+  - [viewmodels/index.ts](../../frontend/src/viewmodels/index.ts)：`SongRow` 是歌曲加喜爱状态（列按阶段 2 的“歌曲列表”）；`CoverCard` 与 `DetailHeader` 直接携带 API 对象，按类型区分，详情头部的四种对应阶段 2 的“详情页头部”表；`PlayerState` 是队列、当前位置、播放位置与是否在播放。页面模板与播放器组件在 3.4、3.5 按需要再细化，不另起字段名。
+- [x] fixture 可切换空曲库、有数据、加载、服务不可达、播放中/暂停；播放器 fixture 复现阶段 2 参考图中的歌曲数据。运行确认（2026-10-25，临时 Vite 实例与 Playwright Chromium，逐个场景调用 `DataSource`）：
+
+  | 场景 `fixture=` | 内容 | `player=` |
+  | --- | --- | --- |
+  | `library` | 虚构曲库：5 位艺术家、5 张专辑（含双碟专辑、多位艺术家合作、超长标题）、34 首歌（含无专辑的歌、两首有 LRC 歌词）、4 个歌单、喜爱与最近播放。没有封面 | `paused`、`playing` |
+  | `baseline` | 阶段 2 基线的歌曲：《THE BOOK》9 首与《紅蓮華》，含歌词原文与封面；喜爱为空（参考账号没有喜欢这两首歌） | `yoru-start`（0 秒）、`yoru-paused`、`yoru-playing`（54.0 秒，队列为整张专辑，当前第 8 首）、`guren-paused`、`guren-playing`（25.6 秒） |
+  | `empty` | 空曲库，没有歌单 | — |
+  | `loading` | 请求一直不返回 | — |
+  | `unreachable` | 请求都以“无法连接服务器”失败 | — |
+
+  列表的搜索、筛选、排序与分页在 fixture 中按服务端规则近似实现（拼音与数值比较、默认新入库在前、按专辑时按碟号与曲目序号）。未知场景、未知播放器状态或缺少 baseline 数据时，页面报错并说明原因。
+  - **baseline 的数据不进入仓库**：[scripts/fixtures/baseline.mjs](../../scripts/fixtures/baseline.mjs) 从 `.local/baseline/splayer/2026-10-25/data/` 生成 `.local/fixtures/baseline/`（曲库 JSON 与封面），fixture 以 `import.meta.glob` 读取。封面按服务端规则命名（SHA-256 前 16 字节）；没有 ThumbHash 编码器，占位为空字符串（与服务端无法解码的图片相同）。
+  - **歌词按 Sonora 保存的格式转换**：《夜に駆ける》的网易 LRC、翻译与音译合成一份 LRC，翻译与音译写在同一时间戳下。《紅蓮華》的 YRC 转为 TTML，因为只有 TTML 能保留每个字的起止时间与翻译、音译；逐字 LRC 只记录字的开始时间，SPlayer 解析逐字 LRC 时也不对齐翻译。转换用 SPlayer 自己的解析代码（`parseLrc`、`alignLyrics`）与 AMLL 的 `parseYrc`、`stringifyTTML`；SPlayer 的 `lyricLinesToTTML` 不写 `itunes:key`，AMLL 1.0.1 会跳过这样的行，因此不用它。
+  - **转换的校验**：脚本在 Chromium 中按 Sonora 的解析路径读回（TTML：`cleanTTMLTranslations` 后 `parseTTML`；LRC：`parseSmartLrc` 后 `alignLyricLines`），与 SPlayer 从网易文件得到的歌词逐行比较，再与参考实例播放器 store 中的最终歌词（`data/<歌曲>-player.json`，见阶段 2 的 0.1）比较。比较每行与每个字的起止时间、文本、翻译、音译、背景人声与对唱标记。两首歌两项比较全部一致。
+
+  以 baseline 对照截图时已知的数据差异，在 3.5、3.6 处理：
+  - SPlayer 全屏播放器在歌名下显示网易的歌曲别名（`alia`：“向夜晚奔去”、“TV动画《鬼灭之刃》片头曲”）。Eric 确定 Sonora 不要歌曲别名（2026-10-25），这一行不显示，对照时作为已知差异。
+  - 歌名下的标签行（参考图中的 `HQ`、`YRC`、`Official`）：Eric 确定歌词类型标签也不显示（2026-10-25），音质与音源标签原本就去掉，整行不再出现，对照时作为已知差异。
+  - SPlayer 只有 TTML 时，用逐字歌词生成普通歌词（`lrcData`），参考实例中《紅蓮華》的普通歌词来自网易的另一份 LRC，行数相同。现有参考图中逐字模式下不显示普通歌词。
 
 ### 3.4 页面模板（视觉语言一致）
 
@@ -42,7 +62,7 @@
 ### 3.5 播放器展示层（严格复刻）
 
 - [ ] 底部播放栏、播放队列抽屉、全屏播放器（各样式与背景、AMLL 歌词渲染含逐字/翻译/音译）。只接 fixture。
-- [ ] 去掉评论按钮、`Official` 标签、音质标签与音质切换；有逐字歌词时显示逐字标记。
+- [ ] 去掉评论按钮、歌曲别名、歌名下的整行标签（音质、歌词类型 `LRC`/`YRC`/`TTML` 及歌词来源切换、`Official` 等音源标签）与音质切换。
 
 ### 3.6 依赖边界与视觉比较
 

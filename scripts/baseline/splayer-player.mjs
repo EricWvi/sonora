@@ -9,7 +9,10 @@
 // they show account details and never leave .local.
 //
 //   node scripts/baseline/splayer-player.mjs [--run NAME] [--only REGEX]
-//       [--viewport 1440x1000] [--base http://127.0.0.1:25884]
+//       [--viewport 1440x1000] [--base http://127.0.0.1:25884] [--data-only]
+//
+// --data-only saves only the data snapshot and what the player holds for
+// each song (data/<song>-player.json), without screenshots or a manifest.
 //
 // Playwright comes from ../palace; set PLAYWRIGHT_TEST to another
 // @playwright/test index.mjs to use a different install.
@@ -40,6 +43,7 @@ const { values: args } = parseArgs({
     only: { type: "string" },
     viewport: { type: "string", default: "1440x1000" },
     base: { type: "string", default: "http://127.0.0.1:25884" },
+    "data-only": { type: "boolean", default: false },
   },
 });
 const [width, height] = args.viewport.split("x").map(Number);
@@ -520,6 +524,44 @@ async function snapshot(browser) {
     }
   }
   await context.close();
+  for (const key of Object.keys(songs)) await snapshotPlayer(browser, key);
+}
+
+// snapshotPlayer saves what the player holds once the song is paused at
+// its seek point: the song, the queue, the lyrics after SPlayer's whole
+// pipeline (exclusion, bracket replacement, normalising) and the lyric
+// mode. Sonora's fixture is checked against these.
+async function snapshotPlayer(browser, key) {
+  const seek = { yoru: YORU_LINE, guren: GUREN_WORD }[key];
+  const { context, page } = await openState(browser, { song: key, seek });
+  try {
+    const player = await page.evaluate((pinia) => {
+      const p = eval(pinia);
+      const status = p._s.get("status");
+      const music = p._s.get("music");
+      const data = p._s.get("data");
+      return JSON.parse(
+        JSON.stringify({
+          playSong: music.playSong,
+          playList: data.playList,
+          songLyric: music.songLyric,
+          status: {
+            playIndex: status.playIndex,
+            currentTime: status.currentTime,
+            duration: status.duration,
+            usingTTMLLyric: status.usingTTMLLyric,
+            usingQRCLyric: status.usingQRCLyric,
+          },
+        }),
+      );
+    }, PINIA);
+    await writeFile(
+      join(out, "data", `${key}-player.json`),
+      JSON.stringify(player, null, 2),
+    );
+  } finally {
+    await context.close();
+  }
 }
 
 // --- run ----------------------------------------------------------------------
@@ -552,8 +594,10 @@ const manifest = {
   states: [],
 };
 try {
-  await mkdir(join(out, args.viewport), { recursive: true });
+  if (!args["data-only"])
+    await mkdir(join(out, args.viewport), { recursive: true });
   await snapshot(browser);
+  if (args["data-only"]) states.length = 0;
   const only = args.only ? new RegExp(args.only) : null;
   let fontsRecorded = false;
   for (const state of states) {
@@ -605,10 +649,11 @@ try {
   }
 } finally {
   manifest.finishedAt = new Date().toISOString();
-  await writeFile(
-    join(out, args.viewport, "manifest.json"),
-    JSON.stringify(manifest, null, 2),
-  );
+  if (!args["data-only"])
+    await writeFile(
+      join(out, args.viewport, "manifest.json"),
+      JSON.stringify(manifest, null, 2),
+    );
   await browser.close();
 }
 console.log(out);

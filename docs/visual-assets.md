@@ -46,7 +46,7 @@
 | `@imsyy/color-utils` | `rgbToHex` | 1.0.2 | package.json 写 ISC，包内 LICENSE 是 MIT 全文 | 已用，同版本（2026-10-25） |
 | `lodash-es` | `chunk`（封面取色）及 SPlayer 各处的 `debounce`、`cloneDeep` 等 | 4.18.1 | MIT | 已用，同版本（2026-10-25） |
 | `@applemusic-like-lyrics/core` | AMLL 歌词播放器与流动背景 | 0.5.1 | AGPL-3.0-only | 待引入；最新为 0.6.0，先锁定 0.5.1 |
-| `@applemusic-like-lyrics/lyric` | LRC、TTML 等歌词解析 | 1.0.1 | AGPL-3.0-only | 待引入 |
+| `@applemusic-like-lyrics/lyric` | LRC、TTML 等歌词解析 | 1.0.1 | AGPL-3.0-only | 已加入依赖，同版本（2026-10-25）；目前只用于生成 fixture 的脚本，播放端代码尚未引用，3.5 接入后写入 THIRD_PARTY_NOTICES.md。其依赖 `@applemusic-like-lyrics/ttml` 1.0.1（AGPL-3.0-only）与 SPlayer 相同，`pako` 解析为 2.2.0（SPlayer 锁定 2.1.0，MIT AND Zlib，用于 QRC 解压，与视觉无关） |
 | `@pixi/app`、`@pixi/core`、`@pixi/display`、`@pixi/sprite`、`@pixi/filter-blur`、`@pixi/filter-color-matrix` | AMLL 的对等依赖 | 7.4.3 | MIT | 随 AMLL 引入 |
 | `@pixi/filter-bulge-pinch` | AMLL 的对等依赖 | 5.1.1 | MIT | 随 AMLL 引入 |
 | `sortablejs` | 播放队列与歌单拖动排序 | 1.15.7 | MIT | 待引入 |

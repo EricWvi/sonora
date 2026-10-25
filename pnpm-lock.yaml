@@ -56,6 +56,9 @@ importers:
 
   frontend:
     dependencies:
+      '@applemusic-like-lyrics/lyric':
+        specifier: 1.0.1
+        version: 1.0.1
       '@imsyy/color-utils':
         specifier: 1.0.2
         version: 1.0.2
@@ -128,6 +131,12 @@ importers:
         version: 3.3.13(typescript@6.0.3)
 
 packages:
+
+  '@applemusic-like-lyrics/lyric@1.0.1':
+    resolution: {integrity: sha512-b4/9MUTdp9AuW59JTBpOxb8P+4SF8NjaoZYpLD/nkVHSM/4kfbnYpo9HldSMOjRLwlKVv8bTF6Vr9K3OLHL85Q==}
+
+  '@applemusic-like-lyrics/ttml@1.0.1':
+    resolution: {integrity: sha512-xhLajMI9Jm+Etv99GbK5Fx8wqa5m9wnS3kCqOTBUy9imjsah2PrV1XyCc6LBssPhEFcQt2SrFNQlwT6GZwpY7A==}
 
   '@babel/helper-string-parser@7.29.7':
     resolution: {integrity: sha512-Pb5ijPrZ89GDH8223L4UP8i6QApWxs04RbPQJTeWDV0/keR2E36MeKnyr6LYmUUvqRRI+Iv87SuF1W6ErINzYw==}
@@ -1367,6 +1376,9 @@ packages:
     resolution: {integrity: sha512-LaNjtRWUBY++zB5nE/NwcaoMylSPk+S+ZHNB1TzdbMJMny6dynpAGt7X/tl/QYq3TIeE6nxHppbo2LGymrG5Pw==}
     engines: {node: '>=10'}
 
+  pako@2.2.0:
+    resolution: {integrity: sha512-zJq6RP/5q+TO2OpFV3FHzlPnFjmkb7Nc99a5SNjJE+uu/PkpChs+NIZSSzbBoD+6kjiISXjfYdwj1ZRQ81dz/w==}
+
   parent-module@1.0.1:
     resolution: {integrity: sha512-GQ2EWRpQV8/o+Aw8YqtfZZPfNRWZYkbidE9k5rpl/hC3vtHHBfGm2Ifi6qWV+coDGkrUKZAxE3Lot5kcsRlh+g==}
     engines: {node: '>=6'}
@@ -1759,6 +1771,13 @@ packages:
     engines: {node: '>=10'}
 
 snapshots:
+
+  '@applemusic-like-lyrics/lyric@1.0.1':
+    dependencies:
+      '@applemusic-like-lyrics/ttml': 1.0.1
+      pako: 2.2.0
+
+  '@applemusic-like-lyrics/ttml@1.0.1': {}
 
   '@babel/helper-string-parser@7.29.7': {}
 
@@ -2922,6 +2941,8 @@ snapshots:
   p-locate@5.0.0:
     dependencies:
       p-limit: 3.1.0
+
+  pako@2.2.0: {}
 
   parent-module@1.0.1:
     dependencies:

@@ -1,59 +1,538 @@
 import { ApiError } from "@/api/error";
 import type { DataSource } from "@/api/source";
-import type { Page, Playlist, User } from "@/api/types";
+import type {
+  Album,
+  Artist,
+  ArtistRef,
+  HistoryEntry,
+  ListQuery,
+  Lyrics,
+  Page,
+  Playlist,
+  Track,
+  User,
+} from "@/api/types";
+import type { PlayerState } from "@/viewmodels";
 
-// 开发用 fixture，以 `?fixture=<场景>` 打开。数据与服务端开发模式的用户一致，内容是虚构的。
+// 开发用 fixture，以 `?fixture=<场景>` 打开，`&player=<状态>` 指定播放器的初始状态。
+// 数据与服务端开发模式的用户一致。`library` 的内容是虚构的；`baseline` 是阶段 2
+// 播放器基线的歌曲，含网易内容，只在本机由 scripts/fixtures/baseline.mjs 生成到
+// .local/fixtures/baseline/，不进入仓库。
 
 const user: User = { name: "listener", email: "listener@sonora.test" };
 
-const playlists: Playlist[] = [
-  ["通勤路上", "早晚各一小时"],
-  ["夜跑", ""],
-  ["写代码时听", "没有人声或人声很少的歌"],
-  ["一个名字很长很长很长很长很长很长的歌单", ""],
-].map(([name, description], index) => ({
-  id: 4 - index,
-  name,
-  description,
-  cover: null,
-  trackCount: 0,
-  durationMs: 0,
-  createdAt: `2026-10-${20 + index}T12:00:00Z`,
-  updatedAt: `2026-10-${20 + index}T12:00:00Z`,
-}));
-
-const page = <T>(items: T[]): Page<T> => ({ items, total: items.length });
-
-type Data = { playlists: Playlist[] };
-
-const scenarios: Record<string, Data | "loading" | "unreachable"> = {
-  /** 有数据 */
-  library: { playlists },
-  /** 空曲库，没有歌单 */
-  empty: { playlists: [] },
-  /** 请求一直没有返回 */
-  loading: "loading",
-  /** 服务不可达 */
-  unreachable: "unreachable",
+/** 播放器状态在 fixture 中以歌曲 ID 记录队列。 */
+type PlayerFixture = {
+  queue: number[];
+  index: number;
+  positionMs: number;
+  playing: boolean;
 };
 
-export function createFixtureSource(name: string): DataSource {
+type Library = {
+  tracks: Track[];
+  albums: Album[];
+  artists: Artist[];
+  playlists: { playlist: Playlist; trackIds: number[] }[];
+  likes: number[];
+  history: { trackId: number; playedAt: string }[];
+  lyrics: Record<number, Lyrics>;
+  coverUrls: Record<string, string>;
+  players: Record<string, PlayerFixture>;
+};
+
+// --- library：虚构曲库 -------------------------------------------------------------
+
+function fictionalLibrary(): Library {
+  const artists: Artist[] = [
+    "晨雾乐队",
+    "Aurora Lane",
+    "林间",
+    "The Long Name Orchestra of Somewhere Very Far Away",
+    "周末",
+  ].map((name, i) => ({
+    id: i + 1,
+    name,
+    image: null,
+    trackCount: 0,
+    albumCount: 0,
+  }));
+  const ref = (id: number): ArtistRef => ({ id, name: artists[id - 1].name });
+
+  const albums: Album[] = [];
+  const tracks: Track[] = [];
+  // 时长按序号生成，保证每次相同。
+  const duration = (n: number) => 150_000 + ((n * 37_123) % 150_000);
+  const addTrack = (
+    title: string,
+    artistIds: number[],
+    album: Album | null,
+    trackNo: number,
+    discNo = 1,
+  ) => {
+    const track: Track = {
+      id: tracks.length + 1,
+      title,
+      artists: artistIds.map(ref),
+      album: album && {
+        id: album.id,
+        title: album.title,
+        artists: album.artists,
+      },
+      trackNo,
+      discNo,
+      year: album?.year ?? 2020,
+      durationMs: duration(tracks.length + 1),
+      format: "mp3",
+      cover: album?.cover ?? null,
+      hasLyrics: false,
+    };
+    tracks.push(track);
+    if (album) {
+      album.trackCount++;
+      album.durationMs += track.durationMs;
+    }
+    for (const id of new Set([
+      ...artistIds,
+      ...(album?.artists.map((a) => a.id) ?? []),
+    ]))
+      artists[id - 1].trackCount++;
+  };
+  const addAlbum = (
+    title: string,
+    artistIds: number[],
+    year: number,
+    discs: string[][],
+    trackArtists?: number[][],
+  ) => {
+    const album: Album = {
+      id: albums.length + 1,
+      title,
+      artists: artistIds.map(ref),
+      year,
+      cover: null,
+      trackCount: 0,
+      durationMs: 0,
+    };
+    albums.push(album);
+    for (const id of artistIds) artists[id - 1].albumCount++;
+    let n = 0;
+    discs.forEach((titles, disc) =>
+      titles.forEach((title, i) =>
+        addTrack(
+          title,
+          trackArtists?.[n++] ?? artistIds,
+          album,
+          i + 1,
+          disc + 1,
+        ),
+      ),
+    );
+  };
+
+  addAlbum("海边的车站", [1], 2024, [
+    [
+      "清晨的第一班车",
+      "海风",
+      "站台",
+      "旧明信片",
+      "潮汐表",
+      "灯塔",
+      "回程",
+      "夜航",
+    ],
+  ]);
+  addAlbum("Northbound", [2], 2023, [
+    ["Departure", "Pine Road", "Snowline", "Lantern", "Quiet Hours", "Polaris"],
+    ["Afterglow", "Northern Sky", "Homeward", "Coda"],
+  ]);
+  addAlbum("雨季", [3], 2022, [
+    ["雨季", "窗", "青苔", "伞下", "六月", "积水", "晴"],
+  ]);
+  addAlbum(
+    "合作单曲集",
+    [1, 3],
+    2025,
+    [["山与海", "同一条街", "Meet Me Halfway", "尾声"]],
+    [
+      [1, 3],
+      [3, 1],
+      [1, 2, 3],
+      [1, 3],
+    ],
+  );
+  addAlbum("一张标题很长很长很长很长很长很长很长很长的专辑", [4], 2021, [
+    [
+      "Overture for a Very Long Afternoon Spent Waiting by the Window",
+      "Intermezzo",
+      "Finale",
+    ],
+  ]);
+  addTrack("没有专辑的歌", [5], null, 0);
+  addTrack("Demo 2026-10-01", [5], null, 0);
+
+  const lyrics: Record<number, Lyrics> = {
+    1: {
+      format: "lrc",
+      lyrics: [
+        "[00:01.000]第一班车还没有来",
+        "[00:01.000]The first bus has not come yet",
+        "[00:06.500]站台上只有风",
+        "[00:06.500]Only the wind on the platform",
+        "[00:12.000]我数着远处的灯",
+        "[00:12.000]I count the lights far away",
+        "[00:18.000]",
+      ].join("\n"),
+    },
+    9: {
+      format: "lrc",
+      lyrics: [
+        "[00:02.000]Leaving before the sun",
+        "[00:08.000]Down the pine road",
+        "[00:14.000]",
+      ].join("\n"),
+    },
+  };
+  for (const id of Object.keys(lyrics)) tracks[Number(id) - 1].hasLyrics = true;
+
+  const playlistFixture = (
+    id: number,
+    name: string,
+    description: string,
+    trackIds: number[],
+    day: number,
+  ) => {
+    const list = trackIds.map((t) => tracks[t - 1]);
+    return {
+      playlist: {
+        id,
+        name,
+        description,
+        cover: list.find((t) => t.cover)?.cover ?? null,
+        trackCount: list.length,
+        durationMs: list.reduce((sum, t) => sum + t.durationMs, 0),
+        createdAt: `2026-10-${day}T12:00:00Z`,
+        updatedAt: `2026-10-${day + 2}T08:30:00Z`,
+      },
+      trackIds,
+    };
+  };
+
+  return {
+    tracks,
+    albums,
+    artists,
+    playlists: [
+      playlistFixture(4, "通勤路上", "早晚各一小时", [1, 2, 3, 9, 10], 20),
+      playlistFixture(3, "夜跑", "", [12, 13, 28], 19),
+      playlistFixture(2, "写代码时听", "没有人声或人声很少的歌", [], 18),
+      playlistFixture(1, "一个名字很长很长很长很长很长很长的歌单", "", [5], 17),
+    ],
+    likes: [12, 3, 20, 7],
+    history: [5, 1, 19, 28, 9].map((trackId, i) => ({
+      trackId,
+      playedAt: `2026-10-24T${String(21 - i).padStart(2, "0")}:15:00Z`,
+    })),
+    lyrics,
+    coverUrls: {},
+    players: {
+      paused: {
+        queue: [1, 2, 3, 4, 5, 6, 7, 8],
+        index: 0,
+        positionMs: 7_000,
+        playing: false,
+      },
+      playing: {
+        queue: [1, 2, 3, 4, 5, 6, 7, 8],
+        index: 0,
+        positionMs: 7_000,
+        playing: true,
+      },
+    },
+  };
+}
+
+// --- baseline：阶段 2 播放器基线的歌曲 ------------------------------------------------
+
+// 路径在仓库根目录的 .local 下；文件不存在时两个 glob 都为空。
+const baselineData = import.meta.glob<BaselineFile>(
+  "../../../.local/fixtures/baseline/library.json",
+  { import: "default" },
+);
+const baselineCovers = import.meta.glob<string>(
+  "../../../.local/fixtures/baseline/covers/*",
+  { query: "?url", import: "default", eager: true },
+);
+
+/** scripts/fixtures/baseline.mjs 的输出。 */
+type BaselineFile = {
+  tracks: Track[];
+  albums: Album[];
+  artists: Artist[];
+  lyrics: Record<number, Lyrics>;
+  /** 基线状态开始时的队列与位置：yoru 为《夜に駆ける》，guren 为《紅蓮華》。 */
+  players: Record<"yoru" | "guren", Omit<PlayerFixture, "playing">>;
+};
+
+async function baselineLibrary(): Promise<Library> {
+  const load = Object.values(baselineData)[0];
+  if (!load) {
+    throw new Error(
+      "没有 baseline 数据：先运行 node scripts/fixtures/baseline.mjs（需要 .local 中的阶段 2 基线）",
+    );
+  }
+  const data = await load();
+  const coverUrls: Record<string, string> = {};
+  for (const [path, url] of Object.entries(baselineCovers)) {
+    coverUrls[path.slice(path.lastIndexOf("/") + 1)] = url;
+  }
+  const { yoru, guren } = data.players;
+  return {
+    tracks: data.tracks,
+    albums: data.albums,
+    artists: data.artists,
+    playlists: [],
+    // 参考账号没有喜欢这两首歌，基线中的喜欢按钮是空心的。
+    likes: [],
+    history: [],
+    lyrics: data.lyrics,
+    coverUrls,
+    players: {
+      // 对应基线的 bar-paused-start
+      "yoru-start": { ...yoru, positionMs: 0, playing: false },
+      "yoru-paused": { ...yoru, playing: false },
+      "yoru-playing": { ...yoru, playing: true },
+      "guren-paused": { ...guren, playing: false },
+      "guren-playing": { ...guren, playing: true },
+    },
+  };
+}
+
+// --- 查询 -----------------------------------------------------------------------------
+
+// 与服务端一致：名称按拼音、数字按数值比较。
+const collator = new Intl.Collator("zh-CN", { numeric: true });
+
+const matches = (q: string | undefined, ...texts: string[]) =>
+  !q || texts.some((text) => text.toLowerCase().includes(q.toLowerCase()));
+
+/** 按 `sort` 与 `order` 排序；`default` 保持列表自身的顺序，相等的项也保持列表顺序。 */
+function sortTracks(list: Track[], query: ListQuery = {}): Track[] {
+  const { sort = "default", order = "asc" } = query;
+  if (sort === "default") return list;
+  const key: Record<
+    Exclude<typeof sort, "default">,
+    (a: Track, b: Track) => number
+  > = {
+    title: (a, b) => collator.compare(a.title, b.title),
+    artist: (a, b) =>
+      collator.compare(a.artists[0]?.name ?? "", b.artists[0]?.name ?? ""),
+    album: (a, b) =>
+      collator.compare(a.album?.title ?? "", b.album?.title ?? ""),
+    duration: (a, b) => a.durationMs - b.durationMs,
+    // fixture 中歌曲 ID 的顺序即入库顺序。
+    createTime: (a, b) => a.id - b.id,
+  };
+  const sign = order === "desc" ? -1 : 1;
+  return [...list].sort((a, b) => sign * key[sort](a, b));
+}
+
+function page<T>(items: T[], query: ListQuery = {}): Page<T> {
+  const { offset = 0, limit = 50 } = query;
+  return { items: items.slice(offset, offset + limit), total: items.length };
+}
+
+const notFound = () => new ApiError(404, "内容不存在", "not_found");
+
+function librarySource(lib: Library): DataSource {
+  const track = (id: number) => {
+    const found = lib.tracks.find((t) => t.id === id);
+    if (!found) throw notFound();
+    return found;
+  };
+  const ownPlaylist = (id: number) => {
+    const found = lib.playlists.find((p) => p.playlist.id === id);
+    if (!found) throw notFound();
+    return found;
+  };
+  // 歌曲默认新入库在前。
+  const newestFirst = () => [...lib.tracks].reverse();
+  const byArtist = (t: Track, id: number) =>
+    t.artists.some((a) => a.id === id) ||
+    !!t.album?.artists.some((a) => a.id === id);
+
+  // 返回副本，页面修改结果不影响 fixture。
+  const reply = async <T>(value: () => T): Promise<T> =>
+    structuredClone(value());
+
+  return {
+    me: () => reply(() => user),
+    tracks: (query = {}) =>
+      reply(() => {
+        let list = newestFirst();
+        if (query.albumId) {
+          list = lib.tracks
+            .filter((t) => t.album?.id === query.albumId)
+            .sort((a, b) => a.discNo - b.discNo || a.trackNo - b.trackNo);
+        }
+        if (query.artistId)
+          list = list.filter((t) => byArtist(t, query.artistId!));
+        list = list.filter((t) =>
+          matches(
+            query.q,
+            t.title,
+            t.album?.title ?? "",
+            ...t.artists.map((a) => a.name),
+          ),
+        );
+        return page(sortTracks(list, query), query);
+      }),
+    track: (id) => reply(() => track(id)),
+    lyrics: (trackId) =>
+      reply(() => {
+        track(trackId);
+        return lib.lyrics[trackId] ?? { format: "", lyrics: "" };
+      }),
+    albums: (query = {}) =>
+      reply(() => {
+        let list = [...lib.albums].sort((a, b) =>
+          collator.compare(a.title, b.title),
+        );
+        if (query.sort === "createTime") {
+          const sign = query.order === "desc" ? -1 : 1;
+          list.sort((a, b) => sign * (a.id - b.id));
+        }
+        if (query.artistId)
+          list = list.filter((a) =>
+            a.artists.some((r) => r.id === query.artistId),
+          );
+        list = list.filter((a) =>
+          matches(query.q, a.title, ...a.artists.map((r) => r.name)),
+        );
+        return page(list, query);
+      }),
+    album: (id) =>
+      reply(() => {
+        const found = lib.albums.find((a) => a.id === id);
+        if (!found) throw notFound();
+        return found;
+      }),
+    artists: (query = {}) =>
+      reply(() =>
+        page(
+          [...lib.artists]
+            .sort((a, b) => collator.compare(a.name, b.name))
+            .filter((a) => matches(query.q, a.name)),
+          query,
+        ),
+      ),
+    artist: (id) =>
+      reply(() => {
+        const found = lib.artists.find((a) => a.id === id);
+        if (!found) throw notFound();
+        return found;
+      }),
+    likes: (query) =>
+      reply(() => page(sortTracks(lib.likes.map(track), query), query)),
+    likeIds: () => reply(() => lib.likes),
+    history: (query) =>
+      reply(() =>
+        page<HistoryEntry>(
+          lib.history.map((e) => ({
+            track: track(e.trackId),
+            playedAt: e.playedAt,
+          })),
+          query,
+        ),
+      ),
+    playlists: () => reply(() => page(lib.playlists.map((p) => p.playlist))),
+    playlist: (id) => reply(() => ownPlaylist(id).playlist),
+    playlistTracks: (id, query) =>
+      reply(() =>
+        page(sortTracks(ownPlaylist(id).trackIds.map(track), query), query),
+      ),
+    logout: () => Promise.resolve(),
+    coverUrl: (cover) => lib.coverUrls[cover.name] ?? "",
+    // fixture 没有音频。
+    audioUrl: () => "",
+  };
+}
+
+// --- 场景 -----------------------------------------------------------------------------
+
+function emptyLibrary(): Library {
+  return {
+    tracks: [],
+    albums: [],
+    artists: [],
+    playlists: [],
+    likes: [],
+    history: [],
+    lyrics: {},
+    coverUrls: {},
+    players: {},
+  };
+}
+
+/** 每个请求都以同样的方式结束：一直不返回，或服务不可达。 */
+function failingSource(fail: () => Promise<never>): DataSource {
+  const source = librarySource(emptyLibrary());
+  for (const key of Object.keys(source) as (keyof DataSource)[]) {
+    if (key === "logout" || key === "coverUrl" || key === "audioUrl") continue;
+    (source[key] as () => Promise<never>) = fail;
+  }
+  return source;
+}
+
+const scenarios: Record<string, () => Promise<Library | DataSource>> = {
+  /** 有数据（虚构） */
+  library: async () => fictionalLibrary(),
+  /** 阶段 2 播放器基线的歌曲：《THE BOOK》与《紅蓮華》 */
+  baseline: baselineLibrary,
+  /** 空曲库，没有歌单 */
+  empty: async () => emptyLibrary(),
+  /** 请求一直没有返回 */
+  loading: async () => failingSource(() => new Promise(() => {})),
+  /** 服务不可达 */
+  unreachable: async () =>
+    failingSource(() => Promise.reject(new ApiError(0, "无法连接服务器"))),
+};
+
+export async function createFixture(
+  name: string,
+  playerName: string | null,
+): Promise<{ source: DataSource; player: PlayerState | null }> {
   const scenario = scenarios[name];
   if (!scenario) {
     throw new Error(
       `未知的 fixture 场景 "${name}"，可用：${Object.keys(scenarios).join("、")}`,
     );
   }
-  const respond = <T>(value: (data: Data) => T): Promise<T> => {
-    if (scenario === "loading") return new Promise(() => {});
-    if (scenario === "unreachable")
-      return Promise.reject(new ApiError(0, "无法连接服务器"));
-    return Promise.resolve(structuredClone(value(scenario)));
-  };
+  const data = await scenario();
+  if (!("players" in data)) {
+    if (playerName) throw new Error(`fixture 场景 "${name}" 没有播放器状态`);
+    return { source: data, player: null };
+  }
+  if (!playerName) return { source: librarySource(data), player: null };
+  const player = data.players[playerName];
+  if (!player) {
+    const names = Object.keys(data.players);
+    throw new Error(
+      `fixture 场景 "${name}" 没有播放器状态 "${playerName}"` +
+        (names.length ? `，可用：${names.join("、")}` : ""),
+    );
+  }
   return {
-    me: () => respond(() => user),
-    playlists: () => respond((data) => page(data.playlists)),
-    logout: () => Promise.resolve(),
-    coverUrl: (cover) => `/fixtures/covers/${cover.name}`,
+    source: librarySource(data),
+    player: {
+      queue: player.queue.map((id) => {
+        const track = data.tracks.find((t) => t.id === id);
+        if (!track) throw new Error(`播放器队列中的歌曲 ${id} 不存在`);
+        return structuredClone(track);
+      }),
+      index: player.index,
+      playing: player.playing,
+      positionMs: player.positionMs,
+    },
   };
 }

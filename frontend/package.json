@@ -12,6 +12,7 @@
     "build": "pnpm typecheck && vite build"
   },
   "dependencies": {
+    "@applemusic-like-lyrics/lyric": "1.0.1",
     "@imsyy/color-utils": "1.0.2",
     "@material/material-color-utilities": "^0.4.0",
     "@vueuse/core": "^14.3.0",
