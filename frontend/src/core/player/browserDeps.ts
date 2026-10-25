@@ -33,5 +33,8 @@ export function browserDeps(): PlaybackDeps {
       mediaSessionManager.clear();
     },
     unauthorized: () => location.assign(loginUrl),
+    setTitle(title) {
+      document.title = title;
+    },
   };
 }

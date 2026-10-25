@@ -62,6 +62,8 @@ export interface PlaybackDeps {
   resetSong(): void;
   /** 会话失效，回到登录页 */
   unauthorized(): void;
+  /** 设置页面标题 */
+  setTitle(title: string): void;
 }
 
 /** 连续失败多少首后停止（阶段 2 的“播放行为”） */
@@ -153,8 +155,12 @@ export class PlayerController {
     const statusStore = useStatusStore();
     const settingStore = useSettingStore();
     const state = this.state;
+    // 出错后等待自动跳过时仍算播放中，与 SPlayer 相同
     const active =
-      state === "resolving" || state === "loading" || state === "playing";
+      state === "resolving" ||
+      state === "loading" ||
+      state === "playing" ||
+      state === "error";
     statusStore.$patch({
       playStatus: this.wantPlay && active,
       playLoading:
@@ -164,6 +170,13 @@ export class PlayerController {
     });
     mediaSessionManager.updatePlaybackStatus(statusStore.playStatus);
     keepAwake(settingStore.preventSleep && statusStore.playStatus);
+    // 播放时标题为当前歌曲，暂停时恢复（照搬 SPlayer 网页版）
+    const entry = this.currentEntry();
+    this.deps.setTitle(
+      entry && state === "playing" && this.wantPlay
+        ? `${entry.title || "未知歌曲"} - ${entry.artists.map((ar) => ar.name).join("/")} | Sonora`
+        : "Sonora",
+    );
   }
 
   /** 保存的队列 */
@@ -543,14 +556,13 @@ export class PlayerController {
       return;
     const entry = this.currentEntry();
     if (!entry) return;
-    const wasPlaying = this.wantPlay;
-    this.wantPlay = false;
     this.playAttempt++;
     this.engine.stop();
     this.setState("error");
     const status = await this.deps.source.audioStatus(entry.id);
     if (token !== this.currentRequestToken) return;
     if (status === 401) {
+      this.stopAfterError();
       this.deps.unauthorized();
       return;
     }
@@ -562,18 +574,21 @@ export class PlayerController {
     // 连续跳过 3 首 -> 停止播放
     if (this.failSkipCount >= MAX_FAIL_SKIP) {
       this.failSkipCount = 0;
+      this.stopAfterError();
       this.deps.message.error(`${reason}，播放失败次数过多，已停止播放`);
       return;
     }
     // 列表只有一首 -> 停止播放
     if (dataStore.playList.length <= 1) {
       this.failSkipCount = 0;
+      this.stopAfterError();
       this.deps.message.error(`${reason}，当前已无可播放歌曲`);
       return;
     }
     const last = statusStore.playIndex >= dataStore.playList.length - 1;
     if (last && statusStore.repeatMode === "off") {
       this.failSkipCount = 0;
+      this.stopAfterError();
       this.deps.message.error(`${reason}，已停止播放`);
       return;
     }
@@ -583,7 +598,14 @@ export class PlayerController {
     if (token !== this.currentRequestToken) return;
     statusStore.playIndex = last ? 0 : statusStore.playIndex + 1;
     this.saveQueue();
-    await this.playSong({ autoPlay: wasPlaying });
+    // 等待期间暂停过就不自动播放
+    await this.playSong({ autoPlay: this.wantPlay });
+  }
+
+  /** 出错后不再跳过：停在出错的歌，显示为暂停 */
+  private stopAfterError() {
+    this.wantPlay = false;
+    this.sync();
   }
 
   /** 用户选择了歌曲，重新统计连续失败 */

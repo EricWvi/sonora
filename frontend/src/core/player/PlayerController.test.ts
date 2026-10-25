@@ -155,6 +155,7 @@ let deps: PlaybackDeps & {
     audioStatus: ReturnType<typeof vi.fn>;
   };
   unauthorized: ReturnType<typeof vi.fn>;
+  setTitle: ReturnType<typeof vi.fn>;
 };
 
 function makeDeps(overrides: Partial<PlaybackDeps> = {}) {
@@ -170,6 +171,7 @@ function makeDeps(overrides: Partial<PlaybackDeps> = {}) {
     setupSong: async () => {},
     resetSong: () => {},
     unauthorized: vi.fn(),
+    setTitle: vi.fn(),
     ...overrides,
   } as typeof deps;
   return deps;
@@ -504,6 +506,7 @@ describe("播放失败", () => {
     engine.fail(AudioErrorCode.NETWORK);
     await settle();
     expect(player.playbackState).toBe("error");
+    expect(useStatusStore().playStatus).toBe(false);
     expect(ids()).toEqual([1]);
     expect(deps.message.error).toHaveBeenCalledWith(
       "无法连接服务器，当前已无可播放歌曲",
@@ -521,6 +524,25 @@ describe("播放失败", () => {
     expect(engine.loads).toEqual(["/audio/1"]);
   });
 
+  it("等待跳过时保持播放中；期间暂停，跳到下一首但不播放", async () => {
+    const player = await failing([1, 2, 3].map((id) => track(id)));
+    const statusStore = useStatusStore();
+    engine.fail(AudioErrorCode.SRC_NOT_SUPPORTED);
+    await settle();
+    expect(player.playbackState).toBe("error");
+    expect(statusStore.playStatus).toBe(true);
+    expect(statusStore.playLoading).toBe(false);
+    await player.playOrPause();
+    expect(statusStore.playStatus).toBe(false);
+    await vi.advanceTimersByTimeAsync(600);
+    expect(engine.loads).toEqual(["/audio/1", "/audio/2"]);
+    expect(statusStore.playIndex).toBe(1);
+    engine.ready();
+    await settle();
+    expect(player.playbackState).toBe("paused");
+    expect(engine.paused).toBe(true);
+  });
+
   it("等待跳过时用户切了歌，不再自动跳过", async () => {
     const player = await failing([1, 2, 3].map((id) => track(id)));
     engine.fail(AudioErrorCode.SRC_NOT_SUPPORTED);
@@ -528,6 +550,38 @@ describe("播放失败", () => {
     void player.togglePlayIndex(2, true);
     await vi.advanceTimersByTimeAsync(600);
     expect(engine.loads).toEqual(["/audio/1", "/audio/3"]);
+  });
+});
+
+describe("页面标题", () => {
+  it("播放时为当前歌曲，暂停、加载与出错时恢复", async () => {
+    const player = newPlayer();
+    const song = {
+      ...track(1),
+      artists: [
+        { id: 1, name: "甲" },
+        { id: 2, name: "乙" },
+      ],
+    };
+    void player.updatePlayList([song, track(2)]);
+    await settle();
+    expect(deps.setTitle).toHaveBeenLastCalledWith("Sonora");
+    engine.ready();
+    await settle();
+    expect(deps.setTitle).toHaveBeenLastCalledWith("歌曲 1 - 甲/乙 | Sonora");
+    await player.pause();
+    expect(deps.setTitle).toHaveBeenLastCalledWith("Sonora");
+    await player.play();
+    expect(deps.setTitle).toHaveBeenLastCalledWith("歌曲 1 - 甲/乙 | Sonora");
+    void player.nextOrPrev("next");
+    await settle();
+    expect(deps.setTitle).toHaveBeenLastCalledWith("Sonora");
+    engine.ready();
+    await settle();
+    expect(deps.setTitle).toHaveBeenLastCalledWith("歌曲 2 -  | Sonora");
+    engine.fail(AudioErrorCode.DECODE);
+    await settle();
+    expect(deps.setTitle).toHaveBeenLastCalledWith("Sonora");
   });
 });
 

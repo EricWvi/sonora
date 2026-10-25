@@ -16,7 +16,7 @@
   - 路由名沿用 SPlayer（`home`、`songs`、`albums`、`album`、`artists`、`artist-songs`/`artist-albums`、`like-songs`、`history`、`playlist`、`search-*`、`404`、`500`），详情页以 `?id=` 指定，缺少 `id` 或 `keyword` 时转到 404，未知路径转到 404。
   - 侧栏由 SPlayer [Menu.vue](../../reference/SPlayer/src/components/Layout/Menu.vue) 改编，样式不变；图标沿用 SPlayer 流媒体页面标签的 `Music`、`Album`、`Artist`。歌单显示封面（SPlayer 默认 `menuShowCover: true`），没有封面时用 `album.jpg`；歌单分组默认折叠，打开自己的歌单时自动展开并高亮。专辑、艺术家详情页高亮所属列表，SPlayer 在这两处不高亮任何项（Eric 已确认，2026-10-25）。新建按钮暂无动作，弹窗在阶段 5 接入。
   - 检查方式：临时开发实例（数据为曲库副本、端口 14570/14572）与 fixture 下用 Playwright Chromium 截图，覆盖展开、折叠侧栏、歌单高亮、`990×800` 抽屉菜单、404 与重定向；截图在 `/tmp`，已删除。
-- [x] 顶栏用户入口显示登录用户名，提供退出（fixture 提供用户）。由 SPlayer [User.vue](../../reference/SPlayer/src/components/Layout/User.vue) 改编：头像沿用未登录时的 `Person` 图标；弹层只保留用户名、邮箱（替换等级标签的位置）与“退出登录”，去掉喜欢数量与多账号。退出沿用 SPlayer 的确认对话框，调用 `POST /auth/logout` 后显示“已退出登录”页（[SignedOut.vue](../../frontend/src/views/Status/SignedOut.vue)），不直接跳转登录，否则 Authelia 会以现有会话立即重新登录（与 homepage 一致）。运行确认：对临时开发实例退出，请求为 `POST /auth/logout`，随后显示退出页。会话失效（401）时跳转 `/auth/login`，开发模式下无法触发，待 OIDC 环境验证。邮箱与退出页属于新增视觉元素，Eric 已确认（2026-10-25）。
+- [x] 顶栏用户入口显示登录用户名，提供退出（fixture 提供用户）。由 SPlayer [User.vue](../../reference/SPlayer/src/components/Layout/User.vue) 改编：头像沿用未登录时的 `Person` 图标；弹层只保留用户名、邮箱（替换等级标签的位置）与“退出登录”，去掉喜欢数量与多账号。退出沿用 SPlayer 的确认对话框，调用 `POST /auth/logout` 后显示“已退出登录”页（[SignedOut.vue](../../frontend/src/views/Status/SignedOut.vue)），不直接跳转登录，否则 Authelia 会以现有会话立即重新登录（与 homepage 一致）。运行确认：对临时开发实例退出，请求为 `POST /auth/logout`，随后显示退出页。会话失效（401）时跳转 `/auth/login`，开发模式下无法触发，已在非开发模式的临时实例上运行确认（见[阶段 4.1](phase-4-playback.md#41-oidc-认证)，2026-10-25）。邮箱与退出页属于新增视觉元素，Eric 已确认（2026-10-25）。
 
 ### 3.2 主题与视觉相关代码
 
