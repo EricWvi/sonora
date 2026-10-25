@@ -1,4 +1,11 @@
-import type { Album, Artist, Cover, Playlist, Track } from "@/api/types";
+import type {
+  Album,
+  Artist,
+  ArtistRef,
+  Cover,
+  Playlist,
+  Track,
+} from "@/api/types";
 
 // 页面与播放器组件展示用的数据。字段沿用播放端 API 的形态（docs/api.md）：
 // `artists` 是数组，`cover` 是 `{name, thumbhash}`，不含文件路径与网易字段。
@@ -37,6 +44,24 @@ export type DetailHeader =
   | { type: "playlist"; playlist: Playlist }
   | { type: "artist"; artist: Artist }
   | { type: "likes"; trackCount: number };
+
+/**
+ * ListDetail 组件显示的数据，由页面从 DetailHeader 的对象生成（专辑、歌单、我喜欢的音乐）
+ */
+export interface ListDetailData {
+  id: number;
+  name: string;
+  cover: Cover | null;
+  description?: string;
+  artists?: ArtistRef[];
+  count?: number;
+  /** 专辑年份 */
+  year?: number;
+  /** 专辑总时长 */
+  durationMs?: number;
+  createTime?: string;
+  updateTime?: string;
+}
 
 /** 卡片与详情头部显示的图片；为 null 时由组件换成 SPlayer 的默认图片。 */
 export function coverOf(item: CoverCard | DetailHeader): Cover | null {

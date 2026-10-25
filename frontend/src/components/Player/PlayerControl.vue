@@ -113,6 +113,7 @@
 </template>
 
 <script setup lang="ts">
+import { toLikeSong } from "@/utils/auth";
 import { usePlayerController } from "@/core/player/PlayerController";
 import {
   useDataStore,
@@ -134,10 +135,6 @@ const settingStore = useSettingStore();
 const player = usePlayerController();
 
 const { timeDisplay, toggleTimeFormat } = useTimeFormat();
-
-// 喜欢歌曲（阶段 4.4 接入）
-const toLikeSong = (_song: unknown, _like: boolean) =>
-  window.$message.info("喜欢将在后续阶段接入");
 </script>
 
 <style lang="scss" scoped>

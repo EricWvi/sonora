@@ -77,11 +77,13 @@ const options = computed<MenuOption[]>(() => [
     key: "history",
     link: "history",
     label: "最近播放",
+    show: !settingStore.sidebarHide.hideHistory,
     icon: renderIcon("History"),
   },
   { key: "divider-two", type: "divider" },
   {
     key: "user-playlists",
+    show: !settingStore.sidebarHide.hideUserPlaylists,
     icon: props.collapsed ? renderIcon("PlaylistAdd") : undefined,
     label: () =>
       h("div", { class: "user-list" }, [

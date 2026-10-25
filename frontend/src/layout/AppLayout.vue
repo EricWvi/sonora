@@ -43,8 +43,12 @@
       <n-layout id="main-layout">
         <AppNav id="main-header" />
         <n-layout
+          ref="contentRef"
           id="main-content"
           :native-scrollbar="false"
+          :style="{
+            '--layout-height': contentHeight,
+          }"
           :content-style="{
             display: 'grid',
             gridTemplateRows: '1fr',
@@ -54,7 +58,26 @@
           position="absolute"
           embedded
         >
-          <router-view class="router-view" />
+          <!-- 路由页面 -->
+          <RouterView v-slot="{ Component }">
+            <Transition
+              :name="`router-${settingStore.routeAnimation}`"
+              mode="out-in"
+            >
+              <KeepAlive
+                v-if="settingStore.useKeepAlive"
+                :max="20"
+                :exclude="['layout']"
+              >
+                <component :is="Component" class="router-view" />
+              </KeepAlive>
+              <component v-else :is="Component" class="router-view" />
+            </Transition>
+          </RouterView>
+          <!-- 回顶 -->
+          <n-back-top :right="40" :bottom="120">
+            <SvgIcon :size="22" name="Up" />
+          </n-back-top>
         </n-layout>
       </n-layout>
     </n-layout>
@@ -78,11 +101,27 @@ import SongPlayList from "@/components/List/SongPlayList.vue";
 import FullPlayer from "@/components/Player/FullPlayer.vue";
 import PlayerProvider from "@/components/Global/PlayerProvider.vue";
 import { initPlayer } from "@/core/player/PlayerController";
-import { useMusicStore, useStatusStore, useUserStore } from "@/stores";
+import {
+  useMusicStore,
+  useSettingStore,
+  useStatusStore,
+  useUserStore,
+} from "@/stores";
 
 const router = useRouter();
 const musicStore = useMusicStore();
 const statusStore = useStatusStore();
+const settingStore = useSettingStore();
+
+// 主内容
+const contentRef = ref<HTMLElement | null>(null);
+
+// 主内容高度
+const { height: contentHeight } = useElementSize(contentRef);
+
+watchEffect(() => {
+  statusStore.mainContentHeight = contentHeight.value;
+});
 const isDesktop = useMediaQuery("(min-width: 1024px)");
 
 // 窗口窄于 990px 时 #app 横向滚动，固定定位的播放器随之平移；不滚动时不设 transform。

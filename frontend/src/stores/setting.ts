@@ -80,6 +80,10 @@ export interface SettingState {
   hiddenCovers: {
     /** 首页 */
     home: boolean;
+    /** 歌单（搜索结果） */
+    playlist: boolean;
+    /** 歌手（艺术家网格） */
+    artist: boolean;
     /** 播放器 */
     player: boolean;
     /** 歌单详情/歌曲列表 */
@@ -232,6 +236,13 @@ export interface SettingState {
   searchInputBehavior: "normal" | "clear" | "sync";
   /** 显示主页问好 */
   showHomeGreeting: boolean;
+  /** 首页栏目顺序和显示配置（栏目换成 Sonora 的最近添加的专辑与最近播放） */
+  homePageSections: Array<{
+    key: "album" | "history";
+    name: string;
+    visible: boolean;
+    order: number;
+  }>;
   /** 是否使用 keep-alive */
   useKeepAlive: boolean;
 }
@@ -271,6 +282,8 @@ export const useSettingStore = defineStore("setting", {
     showPlayMeta: true,
     hiddenCovers: {
       home: false,
+      playlist: false,
+      artist: false,
       player: false,
       list: false,
       artistDetail: false,
@@ -344,6 +357,10 @@ export const useSettingStore = defineStore("setting", {
     enableSearchKeyword: true,
     searchInputBehavior: "normal",
     showHomeGreeting: true,
+    homePageSections: [
+      { key: "album", name: "最近添加的专辑", visible: true, order: 0 },
+      { key: "history", name: "最近播放", visible: true, order: 1 },
+    ],
     useKeepAlive: true,
   }),
   getters: {

@@ -37,7 +37,8 @@ export interface DataSource {
   history(
     query?: Pick<ListQuery, "offset" | "limit">,
   ): Promise<Page<HistoryEntry>>;
-  playlists(): Promise<Page<Playlist>>;
+  /** 自己的歌单，新建的在前；`q` 匹配歌单名。 */
+  playlists(query?: Pick<ListQuery, "q">): Promise<Page<Playlist>>;
   playlist(id: number): Promise<Playlist>;
   playlistTracks(id: number, query?: ListQuery): Promise<Page<Track>>;
   /** 结束本浏览器的会话，不退出 Authelia。 */
@@ -93,7 +94,7 @@ const httpSource: DataSource = {
   likes: (query) => get("likes", query),
   likeIds: async () => (await get<{ ids: number[] }>("likes/ids")).ids,
   history: (query) => get("history", query),
-  playlists: () => get("playlists", { limit: 500 }),
+  playlists: (query) => get("playlists", { ...query, limit: 500 }),
   playlist: (id) => get(`playlists/${id}`),
   playlistTracks: (id, query) => get(`playlists/${id}/tracks`, query),
   async logout() {

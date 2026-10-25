@@ -1,4 +1,5 @@
 import { defineStore } from "pinia";
+import type { SortField } from "@/api/types";
 import type { ColorScheme, RGB } from "@/types/color";
 import type { RepeatModeType, ShuffleModeType } from "@/types/play-mode";
 
@@ -59,6 +60,14 @@ export interface StatusState {
   currentTimeOffsetMap: Record<number, number>;
   /** 主内容高度 */
   mainContentHeight: number;
+  /** 搜索框焦点 */
+  searchFocus: boolean;
+  /** 搜索框输入值 */
+  searchInputValue: string;
+  /** 列表排序字段（Sonora 只有服务端支持的字段） */
+  listSortField: SortField;
+  /** 列表排序顺序 */
+  listSortOrder: "default" | "asc" | "desc";
   /** 均衡器是否开启 */
   eqEnabled: boolean;
   /** 均衡器 10 段增益（dB） */
@@ -91,6 +100,10 @@ export const useStatusStore = defineStore("status", {
     repeatMode: "off",
     shuffleMode: "off",
     mainContentHeight: 0,
+    searchFocus: false,
+    searchInputValue: "",
+    listSortField: "default",
+    listSortOrder: "default",
     eqEnabled: false,
     eqBands: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     eqPreset: "acoustic",
@@ -235,6 +248,8 @@ export const useStatusStore = defineStore("status", {
       "repeatMode",
       "shuffleMode",
       "songCoverTheme",
+      "listSortField",
+      "listSortOrder",
       "eqEnabled",
       "eqBands",
       "eqPreset",

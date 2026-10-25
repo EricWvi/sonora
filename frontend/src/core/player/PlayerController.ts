@@ -145,6 +145,89 @@ class PlayerController {
     if (play) await this.play();
   }
 
+  /**
+   * 更新播放列表并开始播放
+   *
+   * 随机模式下打乱队列在阶段 4.4 接入，目前按原顺序放入队列。
+   * @param data 歌曲列表
+   * @param song 要播放的歌曲，默认为第一首
+   * @param pid 列表来源，如 `album-3`（见 music store 的 playPlaylistId）
+   * @param options 是否提示与播放
+   */
+  public async updatePlayList(
+    data: Track[],
+    song?: Track,
+    pid?: string,
+    options: { showTip?: boolean; play?: boolean } = {
+      showTip: true,
+      play: true,
+    },
+  ) {
+    const dataStore = useDataStore();
+    const statusStore = useStatusStore();
+    const musicStore = useMusicStore();
+    if (!data || !data.length) return;
+    // 更新列表
+    await dataStore.setPlayList([...data]);
+    // 确定播放索引
+    if (song && song.id) {
+      const newIndex = data.findIndex((s) => s.id === song.id);
+      if (musicStore.playSong.id === song.id) {
+        // 如果是同一首歌，仅更新索引
+        if (newIndex !== -1) statusStore.playIndex = newIndex;
+        // 如果需要播放
+        if (options.play) await this.play();
+      } else {
+        statusStore.playIndex = newIndex;
+        await this.setupSong(data[newIndex], 0);
+        if (options.play) await this.play();
+      }
+    } else {
+      // 默认播放第一首
+      statusStore.playIndex = 0;
+      await this.setupSong(data[0], 0);
+      if (options.play) await this.play();
+    }
+    musicStore.playPlaylistId = pid ?? "";
+    if (options.showTip) window.$message.success("已开始播放");
+  }
+
+  /**
+   * 添加下一首歌曲
+   * @param song 歌曲
+   * @param play 是否立即播放
+   */
+  public async addNextSong(song: Track, play: boolean = false) {
+    const dataStore = useDataStore();
+    const musicStore = useMusicStore();
+    const statusStore = useStatusStore();
+    if (musicStore.playSong.id === song.id) {
+      await this.play();
+      window.$message.success("已开始播放");
+      return;
+    }
+    // 尝试添加
+    const currentSongId = musicStore.playSong.id;
+    const songIndex = await dataStore.setNextPlaySong(
+      song,
+      statusStore.playIndex,
+    );
+    // 修正当前播放索引
+    const newCurrentIndex = dataStore.playList.findIndex(
+      (s) => s.id === currentSongId,
+    );
+    if (newCurrentIndex !== -1 && newCurrentIndex !== statusStore.playIndex) {
+      statusStore.playIndex = newCurrentIndex;
+    }
+    // 播放歌曲
+    if (songIndex < 0) return;
+    if (play) {
+      await this.togglePlayIndex(songIndex, true);
+    } else {
+      window.$message.success("已添加至下一首播放");
+    }
+  }
+
   /** 获取频谱数据。音频在阶段 4.4 接入，之前没有数据 */
   public getSpectrumData(): Uint8Array | null {
     return null;

@@ -1,10 +1,10 @@
 # 阶段 3：播放端视觉外壳
 
-状态：进行中，3.1、3.3、3.5、3.6 已完成，3.2 只剩页面相关设置项（随 3.4），3.4 页面模板未开始（2026-10-25）。前置：阶段 2 的页面清单（已确定）；播放器部分需要阶段 2 的播放器参考图。参照路线图：[样式还原与验收方法](../roadmap.md#6-样式还原与验收方法)。
+状态：3.1–3.6 已完成，新增视觉元素 Eric 已确认（2026-10-25）。前置：阶段 2 的页面清单（已确定）；播放器部分需要阶段 2 的播放器参考图。参照路线图：[样式还原与验收方法](../roadmap.md#6-样式还原与验收方法)。
 
 ## 当前事实
 
-`frontend/` 已有主框架（[AppLayout.vue](../../frontend/src/layout/AppLayout.vue)）、侧栏菜单、顶部导航、明暗主题和窄屏抽屉；界面名称已改为 Sonora，标志图形沿用 SPlayer。菜单、路由与顶栏用户入口已按首发范围重建（3.1）。各页面仍是占位（[EmptyView.vue](../../frontend/src/views/EmptyView.vue)）；没有卡片与歌曲列表。播放器展示层（底部播放栏、播放队列抽屉、全屏播放器，3.5）已完成，由 fixture 驱动、不出声；截图对照工具见 3.6。
+`frontend/` 已有主框架（[AppLayout.vue](../../frontend/src/layout/AppLayout.vue)）、侧栏菜单、顶部导航、明暗主题和窄屏抽屉；界面名称已改为 Sonora，标志图形沿用 SPlayer。菜单、路由与顶栏用户入口已按首发范围重建（3.1）。页面模板（3.4）已完成：首页、歌曲、专辑、艺术家、各详情页与搜索都由 `DataSource` 取数，fixture 与 Go 服务都可用；写操作（喜欢、歌单编辑与排序、清空最近播放）只提示，在阶段 4.4 与 5 接入。播放器展示层（底部播放栏、播放队列抽屉、全屏播放器，3.5）已完成，由 fixture 驱动、不出声；截图对照工具见 3.6。
 
 数据只经 [api/source.ts](../../frontend/src/api/source.ts) 的 `DataSource` 读取，它覆盖播放端 API 的全部读取接口。开发服务器上以 `?fixture=<场景>` 打开时换成 [fixtures](../../frontend/src/fixtures/index.ts)，不需要 Go 服务；`&player=<状态>` 再指定播放器的初始状态（`source.ts` 导出的 `fixturePlayer`），例如 `http://127.0.0.1:14559/?fixture=baseline&player=yoru-paused#/`。场景与状态见 3.3。生产构建不含 fixture（已用 `vite build` 检查产物）。
 
@@ -32,7 +32,11 @@
   - `set-yrc-off`（关闭逐字歌词）的歌词内容不同：参考实例改用网易另给的 LRC，Sonora 只有一份 TTML，由逐字歌词生成普通歌词（与 SPlayer 只有 TTML 时相同，见 3.3）。这是数据差异，渲染一致。
   - 流动背景的帧率、流速、渲染比例、暂停时停止流动（`set-animation`）按渲染器输入比较，两边相同（方法见 3.6）。
   - 未在这里验证的：动态封面（视频来自网易接口，Sonora 没有来源，设置保留但不起作用）；音乐频谱与背景响应低频音量（需要音频，4.4）；展开动画（过程动画，未采集）。
-- [ ] 页面相关的设置项（歌曲列表显示、侧边栏管理、首页栏目、页面切换动画）随 3.4 页面模板验证。
+- [x] 页面相关的设置项（歌曲列表显示、侧边栏管理、首页栏目、页面切换动画）随 3.4 页面模板验证。运行确认（2026-10-25，临时 Vite 实例与 Playwright Chromium，`fixture=library`，每项在新的 BrowserContext 中写入 `sonora-setting` 后检查页面）：
+  - 歌曲列表显示：`showSongAlbum`、`showSongDuration`、`showSongOperations`、`showSongArtist` 关闭时，表头与每行的对应列消失；`hiddenCovers` 的 `list`（歌曲行与详情头部封面）、`album`（专辑网格换成无封面卡片）、`artist`（艺术家网格）、`artistDetail`（艺术家详情图片）、`home`（首页卡片、专辑与歌曲行）都生效。`hiddenCovers` 补回 SPlayer 的 `artist` 与 `playlist`（搜索结果的歌单）两项，字段名与默认值相同。`hideBracketedContent` 在 SongCard、ListDetail、CoverList、ArtistList 中调用照搬的 `removeBrackets`，fixture 没有带括号的标题，只做了源码确认。
+  - 侧边栏管理：`sidebarHide.hideHistory`、`hideUserPlaylists` 隐藏“最近播放”与“创建的歌单”，与 SPlayer 的 `Menu.vue` 相同（此前侧栏没有读取这两项）。
+  - 首页栏目：`homePageSections` 字段形态与 SPlayer 相同，栏目换成 Sonora 的“最近添加的专辑”（`album`）与“最近播放”（`history`）；调换 `order` 后顺序随之改变，`visible: false` 的栏目不显示；`showHomeGreeting` 关闭时没有问候语。
+  - 页面切换动画：AppLayout 按 SPlayer 加入 `RouterView` 的 `Transition`（`router-${routeAnimation}`）、`KeepAlive`（`max: 20`，排除 `layout`）与回到顶部按钮。8 种 `routeAnimation` 切换页面时都出现对应的 `router-*-enter-active` 与 `-leave-active`，`none` 不出现动画类；`useKeepAlive` 开启时离开再回到歌曲页保留列表滚动位置，关闭时回到顶部。动画样式（`animate.scss`）与 SPlayer 相同。
 
 ### 3.3 Fixture 与 ViewModel
 
@@ -61,10 +65,27 @@
 
 ### 3.4 页面模板（视觉语言一致）
 
-- [ ] 首页：问候语、快捷入口、最近添加的专辑、最近播放。
-- [ ] 歌曲列表（列、排序菜单、右键菜单、滚动）；专辑、艺术家网格；专辑详情（含碟号分组）、艺术家详情、歌单详情、我喜欢的音乐、最近播放。
-- [ ] 搜索建议面板与结果页（歌曲、专辑、艺术家、歌单）。
-- [ ] 新增的视觉元素（碟号分组标题等）交 Eric 确认。
+- [x] 公共组件照搬 SPlayer，数据换成播放端 API 的对象。运行确认（2026-10-25）：
+  - [SongCard.vue](../../frontend/src/components/Card/SongCard.vue)（歌曲行，去掉音质、原唱翻唱、特权、云盘、MV、脏标标签与电台、移动端分支）、[SongList.vue](../../frontend/src/components/List/SongList.vue)（虚拟列表、排序菜单、右键菜单、拖动排序、定位当前歌曲与回到顶部）、[ListDetail.vue](../../frontend/src/components/List/ListDetail.vue)（详情页头部，滚动时收起）、[CoverList.vue](../../frontend/src/components/List/CoverList.vue) 与 [ArtistList.vue](../../frontend/src/components/List/ArtistList.vue)（封面网格，悬停播放按钮）、[SongListCard.vue](../../frontend/src/components/Card/SongListCard.vue)（首页快捷入口）、[SongListMenu.vue](../../frontend/src/components/Menu/SongListMenu.vue) 与 [useSongMenu.ts](../../frontend/src/composables/useSongMenu.ts)、列表组合函数 `useListDetail`、`useListSearch`（Fuse.js 模糊搜索，同 SPlayer 版本 7.4.1）、`useListScroll`、`useListActions`。
+  - **排序由服务端完成**（阶段 2 的“歌曲列表”）：SongList 的排序菜单照搬，只修改 status store 的 `listSortField`、`listSortOrder`（与 SPlayer 同名，同样保存在浏览器中），页面监听后带上 `sort`、`order` 重新请求。排序字段只保留服务端支持的六项，名称与 SPlayer 相同。SPlayer 的单选组同时用 `v-model` 与 `@update:value`，选中新字段时顺序会从“默认”变为“升序”，Sonora 保持一致。
+  - **加载方式**：全部歌曲、艺术家的歌曲与专辑、专辑与艺术家网格、搜索结果分页载入（[usePagedList.ts](../../frontend/src/composables/List/usePagedList.ts)，触底或“加载更多”时追加，过期请求丢弃）；专辑、歌单、我喜欢的音乐、最近播放一次载入全部（[fetchAll](../../frontend/src/api/pages.ts)，每页 500）。“播放”按阶段 2 的“播放行为”：专辑、歌单、我喜欢、最近播放放入整个列表，全部歌曲、艺术家的歌曲与搜索结果只放入已经载入的部分。
+  - **播放**：控制器按 SPlayer 补上 `updatePlayList` 与 `addNextSong`（data store 的 `setNextPlaySong`），只改界面状态；随机模式下打乱队列仍在 4.4。`playPlaylistId` 改为带类型的字符串（`album-3`、`playlist-5`、`likes`），因为 Sonora 的专辑与歌单 ID 会重复，网格上的播放按钮据此显示暂停。
+  - 写操作（喜欢、添加到歌单、编辑与删除歌单、保存歌单顺序、从歌单中删除、清空最近播放、复制更多信息、选择歌手）只提示，分别在阶段 4.4 与 5 接入（[utils/auth.ts](../../frontend/src/utils/auth.ts)、[utils/modal.ts](../../frontend/src/utils/modal.ts)）。
+  - 加载失败时显示错误说明与“重试”（[ListError.vue](../../frontend/src/components/List/ListError.vue)，沿用 SPlayer 流媒体页面的空状态：`n-empty` 加主色按钮），详情页出错时不显示头部骨架。
+- [x] 首页：问候语、快捷入口、最近添加的专辑、最近播放。运行确认（2026-10-25）：问候语照搬 SPlayer（带用户名）；快捷入口是两张 SongListCard（“我喜欢的音乐”沿用 SPlayer 的说明文字，“歌曲”显示曲库歌曲数）；栏目标题与列表沿用 SPlayer 首页（`CoverList`，以及 SPlayer 每日推荐用的 `SongList height="auto"` 显示最近 10 首），标题指向专辑页与最近播放页。首页结构是新的，Eric 已确认（2026-10-25）。
+- [x] 歌曲列表（列、排序菜单、右键菜单、滚动）；专辑、艺术家网格；专辑详情（含碟号分组）、艺术家详情、歌单详情、我喜欢的音乐、最近播放。运行确认（2026-10-25）：
+  - 歌曲、专辑、艺术家三个列表页的标题与操作栏沿用 SPlayer 本地音乐页面（标题、数量、播放、刷新、模糊搜索；[ListPageHeader.vue](../../frontend/src/components/List/ListPageHeader.vue)），搜索走服务端的 `q`。专辑页的排序（按标题、最近添加）用 SPlayer 窄窗口下标签页的下拉按钮样式。
+  - 专辑详情、歌单详情、我喜欢的音乐照搬 SPlayer 的 `album.vue`、`playlist.vue`、`liked.vue`，头部内容按阶段 2 的“详情页头部”表：专辑的“更多”只有添加到歌单；歌单有“编辑歌单”与“更多 → 删除歌单”，默认排序且未搜索时可拖动排序；我喜欢的音乐用默认封面。艺术家详情照搬 `Artist/layout.vue`（圆形图片、歌曲数与专辑数、“歌曲 / 专辑”标签页），去掉关注、视频、简介与“更多”。最近播放照搬 `History.vue`。
+  - 右键菜单条目按阶段 2：立即播放、下一首播放、添加到歌单、更多操作（复制歌曲名称、复制更多信息）、从歌单中删除（在自己的歌单中）、查看专辑、查看艺术家、同名搜索。“查看专辑”“查看艺术家”是 SPlayer 没有的条目，沿用 `Album`、`Artist` 图标；多位艺术家时打开选择（弹窗在阶段 5）。
+  - 交互在 fixture 中逐项点过：双击歌曲放入整张专辑并从该曲播放、网格播放按钮放入整张专辑、艺术家页“播放”、右键“下一首播放”插到当前曲目之后、专辑内模糊搜索、按时长排序后重新请求、详情页滚动收起头部；页面没有报错。空曲库、加载中与服务不可达三个场景都检查过。
+- [x] 搜索建议面板与结果页（歌曲、专辑、艺术家、歌单）。运行确认（2026-10-25）：顶栏搜索框照搬 SPlayer 的 `SearchInp.vue`（遮罩、搜索历史、搜索建议、`searchInputBehavior`），搜索历史保存在浏览器中（`sonora-data`，与 SPlayer 的 data-store 一样）。建议来自曲库搜索：歌曲 4 首、艺术家、专辑与自己的歌单各 2 项，点击歌曲加入下一首并播放，点击其他项进入详情。结果页照搬 `Search/layout.vue` 与各类型页面，标签页为歌曲、专辑、艺术家、歌单；歌单搜索用 `GET playlists?q=`（`DataSource.playlists` 增加 `q`，fixture 同步）。去掉热搜榜、推荐关键词、分享链接识别与搜索框右键菜单（复制、粘贴）。
+- [x] 新增的视觉元素交 Eric 确认，以下各项 Eric 已确认（2026-10-25，截图在 `.local/visual/pages-3.4/`）：
+  - 专辑详情的碟号分组标题：多碟专辑、默认排序时显示，沿用表头的高度与透明度，`Album` 图标对齐序号列，文字“第 N 碟”对齐标题列，序号按碟重新开始；排序或搜索时不分组。
+  - 专辑详情头部的年份（`Calendar-Empty`）与总时长（`Time`），歌单头部同时显示更新时间（`Update`）与创建时间（`Time`）；SPlayer 只显示其中一个时间。
+  - 专辑卡片在名称下显示艺术家（沿用 SPlayer 视频卡片的艺术家样式，单行省略），再显示“N首 · 年份”（SPlayer 是发行日期）。
+  - 首页的结构（上文）、列表页的排序下拉按钮与加载失败的“重试”。
+  - 窄于 990px 的页面没有单独处理，按最小宽度 990px 横向滚动；`1200px` 以下详情页头部右侧的模糊搜索隐藏，与 SPlayer 相同。
+- 回归：页面改动后 `task test:visual` 全量 54 个状态 30 一致、24 例外、0 不符（AppLayout 加入路由动画与 KeepAlive 不影响播放器截图）。`task lint:frontend` 与 `vite build` 通过，产物中没有 fixture。
 
 ### 3.5 播放器展示层（严格复刻）
 

@@ -446,7 +446,14 @@ function librarySource(lib: Library): DataSource {
           query,
         ),
       ),
-    playlists: () => reply(() => page(lib.playlists.map((p) => p.playlist))),
+    playlists: (query = {}) =>
+      reply(() =>
+        page(
+          lib.playlists
+            .map((p) => p.playlist)
+            .filter((p) => matches(query.q, p.name)),
+        ),
+      ),
     playlist: (id) => reply(() => ownPlaylist(id).playlist),
     playlistTracks: (id, query) =>
       reply(() =>

@@ -1,5 +1,7 @@
-// 照搬 SPlayer utils/helper.ts 中播放器用到的函数。
+// 照搬 SPlayer utils/helper.ts 中播放器与页面用到的函数。
 import { h } from "vue";
+import Fuse from "fuse.js";
+import type { Track } from "@/api/types";
 import SvgIcon from "@/components/Global/SvgIcon.vue";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -81,5 +83,32 @@ export const copyData = async (text: any, message?: string) => {
   } catch (error) {
     window.$message.error("复制出错，请重试");
     console.error("复制出错：", error);
+  }
+};
+
+/**
+ * 模糊搜索。字段按 Sonora 的歌曲改为标题、艺术家与专辑，权重与 SPlayer 相同
+ * @param keyword 搜索关键词
+ * @param data 歌曲列表
+ */
+export const fuzzySearch = (keyword: string, data: Track[]): Track[] => {
+  try {
+    if (!keyword || !data || !Array.isArray(data)) return [];
+
+    const fuse = new Fuse(data, {
+      // 针对歌曲可读字段进行索引
+      keys: [
+        { name: "title", weight: 0.5 },
+        { name: "artists.name", weight: 0.15 },
+        { name: "album.title", weight: 0.1 },
+      ],
+      threshold: 0.35, // 0 精确匹配 ~ 1 完全模糊
+      ignoreLocation: true, // 不要求关键词位置接近
+    });
+
+    return fuse.search(keyword).map((result) => result.item);
+  } catch (error) {
+    console.error("模糊搜索出现错误：", error);
+    return [];
   }
 };

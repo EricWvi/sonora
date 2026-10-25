@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
-import { source } from "@/api/source";
 import type { Track } from "@/api/types";
 import type { SongLyric } from "@/types/lyric";
+import { coverSizes, coverUrl } from "@/utils/cover";
 
 /**
  * 当前歌曲与歌词。字段名照搬 SPlayer stores/music.ts，歌曲是播放端 API 的 `Track`。
@@ -9,6 +9,11 @@ import type { SongLyric } from "@/types/lyric";
  */
 interface MusicState {
   playSong: Track;
+  /**
+   * 当前播放列表的来源，如 `album-3`、`playlist-5`、`likes`；空字符串表示其他列表。
+   * SPlayer 用网易的数字 ID，Sonora 的专辑与歌单 ID 会重复，所以带上类型
+   */
+  playPlaylistId: string;
   songLyric: SongLyric;
 }
 
@@ -27,24 +32,15 @@ const defaultMusicData: Track = {
   hasLyrics: false,
 };
 
-/** SPlayer 的封面尺寸 `coverSize` 对应的服务端缩略图；`xl` 与 `cover` 使用原图。 */
-const coverSizes = {
-  s: 100,
-  m: 300,
-  l: 1024,
-  xl: undefined,
-  cover: undefined,
-} as const;
-
-const coverUrl = (song: Track, size: keyof typeof coverSizes) =>
-  song.cover
-    ? source.coverUrl(song.cover, coverSizes[size])
-    : "/images/song.jpg";
+const songCoverUrl = (song: Track, size: keyof typeof coverSizes) =>
+  coverUrl(song.cover, size);
 
 export const useMusicStore = defineStore("music", {
   state: (): MusicState => ({
     // 当前播放歌曲
     playSong: { ...defaultMusicData },
+    // 当前播放列表 ID
+    playPlaylistId: "",
     // 当前歌曲歌词
     songLyric: {
       lrcData: [], // 普通歌词
@@ -66,13 +62,14 @@ export const useMusicStore = defineStore("music", {
     },
     /** 歌曲封面 */
     songCover(state): string {
-      return coverUrl(state.playSong, "s");
+      return songCoverUrl(state.playSong, "s");
     },
   },
   actions: {
     /** 重置音乐数据 */
     resetMusicData() {
       this.playSong = { ...defaultMusicData };
+      this.playPlaylistId = "";
       this.setSongLyric({ lrcData: [], yrcData: [] }, true);
     },
     /**
@@ -95,7 +92,7 @@ export const useMusicStore = defineStore("music", {
     },
     // 获取歌曲封面；没有封面时为 SPlayer 的默认封面
     getSongCover(size: keyof typeof coverSizes = "s") {
-      return coverUrl(this.playSong, size);
+      return songCoverUrl(this.playSong, size);
     },
   },
 });

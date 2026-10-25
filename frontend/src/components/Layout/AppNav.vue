@@ -26,19 +26,7 @@
       </template>
     </n-flex>
     <n-flex :wrap="false" justify="end" class="nav-main">
-      <div class="search">
-        <n-input
-          v-model:value="keyword"
-          class="search-input"
-          placeholder="搜索音乐"
-          round
-          clearable
-          :input-props="{ 'aria-label': '搜索音乐' }"
-          @keyup.enter="search"
-        >
-          <template #prefix><SvgIcon :size="18" name="Search" /></template>
-        </n-input>
-      </div>
+      <SearchInp />
       <div v-if="isDesktop" class="nav-drag" />
       <n-flex align="center">
         <UserMenu />
@@ -85,6 +73,7 @@
 import Logo from "./Logo.vue";
 import SidebarMenu from "./SidebarMenu.vue";
 import UserMenu from "./UserMenu.vue";
+import SearchInp from "@/components/Search/SearchInp.vue";
 import SvgIcon from "@/components/Global/SvgIcon.vue";
 import type { DropdownOption } from "naive-ui";
 import { useSettingStore } from "@/stores/setting";
@@ -93,7 +82,6 @@ const router = useRouter();
 const settingStore = useSettingStore();
 const isDesktop = useMediaQuery("(min-width: 1024px)");
 const isSmallScreen = useMediaQuery("(max-width: 767.98px)");
-const keyword = ref("");
 const showAside = ref(false);
 // 设置菜单：沿用 SPlayer，主题配置与全局设置的弹窗在阶段 5 接入。
 const setOptions = computed<DropdownOption[]>(() => [
@@ -120,16 +108,6 @@ const setOptions = computed<DropdownOption[]>(() => [
 function setSelect(key: string): void {
   if (key === "themeMode") settingStore.setThemeMode();
 }
-
-// 搜索先展示空结果，不模拟服务端数据。
-function search(): void {
-  if (keyword.value.trim())
-    void router.push({
-      name: "search",
-      query: { keyword: keyword.value.trim() },
-    });
-}
 </script>
 
 <style lang="scss" scoped src="@/style/nav.scss"></style>
-<style lang="scss" scoped src="@/style/search.scss"></style>

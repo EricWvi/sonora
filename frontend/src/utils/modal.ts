@@ -1,4 +1,5 @@
 import type { ArtistRef, Track } from "@/api/types";
+import { NScrollbar } from "naive-ui";
 import router from "@/router";
 
 // 照搬 SPlayer utils/modal.ts 中播放器用到的入口。弹窗（选择艺术家、添加到歌单、
@@ -41,3 +42,38 @@ export const openCopyLyrics = async () => pending("复制歌词");
  * @param _type 设置分类
  */
 export const openSetting = async (_type?: string) => pending("设置");
+
+/**
+ * 打开简介
+ * @param content 简介内容
+ * @param title 标题
+ */
+export const openDescModal = (content: string, title: string = "歌单简介") => {
+  window.$modal.create({
+    preset: "card",
+    transformOrigin: "center",
+    autoFocus: false,
+    style: { width: "600px" },
+    title,
+    content: () => {
+      return h(
+        NScrollbar,
+        { style: { maxHeight: "400px" } },
+        {
+          default: () =>
+            h(
+              "div",
+              { style: { whiteSpace: "pre-wrap" } },
+              { default: () => content },
+            ),
+        },
+      );
+    },
+  });
+};
+
+/**
+ * 编辑歌单
+ * @param _id 歌单 ID
+ */
+export const openUpdatePlaylist = async (_id: number) => pending("编辑歌单");
