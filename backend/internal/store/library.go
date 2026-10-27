@@ -124,12 +124,6 @@ func (w Window) clamp() Window {
 	return w
 }
 
-// like turns a search phrase into a LIKE pattern with ESCAPE '\'.
-func like(q string) string {
-	r := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
-	return "%" + r.Replace(q) + "%"
-}
-
 // --- artist links ----------------------------------------------------------
 
 // artistsJSON selects, as a JSON array in position order, the artists that
@@ -254,8 +248,8 @@ func scanTrack(row scanner, extra ...any) (Track, error) {
 	return t, nil
 }
 
-// Tracks lists tracks in q.Sort order; by default an album's in disc and
-// track order, otherwise newest first.
+// Tracks lists tracks in q.Sort order; by default a search by relevance,
+// an album's in disc and track order, otherwise newest first.
 func (s *Store) Tracks(ctx context.Context, q TrackQuery) (Page[Track], error) {
 	page := Page[Track]{Items: []Track{}}
 	natural := `t.id DESC`
@@ -267,13 +261,15 @@ func (s *Store) Tracks(ctx context.Context, q TrackQuery) (Page[Track], error) {
 		return page, err
 	}
 	var where []string
-	var args []any
+	var args, orderArgs []any
 	if q.Q = strings.TrimSpace(q.Q); q.Q != "" {
-		where = append(where, `(t.title LIKE ? ESCAPE '\' OR al.title LIKE ? ESCAPE '\' OR EXISTS (
-			SELECT 1 FROM track_artists x JOIN artists a ON a.id = x.artist_id
-			WHERE x.track_id = t.id AND a.name LIKE ? ESCAPE '\'))`)
-		p := like(q.Q)
-		args = append(args, p, p, p)
+		tiers := [][]searchField{{{col: `t.title`}}, {{col: `al.title`}, trackArtistField}}
+		cond, condArgs := searchCond(q.Q, tiers...)
+		where = append(where, cond)
+		args = append(args, condArgs...)
+		if q.Sort.isDefault() {
+			order, orderArgs = searchOrder(q.Q, natural, tiers...)
+		}
 	}
 	if q.Missing {
 		where = append(where, `(t.album_id IS NULL OR NOT EXISTS (SELECT 1 FROM track_artists WHERE track_id = t.id))`)
@@ -296,7 +292,7 @@ func (s *Store) Tracks(ctx context.Context, q TrackQuery) (Page[Track], error) {
 	}
 	w := q.Window.clamp()
 	rows, err := s.db.QueryContext(ctx, `SELECT `+trackColumns+trackFrom+cond+order+` LIMIT ? OFFSET ?`,
-		append(args, w.Limit, w.Offset)...)
+		append(append(args, orderArgs...), w.Limit, w.Offset)...)
 	if err != nil {
 		return page, err
 	}
@@ -527,21 +523,25 @@ func scanAlbum(row scanner) (Album, error) {
 	return a, err
 }
 
-// Albums lists albums, by title unless q.Sort says otherwise.
+// Albums lists albums, by title unless q.Sort says otherwise; a search
+// without a sort orders by relevance.
 func (s *Store) Albums(ctx context.Context, q AlbumQuery) (Page[Album], error) {
 	page := Page[Album]{Items: []Album{}}
-	order, err := q.Sort.orderBy(albumSortKeys, `al.title COLLATE `+sortCollation+`, al.id`)
+	natural := `al.title COLLATE ` + sortCollation + `, al.id`
+	order, err := q.Sort.orderBy(albumSortKeys, natural)
 	if err != nil {
 		return page, err
 	}
 	var where []string
-	var args []any
+	var args, orderArgs []any
 	if q.Q = strings.TrimSpace(q.Q); q.Q != "" {
-		where = append(where, `(al.title LIKE ? ESCAPE '\' OR EXISTS (
-			SELECT 1 FROM album_artists x JOIN artists a ON a.id = x.artist_id
-			WHERE x.album_id = al.id AND a.name LIKE ? ESCAPE '\'))`)
-		p := like(q.Q)
-		args = append(args, p, p)
+		tiers := [][]searchField{{{col: `al.title`}}, {albumArtistField}}
+		cond, condArgs := searchCond(q.Q, tiers...)
+		where = append(where, cond)
+		args = append(args, condArgs...)
+		if q.Sort.isDefault() {
+			order, orderArgs = searchOrder(q.Q, natural, tiers...)
+		}
 	}
 	if q.ArtistID > 0 {
 		where = append(where, `EXISTS (SELECT 1 FROM album_artists WHERE album_id = al.id AND artist_id = ?)`)
@@ -558,7 +558,7 @@ func (s *Store) Albums(ctx context.Context, q AlbumQuery) (Page[Album], error) {
 	}
 	w := q.Window.clamp()
 	rows, err := s.db.QueryContext(ctx, albumSelect+cond+order+` LIMIT ? OFFSET ?`,
-		append(args, w.Limit, w.Offset)...)
+		append(append(args, orderArgs...), w.Limit, w.Offset)...)
 	if err != nil {
 		return page, err
 	}
@@ -713,19 +713,25 @@ func scanArtist(row scanner) (Artist, error) {
 	return a, err
 }
 
-// Artists lists artists by name.
+const artistOrder = `a.name COLLATE ` + sortCollation + `, a.id`
+
+// Artists lists artists by name, or by relevance when searching.
 func (s *Store) Artists(ctx context.Context, q string, w Window) (Page[Artist], error) {
 	page := Page[Artist]{Items: []Artist{}}
 	cond, args := "", []any{}
+	order, orderArgs := ` ORDER BY `+artistOrder, []any{}
 	if q = strings.TrimSpace(q); q != "" {
-		cond, args = ` WHERE a.name LIKE ? ESCAPE '\'`, []any{like(q)}
+		name := []searchField{{col: `a.name`}}
+		cond, args = searchCond(q, name)
+		cond = ` WHERE ` + cond
+		order, orderArgs = searchOrder(q, artistOrder, name)
 	}
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM artists a`+cond, args...).Scan(&page.Total); err != nil {
 		return page, err
 	}
 	w = w.clamp()
-	rows, err := s.db.QueryContext(ctx, artistSelect+cond+` ORDER BY a.name COLLATE `+sortCollation+`, a.id LIMIT ? OFFSET ?`,
-		append(args, w.Limit, w.Offset)...)
+	rows, err := s.db.QueryContext(ctx, artistSelect+cond+order+` LIMIT ? OFFSET ?`,
+		append(append(args, orderArgs...), w.Limit, w.Offset)...)
 	if err != nil {
 		return page, err
 	}

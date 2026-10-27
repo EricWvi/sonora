@@ -1,6 +1,6 @@
 # Sonora API 约定
 
-更新日期：2026-10-25。本文记录已实现的管理 API（阶段 1）、播放端登录与播放端 API（阶段 4）及其通用约定。实现见 [server.go](../backend/internal/server/server.go)、[player.go](../backend/internal/server/player.go)、[admin.go](../backend/internal/admin/admin.go) 与 [auth.go](../backend/internal/auth/auth.go)。
+更新日期：2026-10-27。本文记录已实现的管理 API（阶段 1）、播放端登录与播放端 API（阶段 4）及其通用约定。实现见 [server.go](../backend/internal/server/server.go)、[player.go](../backend/internal/server/player.go)、[admin.go](../backend/internal/admin/admin.go) 与 [auth.go](../backend/internal/auth/auth.go)。
 
 ## 通用约定
 
@@ -9,6 +9,7 @@
 - **身份**：媒体以整数 ID 标识。ID 由 `AUTOINCREMENT` 分配，删除后不复用。文件路径、存储布局和内容哈希不出现在任何响应中；封面以内容哈希文件名引用，只能经 `covers/{name}` 读取。
 - **分页**：列表接受 `offset`、`limit`（默认 50，上限 500），返回 `{"items": [...], "total": n}`。
 - **排序**：歌曲列表接受 `sort` 与 `order`。`sort` 取 `default`（默认）、`title`、`artist`、`album`、`duration`、`createTime`，与 SPlayer 的 `sortFieldOptions` 同名；`order` 取 `asc`（默认）或 `desc`。`default` 是列表自身的顺序，此时忽略 `order`；按其他字段排序时，相等的项保持列表自身的顺序。`artist` 按第一位艺术家，没有艺术家或专辑的歌曲视为空名。名称按拼音、数字按数值比较（对应 SPlayer 的 `Intl.Collator("zh-CN", {numeric: true})`），专辑与艺术家列表的默认顺序也使用同一规则。专辑列表只接受 `default`（按标题）与 `createTime`。其他取值返回 400 `invalid`。
+- **搜索**：`q` 去掉首尾空白后按子串匹配（ASCII 不区分大小写，`%`、`_` 按字面匹配）。`sort` 为 `default` 时结果按相关度排列（2026-10-27）：先比较主要字段（歌曲与专辑的标题、艺术家与歌单的名称），再比较次要字段（歌曲的专辑名与艺术家名、专辑的艺术家名）；同一字段内与 `q` 完全相同的在前，其次是以 `q` 开头的，最后是只包含 `q` 的；同一档内保持列表自身的顺序。指定其他 `sort` 时按该字段排序。
 - **写请求**：非 GET 请求若带 `Origin` 头，必须等于配置的 `public_url`，否则返回 403 `bad_origin`。
 
 | 状态 | code | 场景 |
@@ -117,7 +118,7 @@
 | `GET history` | `{items: [{track, playedAt}], total}`，最近播放的在前；同一首歌只保留一条，重播移到最前；每人最多保留 500 首，与 SPlayer 一致 |
 | `POST history` | `{trackId}` 记录一次播放，204。什么时候算一次播放由播放端决定 |
 | `DELETE history`、`DELETE history/{trackId}` | 清空 / 删除一条，204 |
-| `GET playlists` | 自己的歌单，新建的在前；`q` 匹配歌单名 |
+| `GET playlists` | 自己的歌单，新建的在前；`q` 匹配歌单名，按相关度排列 |
 | `POST playlists` | `{name, description}` 新建，201。名称 1–100 个字符，简介最多 1000 个字符 |
 | `GET/PUT/DELETE playlists/{id}` | 详情 / 修改 `{name, description}` / 删除 |
 | `GET playlists/{id}/tracks` | 歌单中的歌曲，默认按歌单顺序，分页，可排序 |

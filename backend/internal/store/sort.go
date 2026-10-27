@@ -59,6 +59,11 @@ type Sort struct {
 	Order string
 }
 
+// isDefault reports whether the list keeps its own order.
+func (s Sort) isDefault() bool {
+	return s.Field == "" || s.Field == SortDefault
+}
+
 // orderBy returns the ORDER BY clause for keys, falling back to the list's
 // own order natural, which also breaks ties so equal rows keep it.
 func (s Sort) orderBy(keys map[string]string, natural string) (string, error) {
@@ -71,7 +76,7 @@ func (s Sort) orderBy(keys map[string]string, natural string) (string, error) {
 	default:
 		return "", invalid("排序方向只支持 asc 或 desc")
 	}
-	if s.Field == "" || s.Field == SortDefault {
+	if s.isDefault() {
 		return ` ORDER BY ` + natural, nil
 	}
 	key, ok := keys[s.Field]

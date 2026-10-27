@@ -236,20 +236,25 @@ func scanPlaylist(row scanner) (Playlist, error) {
 	return p, err
 }
 
-// Playlists lists the user's playlists, newest first. q matches names.
+// Playlists lists the user's playlists, newest first. q matches names,
+// ordered by relevance.
 func (s *Store) Playlists(ctx context.Context, userID int64, q string, w Window) (Page[Playlist], error) {
 	page := Page[Playlist]{Items: []Playlist{}}
 	cond, args := ` WHERE p.user_id = ?`, []any{userID}
+	order, orderArgs := ` ORDER BY p.id DESC`, []any{}
 	if q = strings.TrimSpace(q); q != "" {
-		cond += ` AND p.name LIKE ? ESCAPE '\'`
-		args = append(args, like(q))
+		name := []searchField{{col: `p.name`}}
+		match, matchArgs := searchCond(q, name)
+		cond += ` AND ` + match
+		args = append(args, matchArgs...)
+		order, orderArgs = searchOrder(q, `p.id DESC`, name)
 	}
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM playlists p`+cond, args...).Scan(&page.Total); err != nil {
 		return page, err
 	}
 	w = w.clamp()
-	rows, err := s.db.QueryContext(ctx, playlistSelect+cond+` ORDER BY p.id DESC LIMIT ? OFFSET ?`,
-		append(args, w.Limit, w.Offset)...)
+	rows, err := s.db.QueryContext(ctx, playlistSelect+cond+order+` LIMIT ? OFFSET ?`,
+		append(append(args, orderArgs...), w.Limit, w.Offset)...)
 	if err != nil {
 		return page, err
 	}

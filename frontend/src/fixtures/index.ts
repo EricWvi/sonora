@@ -317,6 +317,33 @@ const collator = new Intl.Collator("zh-CN", { numeric: true });
 const matches = (q: string | undefined, ...texts: string[]) =>
   !q || texts.some((text) => text.toLowerCase().includes(q.toLowerCase()));
 
+/**
+ * 搜索时按相关度排序，与服务端相同：`tiers` 从重要到次要分组，组内完全相同在前，
+ * 其次是开头相同，再次是包含；同一档保持列表原来的顺序。
+ */
+function byRelevance<T>(
+  list: T[],
+  q: string | undefined,
+  tiers: (item: T) => string[][],
+): T[] {
+  if (!q) return list;
+  const key = q.toLowerCase();
+  const rank = (item: T) => {
+    const groups = tiers(item);
+    for (const [i, texts] of groups.entries()) {
+      const lower = texts.map((text) => text.toLowerCase());
+      if (lower.some((text) => text === key)) return i * 3;
+      if (lower.some((text) => text.startsWith(key))) return i * 3 + 1;
+      if (lower.some((text) => text.includes(key))) return i * 3 + 2;
+    }
+    return groups.length * 3;
+  };
+  return list
+    .map((item, index) => ({ item, index, rank: rank(item) }))
+    .sort((a, b) => a.rank - b.rank || a.index - b.index)
+    .map(({ item }) => item);
+}
+
 /** 按 `sort` 与 `order` 排序；`default` 保持列表自身的顺序，相等的项也保持列表顺序。 */
 function sortTracks(list: Track[], query: ListQuery = {}): Track[] {
   const { sort = "default", order = "asc" } = query;
@@ -399,6 +426,11 @@ function librarySource(lib: Library): DataSource {
             ...t.artists.map((a) => a.name),
           ),
         );
+        if (!query.sort || query.sort === "default")
+          list = byRelevance(list, query.q, (t) => [
+            [t.title],
+            [t.album?.title ?? "", ...t.artists.map((a) => a.name)],
+          ]);
         return page(sortTracks(list, query), query);
       }),
     track: (id) => reply(() => track(id)),
@@ -423,6 +455,11 @@ function librarySource(lib: Library): DataSource {
         list = list.filter((a) =>
           matches(query.q, a.title, ...a.artists.map((r) => r.name)),
         );
+        if (query.sort !== "createTime")
+          list = byRelevance(list, query.q, (a) => [
+            [a.title],
+            a.artists.map((r) => r.name),
+          ]);
         return page(list, query);
       }),
     album: (id) =>
@@ -434,9 +471,13 @@ function librarySource(lib: Library): DataSource {
     artists: (query = {}) =>
       reply(() =>
         page(
-          [...lib.artists]
-            .sort((a, b) => collator.compare(a.name, b.name))
-            .filter((a) => matches(query.q, a.name)),
+          byRelevance(
+            [...lib.artists]
+              .sort((a, b) => collator.compare(a.name, b.name))
+              .filter((a) => matches(query.q, a.name)),
+            query.q,
+            (a) => [[a.name]],
+          ),
           query,
         ),
       ),
@@ -462,9 +503,13 @@ function librarySource(lib: Library): DataSource {
     playlists: (query = {}) =>
       reply(() =>
         page(
-          lib.playlists
-            .map((p) => p.playlist)
-            .filter((p) => matches(query.q, p.name)),
+          byRelevance(
+            lib.playlists
+              .map((p) => p.playlist)
+              .filter((p) => matches(query.q, p.name)),
+            query.q,
+            (p) => [[p.name]],
+          ),
         ),
       ),
     playlist: (id) => reply(() => ownPlaylist(id).playlist),
