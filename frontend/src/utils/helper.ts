@@ -1,5 +1,6 @@
 // 照搬 SPlayer utils/helper.ts 中播放器与页面用到的函数。
-import { h } from "vue";
+import { h, type VNode } from "vue";
+import { NTooltip, type SelectOption } from "naive-ui";
 import Fuse from "fuse.js";
 import type { Track } from "@/api/types";
 import SvgIcon from "@/components/Global/SvgIcon.vue";
@@ -25,6 +26,25 @@ export const renderIcon = (
     return h(SvgIcon, { name: iconName, size, style });
   };
 };
+
+/**
+ * 渲染下拉选项：悬停时显示完整名称
+ */
+export const renderOption = ({
+  node,
+  option,
+}: {
+  node: VNode;
+  option: SelectOption;
+}) =>
+  h(
+    NTooltip,
+    { placement: "left" },
+    {
+      trigger: () => node,
+      default: () => option.label,
+    },
+  );
 
 /**
  * 封面加载完成时，设置透明度为 1

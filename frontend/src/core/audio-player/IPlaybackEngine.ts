@@ -100,6 +100,13 @@ export interface IPlaybackEngine extends TypedEventTarget<AudioEventMap> {
   getVolume(): number;
   /** 设置输出设备 */
   setSinkId(deviceId: string): Promise<void>;
+  /**
+   * 预加载下一首的音频，切过去时浏览器复用已下载的部分；null 释放。
+   * Sonora 的“下一首歌曲预载”（SPlayer 预取的是网易的播放地址）。
+   */
+  preload(url: string | null): void;
+  /** 音频与歌词同步补偿（毫秒），正值让 currentTime 提前，歌词随之变快 */
+  setAudioDelayCompensation(offset: number): void;
   /** 设置均衡器第 index 段的增益（dB） */
   setFilterGain(index: number, value: number): void;
   /** 频谱数据，没有音频图谱时为空数组 */

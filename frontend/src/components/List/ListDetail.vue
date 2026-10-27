@@ -45,7 +45,10 @@ Sonora 增加的信息项，样式沿用其他信息项。 -->
           <n-collapse-transition :show="!listScrolling" class="collapse">
             <!-- 简介 -->
             <n-text
-              v-if="detailData.description"
+              v-if="
+                detailData.description &&
+                settingStore.playlistPageElements.description
+              "
               class="description text-hidden"
               @click="handleDescriptionClick"
             >
@@ -54,7 +57,12 @@ Sonora 增加的信息项，样式沿用其他信息项。 -->
             <!-- 信息 -->
             <n-flex class="meta">
               <!-- 艺术家 -->
-              <div v-if="config.showArtist" class="item">
+              <div
+                v-if="
+                  config.showArtist && settingStore.playlistPageElements.creator
+                "
+                class="item"
+              >
                 <SvgIcon name="Person" :depth="3" />
                 <div
                   v-if="detailData.artists?.length"
@@ -78,7 +86,10 @@ Sonora 增加的信息项，样式沿用其他信息项。 -->
                 </div>
               </div>
               <!-- 年份 -->
-              <div v-if="detailData.year" class="item">
+              <div
+                v-if="detailData.year && settingStore.playlistPageElements.time"
+                class="item"
+              >
                 <SvgIcon name="Calendar-Empty" :depth="3" />
                 <n-text>{{ detailData.year }}</n-text>
               </div>
@@ -93,12 +104,24 @@ Sonora 增加的信息项，样式沿用其他信息项。 -->
                 <n-text>{{ msToTime(detailData.durationMs) }}</n-text>
               </div>
               <!-- 更新时间 -->
-              <div v-if="detailData.updateTime" class="item">
+              <div
+                v-if="
+                  detailData.updateTime &&
+                  settingStore.playlistPageElements.time
+                "
+                class="item"
+              >
                 <SvgIcon name="Update" :depth="3" />
                 <n-text>{{ formatTimestamp(detailData.updateTime) }}</n-text>
               </div>
               <!-- 创建时间 -->
-              <div v-if="detailData.createTime" class="item">
+              <div
+                v-if="
+                  detailData.createTime &&
+                  settingStore.playlistPageElements.time
+                "
+                class="item"
+              >
                 <SvgIcon name="Time" :depth="3" />
                 <n-text>{{ formatTimestamp(detailData.createTime) }}</n-text>
               </div>

@@ -3,10 +3,13 @@
 // repeated captures and, later, to compare Sonora with SPlayer.
 //
 //   node scripts/baseline/diff.mjs <dir A> <dir B> [--out DIR] [--threshold N]
+//       [--masks FILE]
 //
 // A pixel differs when any channel differs by more than threshold (0–255,
 // default 0). The report lists, per file, the differing pixels, how many
-// differ by each amount and the bounding box they fall in. Decoding and comparing run in Chromium's
+// differ by each amount and the bounding box they fall in. --masks names a
+// JSON file mapping a file name to rectangles [x0, y0, x1, y1] (inclusive)
+// whose pixels are left out; they are counted as "masked" and drawn blue. Decoding and comparing run in Chromium's
 // canvas, so no image library is needed.
 
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
@@ -28,6 +31,7 @@ const { values: opts, positionals } = parseArgs({
   options: {
     out: { type: "string" },
     threshold: { type: "string", default: "0" },
+    masks: { type: "string" },
   },
 });
 if (positionals.length !== 2) {
@@ -36,6 +40,7 @@ if (positionals.length !== 2) {
 }
 const [dirA, dirB] = positionals.map((p) => resolve(p));
 const threshold = Number(opts.threshold);
+const masks = opts.masks ? JSON.parse(await readFile(opts.masks, "utf8")) : {};
 const outDir = opts.out && resolve(opts.out);
 if (outDir) await mkdir(outDir, { recursive: true });
 
@@ -54,7 +59,7 @@ try {
     }
     const a = await readFile(join(dirA, file));
     const result = await page.evaluate(
-      async ([a, b, threshold]) => {
+      async ([a, b, threshold, masks]) => {
         const load = async (b64) => {
           const img = new Image();
           img.src = "data:image/png;base64," + b64;
@@ -81,6 +86,11 @@ try {
         const dctx = diff.getContext("2d");
         const out = dctx.createImageData(w, h);
         let count = 0;
+        let masked = 0;
+        const inMask = (x, y) =>
+          masks.some(
+            ([x0, y0, x1, y1]) => x >= x0 && x <= x1 && y >= y0 && y <= y1,
+          );
         let maxDelta = 0;
         let box = null;
         // Differing pixels per largest channel difference.
@@ -96,7 +106,12 @@ try {
           const grey = (pa[i] + pa[i + 1] + pa[i + 2]) / 3;
           out.data[i] = out.data[i + 1] = out.data[i + 2] = 200 + grey / 5;
           out.data[i + 3] = 255;
-          if (d > threshold) {
+          const p0 = i / 4;
+          if (d > threshold && inMask(p0 % w, Math.floor(p0 / w))) {
+            masked++;
+            out.data[i] = out.data[i + 1] = 0;
+            out.data[i + 2] = 255;
+          } else if (d > threshold) {
             count++;
             maxDelta = Math.max(maxDelta, d);
             deltas[d] = (deltas[d] ?? 0) + 1;
@@ -116,7 +131,7 @@ try {
           }
         }
         let png = null;
-        if (count) {
+        if (count || masked) {
           dctx.putImageData(out, 0, 0);
           const blob = await diff.convertToBlob({ type: "image/png" });
           const bytes = new Uint8Array(await blob.arrayBuffer());
@@ -125,9 +140,14 @@ try {
             s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
           png = btoa(s);
         }
-        return { pixels: w * h, count, maxDelta, deltas, box, png };
+        return { pixels: w * h, count, masked, maxDelta, deltas, box, png };
       },
-      [a.toString("base64"), b.toString("base64"), threshold],
+      [
+        a.toString("base64"),
+        b.toString("base64"),
+        threshold,
+        masks[file] ?? [],
+      ],
     );
     const { png, ...entry } = result;
     if (png && outDir) {
@@ -145,12 +165,16 @@ try {
 for (const r of report) {
   if (r.missing) console.log(`${r.file}: missing in B`);
   else if (r.size) console.log(`${r.file}: size ${r.size[0]} vs ${r.size[1]}`);
-  else if (!r.count) console.log(`${r.file}: identical`);
   else {
+    const masked = r.masked ? ` (${r.masked} px masked)` : "";
+    if (!r.count) {
+      console.log(`${r.file}: identical${masked}`);
+      continue;
+    }
     const pct = ((100 * r.count) / r.pixels).toFixed(3);
     const [x0, y0, x1, y1] = r.box;
     console.log(
-      `${r.file}: ${r.count} px (${pct}%), max Δ ${r.maxDelta}, box ${x0},${y0}–${x1},${y1}`,
+      `${r.file}: ${r.count} px (${pct}%), max Δ ${r.maxDelta}, box ${x0},${y0}–${x1},${y1}${masked}`,
     );
   }
 }

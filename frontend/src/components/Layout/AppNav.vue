@@ -77,13 +77,14 @@ import SearchInp from "@/components/Search/SearchInp.vue";
 import SvgIcon from "@/components/Global/SvgIcon.vue";
 import type { DropdownOption } from "naive-ui";
 import { useSettingStore } from "@/stores/setting";
+import { openSetting, openThemeConfig } from "@/utils/modal";
 
 const router = useRouter();
 const settingStore = useSettingStore();
 const isDesktop = useMediaQuery("(min-width: 1024px)");
 const isSmallScreen = useMediaQuery("(max-width: 767.98px)");
 const showAside = ref(false);
-// 设置菜单：沿用 SPlayer，主题配置与全局设置的弹窗在阶段 5 接入。
+// 设置菜单：沿用 SPlayer 网页版（明暗模式、主题配置、全局设置）。
 const setOptions = computed<DropdownOption[]>(() => [
   {
     label:
@@ -103,10 +104,34 @@ const setOptions = computed<DropdownOption[]>(() => [
               : "AutoTheme",
       }),
   },
+  {
+    label: "主题配置",
+    key: "themeConfig",
+    icon: () => h(SvgIcon, { name: "Palette" }),
+  },
+  {
+    key: "divider-1",
+    type: "divider",
+  },
+  {
+    key: "setting",
+    label: "全局设置",
+    icon: () => h(SvgIcon, { name: "Settings" }),
+  },
 ]);
 
 function setSelect(key: string): void {
-  if (key === "themeMode") settingStore.setThemeMode();
+  switch (key) {
+    case "themeMode":
+      settingStore.setThemeMode();
+      break;
+    case "themeConfig":
+      openThemeConfig();
+      break;
+    case "setting":
+      openSetting();
+      break;
+  }
 }
 </script>
 

@@ -40,6 +40,9 @@ export abstract class BaseAudioPlayer
   protected isInitialized = false;
   /** 目标音量 (0-1) */
   protected volume: number = 1;
+
+  /** 音频与歌词同步补偿（毫秒） */
+  protected audioDelayCompensation = 0;
   /** 均衡器增益，音频图谱建立前设置的值在建立时应用 */
   private filterGains: number[] = [];
   /** 存储淡出暂停的定时器 ID */
@@ -313,6 +316,14 @@ export abstract class BaseAudioPlayer
   }
 
   /**
+   * 设置音频与歌词同步补偿
+   * @param offset 补偿（毫秒），正值让 currentTime 提前
+   */
+  public setAudioDelayCompensation(offset: number): void {
+    this.audioDelayCompensation = offset;
+  }
+
+  /**
    * 设置输出设备
    */
   public async setSinkId(device: string) {
@@ -362,6 +373,9 @@ export abstract class BaseAudioPlayer
 
   /** 加载资源 */
   public abstract load(url: string): Promise<void>;
+
+  /** 预加载下一首的音频，null 释放 */
+  public abstract preload(url: string | null): void;
 
   /** 执行底层播放 */
   protected abstract doPlay(): Promise<void>;

@@ -69,6 +69,15 @@ export interface DataSource {
    * 播放控制器用它区分未登录、歌曲已删除与网络问题。
    */
   audioStatus(trackId: number): Promise<number>;
+  /** 当前用户保存的设置（外观、歌词等，设备相关的不上传），从未保存时为 `{}`。 */
+  settings(): Promise<Record<string, unknown>>;
+  /**
+   * 整体替换保存的设置。`keepalive` 用于关闭页面时补发，页面卸载后请求仍会发出。
+   */
+  saveSettings(
+    data: Record<string, unknown>,
+    options?: { keepalive?: boolean },
+  ): Promise<void>;
   /** 结束本浏览器的会话，不退出 Authelia。 */
   logout(): Promise<void>;
   /** 不指定尺寸时为原图；尺寸为长边像素，见 docs/api.md 的 `covers/{name}`。 */
@@ -92,12 +101,14 @@ async function request<T>(
   method: string,
   path: string,
   body?: unknown,
+  keepalive?: boolean,
 ): Promise<T> {
   let res: Response;
   try {
     res = await fetch(path, {
       method,
       cache: "no-store",
+      keepalive,
       ...(body === undefined
         ? {}
         : {
@@ -160,6 +171,10 @@ const httpSource: DataSource = {
     write("DELETE", `playlists/${id}/tracks/${trackId}`),
   setPlaylistOrder: (id, trackIds) =>
     write("PUT", `playlists/${id}/order`, { trackIds }),
+  settings: () => get("settings"),
+  saveSettings: async (data, options) => {
+    await request<null>("PUT", api + "settings", data, options?.keepalive);
+  },
   async audioStatus(trackId) {
     try {
       const res = await fetch(httpSource.audioUrl(trackId), {

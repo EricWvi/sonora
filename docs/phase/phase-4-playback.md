@@ -67,7 +67,7 @@
 - [x] 在桌面 Chrome 上实际听：2026-10-25 Eric 在开发模式（`task run:server`、`task run:web`）下手动确认，拖动进度条跳转、页面标题、刷新后恢复、实际听感（含淡入淡出）没有明显问题；细节在日常使用中继续观察。
 - 输出设备的列表与切换（阶段 2 的 0.3）：转入[阶段 5](phase-5-player-pages.md)，与设置界面一起确认（2026-10-25 Eric 同意）。
 - 真实 Authelia 下的浏览器登录：开发模式跳过 OIDC，未手动确认；服务端流程由 `task test:contract` 覆盖，播放端的未登录跳转见 4.1。转入[阶段 6](phase-6-first-release.md)，首次部署时确认（2026-10-25 Eric 同意）。
-- “音频与歌词同步补偿”在 SPlayer 中只在“音频延迟模式”为 playback 时生效，Sonora 没有保留这项设置，补偿目前不起作用；Eric 确认阶段 5 接入设置界面时再定（2026-10-25）。
+- “音频与歌词同步补偿”在 SPlayer 中只在“音频延迟模式”为 playback 时生效，Sonora 没有保留这项设置，补偿目前不起作用；Eric 确认阶段 5 接入设置界面时再定（2026-10-25）。已在阶段 5 解决（2026-10-27）：只保留手动补偿，始终生效，`AudioElementPlayer.currentTime` 加上补偿值，见[阶段 5](phase-5-player-pages.md)。
 
 ## 退出条件
 

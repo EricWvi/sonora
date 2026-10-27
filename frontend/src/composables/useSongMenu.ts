@@ -1,6 +1,6 @@
 import type { DropdownOption } from "naive-ui";
 import type { Track } from "@/api/types";
-import { useMusicStore } from "@/stores";
+import { useMusicStore, useSettingStore } from "@/stores";
 import { usePlayerController } from "@/core/player/PlayerController";
 import { renderIcon, copyData } from "@/utils/helper";
 import { openJumpArtist, openPlaylistAdd } from "@/utils/modal";
@@ -11,11 +11,13 @@ import { deleteSongs } from "@/utils/auth";
  * 立即播放、下一首播放、添加到歌单、更多操作（复制歌曲名称）、
  * 从歌单中删除（在自己的歌单中时）、查看专辑、查看艺术家、同名搜索（在曲库中搜索）。
  * SPlayer 没有“查看专辑”与“查看艺术家”，图标沿用其 Album 与 Artist。
- * 菜单项的显示设置（contextMenuOptions）不迁入。
+ * 菜单项的显示设置 contextMenuOptions 照搬，只有 Sonora 的条目；“更多操作”只剩复制歌曲名称，
+ * 关掉复制歌曲名称时“更多操作”一并隐藏。
  */
 export const useSongMenu = () => {
   const router = useRouter();
   const musicStore = useMusicStore();
+  const settingStore = useSettingStore();
   const player = usePlayerController();
 
   // 生成菜单选项
@@ -25,11 +27,13 @@ export const useSongMenu = () => {
     emit?: (event: "removeSong", args: number[]) => void,
   ): DropdownOption[] => {
     const isCurrent = musicStore.playSong.id === song.id;
+    const options = settingStore.contextMenuOptions;
 
     return [
       {
         key: "play",
         label: "立即播放",
+        show: options.play,
         props: {
           onClick: () => player.addNextSong(song, true),
         },
@@ -38,7 +42,7 @@ export const useSongMenu = () => {
       {
         key: "play-next",
         label: "下一首播放",
-        show: !isCurrent,
+        show: options.playNext && !isCurrent,
         props: {
           onClick: () => player.addNextSong(song, false),
         },
@@ -47,6 +51,7 @@ export const useSongMenu = () => {
       {
         key: "playlist-add",
         label: "添加到歌单",
+        show: options.addToPlaylist,
         props: {
           onClick: () => openPlaylistAdd([song]),
         },
@@ -55,15 +60,18 @@ export const useSongMenu = () => {
       {
         key: "line-1",
         type: "divider",
+        show: options.play || options.playNext || options.addToPlaylist,
       },
       {
         key: "more",
         label: "更多操作",
+        show: options.more && options.copyName,
         icon: renderIcon("Menu", { size: 18 }),
         children: [
           {
             key: "code-name",
             label: "复制歌曲名称",
+            show: options.copyName,
             props: {
               onClick: () => copyData(song.title),
             },
@@ -74,11 +82,12 @@ export const useSongMenu = () => {
       {
         key: "line-two",
         type: "divider",
+        show: options.more && options.copyName,
       },
       {
         key: "delete-playlist",
         label: "从歌单中删除",
-        show: emit !== undefined && !!playlistId,
+        show: options.deleteFromPlaylist && emit !== undefined && !!playlistId,
         props: {
           onClick: () =>
             deleteSongs(playlistId, [song.id], {
@@ -91,7 +100,7 @@ export const useSongMenu = () => {
       {
         key: "album",
         label: "查看专辑",
-        show: !!song.album,
+        show: options.album && !!song.album,
         props: {
           onClick: () =>
             router.push({ name: "album", query: { id: song.album?.id } }),
@@ -101,7 +110,7 @@ export const useSongMenu = () => {
       {
         key: "artist",
         label: "查看艺术家",
-        show: song.artists.length > 0,
+        show: options.artist && song.artists.length > 0,
         props: {
           // 一位艺术家直接跳转，多位时选择
           onClick: () =>
@@ -115,6 +124,7 @@ export const useSongMenu = () => {
       {
         key: "search",
         label: "同名搜索",
+        show: options.search,
         props: {
           onClick: () =>
             router.push({ name: "search", query: { keyword: song.title } }),

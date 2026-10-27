@@ -10,7 +10,8 @@
 - `frontend/public/images/`：默认封面与艺术家图片（`album.jpg`、`song.jpg`、`artist.jpg`），以及唱片样式的唱针（`pointer.png`）。
 - `frontend/src/views/Status/404.vue`、`500.vue`：原状态页。
 - `frontend/src/components/Global/Provider.vue`、`frontend/src/utils/color.ts`、`frontend/src/assets/data/themeColor.json`：原全局主题与封面取色，照搬后去掉 Sonora 不做的功能。
-- `frontend/src/stores/setting.ts`、`frontend/src/stores/status.ts`、`frontend/src/stores/music.ts`、`frontend/src/stores/data.ts`：原设置、状态、当前歌曲与播放列表的字段定义和默认值（保留部分）。
+- `frontend/src/stores/setting.ts`、`frontend/src/stores/status.ts`、`frontend/src/stores/music.ts`、`frontend/src/stores/data.ts`、`frontend/src/stores/shortcut.ts`：原设置、状态、当前歌曲、播放列表与快捷键的字段定义和默认值（保留部分）。
+- `frontend/src/components/Setting/`、`frontend/src/types/settings.ts`、`frontend/src/components/Modal/ThemeConfig.vue`、`frontend/src/components/Modal/Setting/`、`frontend/src/components/UI/s-input.vue`、`frontend/src/composables/useShortcut.ts`：原设置界面（设置项配置、渲染、搜索、歌词预览、快捷键录制）、主题配置与各设置弹窗、输入框组件及页面内快捷键，照搬后去掉 Sonora 不做的设置项。
 - `frontend/src/components/Player/`、`frontend/src/components/Global/TextContainer.vue`、`frontend/src/composables/useTimeFormat.ts`：原播放器组件，照搬后去掉 Sonora 不做的功能。
 - `frontend/src/components/List/SongPlayList.vue`、`frontend/src/components/UI/VirtualScroll.vue`、`frontend/src/composables/List/useDragSort.ts`：原播放队列抽屉、虚拟滚动与拖动排序。
 - `frontend/src/components/AMLL/`、`frontend/src/components/Global/PlayerProvider.vue`、`frontend/src/components/UI/s-image.vue`、`frontend/src/utils/style.ts`、`frontend/src/utils/lyric/lyricFontConfig.ts`：原 AMLL 歌词与背景封装、播放器主题覆盖、图片组件与歌词字体工具。
@@ -57,6 +58,8 @@
 - [PixiJS](https://github.com/pixijs/pixijs)（`@pixi/*`）：AMLL 流动背景的渲染，Copyright (c) 2013-2023 Mathew Groves, Chad Engler，MIT 许可证。其中 `@pixi/filter-bulge-pinch` 来自 [pixi-filters](https://github.com/pixijs/filters)，Copyright (c) 2013-2017 Mathew Groves, Chad Engler，MIT 许可证。
 - [Day.js](https://github.com/iamkun/dayjs)：Copyright (c) 2018-present, iamkun，MIT 许可证。
 - [Fuse.js](https://github.com/krisk/Fuse)：Copyright 2017 Kirollos Risk，Apache License 2.0。
+- [SortableJS](https://github.com/SortableJS/Sortable)：设置中首页栏目的拖动排序，Copyright (c) 2019 All contributors to Sortable，MIT 许可证。
+- [@vueuse/integrations](https://github.com/vueuse/vueuse)：`useSortable`，Copyright (c) 2019-PRESENT Anthony Fu，MIT 许可证。
 
 # ThumbHash
 

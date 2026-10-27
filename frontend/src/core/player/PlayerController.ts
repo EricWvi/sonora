@@ -442,6 +442,46 @@ export class PlayerController {
     if (token !== this.currentRequestToken || attempt !== this.playAttempt)
       return;
     this.setState("playing");
+    this.preloadNext();
+  }
+
+  /**
+   * 自动播完当前条目后会播放的条目：单曲循环、不循环时的最后一首与只有一首时没有
+   */
+  public nextAutoEntry(): QueueEntry | null {
+    const statusStore = useStatusStore();
+    const { playList } = useDataStore();
+    if (statusStore.repeatMode === "one" || playList.length < 2) return null;
+    let index = statusStore.playIndex + 1;
+    if (index >= playList.length) {
+      if (statusStore.repeatMode === "off") return null;
+      index = 0;
+    }
+    return playList[index] ?? null;
+  }
+
+  /**
+   * 下一首歌曲预载（Sonora 预加载下一首的音频，SPlayer 预取网易的播放地址）：当前曲开始
+   * 播放后预加载下一首，切过去时不必等待开头的下载。当前曲还没开始时不动，可能正要切到
+   * 预加载的那首。
+   */
+  public preloadNext() {
+    if (!this.ready) return;
+    const entry = useSettingStore().useNextPrefetch
+      ? this.nextAutoEntry()
+      : null;
+    if (!entry) {
+      this.engine.preload(null);
+      return;
+    }
+    const token = this.currentRequestToken;
+    this.deps.resolveAudio(entry).then(
+      (url) => {
+        if (token === this.currentRequestToken && this.ready)
+          this.engine.preload(url);
+      },
+      (error: unknown) => console.warn("预加载下一首失败", error),
+    );
   }
 
   /**
@@ -761,6 +801,15 @@ export class PlayerController {
   }
 
   /**
+   * 快进 / 快退
+   * @param delta 时间差 (ms)
+   */
+  public seekBy(delta: number) {
+    const currentTime = this.getSeek();
+    this.setSeek(currentTime + delta);
+  }
+
+  /**
    * 设置音量
    * @param actions 音量值或滚动事件
    */
@@ -876,6 +925,7 @@ export class PlayerController {
     // 清空播放列表
     useDataStore().setPlayList([]);
     useDataStore().setOriginalPlayList([]);
+    this.engine.preload(null);
     await this.deps.storage.clear();
   }
 
@@ -1069,6 +1119,14 @@ export class PlayerController {
   }
 
   /**
+   * 设置音频与歌词同步补偿
+   * @param offset 补偿（毫秒）
+   */
+  public setAudioDelayCompensation(offset: number) {
+    this.engine.setAudioDelayCompensation(offset);
+  }
+
+  /**
    * 切换输出设备
    * @param deviceId 设备 ID
    */
@@ -1131,7 +1189,7 @@ export const usePlayerController = (): PlayerController => {
 
 /**
  * 启动时载入播放器：恢复浏览器中保存的队列与位置（不自动播放，除非开启了“自动播放”），
- * 载入喜爱的歌曲，并应用均衡器与输出设备。开发时由 fixture 指定状态（`?player=`）。
+ * 载入喜爱的歌曲，并应用均衡器、输出设备与同步补偿。开发时由 fixture 指定状态（`?player=`）。
  */
 export async function initPlayer() {
   const player = usePlayerController();
@@ -1159,6 +1217,17 @@ export async function initPlayer() {
       player
         .toggleOutputDevice()
         .catch((error) => console.warn("切换输出设备失败", error)),
+  );
+  // 下一首歌曲预载：队列、播放模式或设置变化时重新计算下一首
+  watch(
+    () => [settingStore.useNextPrefetch, player.nextAutoEntry()?.entryId],
+    () => player.preloadNext(),
+  );
+  // 音频与歌词同步补偿
+  watch(
+    () => settingStore.audioDelayCompensation,
+    (offset) => player.setAudioDelayCompensation(offset),
+    { immediate: true },
   );
   // 关闭页面前保存
   window.addEventListener("pagehide", () => {

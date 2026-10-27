@@ -81,6 +81,10 @@ export class SilentAudioPlayer
 
   public async setSinkId() {}
 
+  public setAudioDelayCompensation() {}
+
+  public preload() {}
+
   public setFilterGain() {}
 
   public getFrequencyData() {

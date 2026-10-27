@@ -346,6 +346,8 @@ function page<T>(items: T[], query: ListQuery = {}): Page<T> {
 const notFound = () => new ApiError(404, "内容不存在", "not_found");
 
 function librarySource(lib: Library): DataSource {
+  // 设置只存在内存中，从未保存时为 {}（与服务端相同）
+  let settings: Record<string, unknown> = {};
   const track = (id: number) => {
     const found = lib.tracks.find((t) => t.id === id);
     if (!found) throw notFound();
@@ -547,6 +549,11 @@ function librarySource(lib: Library): DataSource {
         return touch(found);
       }),
     audioStatus: () => reply(() => 200),
+    settings: () => reply(() => settings),
+    saveSettings: (data) =>
+      reply(() => {
+        settings = structuredClone(data);
+      }),
     logout: () => Promise.resolve(),
     // baseline 带有网易按 100、300、1024 缩放的图，没有对应尺寸时用原图。
     coverUrl: (cover, size) =>

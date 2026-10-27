@@ -119,6 +119,30 @@ async function prepareState(context, state) {
   return { page, errors };
 }
 
+// Areas compare.mjs leaves out, in screenshot pixels: the equalizer button
+// that replaced SPlayer's one-item "其他控制" menu (Eric, 2026-10-27).
+async function masksOf(page, clip) {
+  const [ox, oy, w, h] = clip
+    ? [clip.x, clip.y, clip.width, clip.height]
+    : [0, 0, width, height];
+  const rects = await page
+    .locator(".right-menu .menu-icon[title='均衡器']")
+    .evaluateAll((els) =>
+      els
+        .map((el) => el.getBoundingClientRect())
+        .filter((r) => r.width && r.height)
+        .map((r) => [r.left, r.top, r.right, r.bottom]),
+    );
+  return rects
+    .map(([x0, y0, x1, y1]) => [
+      Math.max(0, Math.floor(x0 - ox) - 1),
+      Math.max(0, Math.floor(y0 - oy) - 1),
+      Math.min(w - 1, Math.ceil(x1 - ox)),
+      Math.min(h - 1, Math.ceil(y1 - oy)),
+    ])
+    .filter(([x0, y0, x1, y1]) => x0 <= x1 && y0 <= y1);
+}
+
 const browser = await chromium.launch({ headless: true });
 const manifest = {
   run: args.run,
@@ -143,9 +167,11 @@ try {
     try {
       ctx = await openState(browser, state);
       const file = `${state.id}.png`;
+      const clip = await clipFor(ctx.page, state);
+      entry.masks = await masksOf(ctx.page, clip);
       await ctx.page.screenshot({
         path: join(out, file),
-        clip: await clipFor(ctx.page, state),
+        clip,
         animations: state.animations === "allow" ? "allow" : "disabled",
         caret: "hide",
       });

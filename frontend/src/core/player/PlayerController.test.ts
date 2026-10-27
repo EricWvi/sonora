@@ -7,7 +7,12 @@ import {
   type IPlaybackEngine,
   type PlayOptions,
 } from "@/core/audio-player/IPlaybackEngine";
-import { useDataStore, useMusicStore, useStatusStore } from "@/stores";
+import {
+  useDataStore,
+  useMusicStore,
+  useSettingStore,
+  useStatusStore,
+} from "@/stores";
 import { TypedEventTarget } from "@/utils/TypedEventTarget";
 import { PlayerController, type PlaybackDeps } from "./PlayerController";
 import { memoryStorage } from "./storage";
@@ -80,6 +85,12 @@ class FakeEngine
     return this.volume;
   }
   async setSinkId() {}
+  setAudioDelayCompensation() {}
+  /** 预加载的地址 */
+  preloaded: string | null = null;
+  preload(url: string | null) {
+    this.preloaded = url;
+  }
   setFilterGain() {}
   getFrequencyData() {
     return new Uint8Array(0);
@@ -453,6 +464,81 @@ describe("播放模式", () => {
     expect(useDataStore().originalPlayList.map((e) => e.id)).toEqual([
       1, 2, 3, 4,
     ]);
+  });
+});
+
+describe("下一首歌曲预载", () => {
+  async function playing(tracks: Track[], index = 0) {
+    const player = newPlayer();
+    void player.updatePlayList(tracks, tracks[index]);
+    await settle();
+    return player;
+  }
+
+  it("当前曲开始播放后才预加载下一首", async () => {
+    useStatusStore().repeatMode = "off";
+    await playing([track(1), track(2), track(3)]);
+    expect(engine.preloaded).toBeNull();
+    engine.ready();
+    await settle();
+    expect(engine.preloaded).toBe("/audio/2");
+  });
+
+  it("切到预加载的那首时保留，开始播放后预加载再下一首", async () => {
+    useStatusStore().repeatMode = "off";
+    const player = await playing([track(1), track(2), track(3)]);
+    engine.ready();
+    await settle();
+    engine.end();
+    await settle();
+    // 队列变化时 initPlayer 会重新计算；这时当前曲还没开始，不释放
+    player.preloadNext();
+    expect(engine.loads).toEqual(["/audio/1", "/audio/2"]);
+    expect(engine.preloaded).toBe("/audio/2");
+    engine.ready();
+    await settle();
+    expect(engine.preloaded).toBe("/audio/3");
+  });
+
+  it("不循环时最后一首不预加载，列表循环时预加载第一首", async () => {
+    useStatusStore().repeatMode = "off";
+    const player = await playing([track(1), track(2)], 1);
+    engine.ready();
+    await settle();
+    expect(engine.preloaded).toBeNull();
+    useStatusStore().repeatMode = "list";
+    player.preloadNext();
+    await settle();
+    expect(engine.preloaded).toBe("/audio/1");
+  });
+
+  it("单曲循环或关闭设置时释放", async () => {
+    useStatusStore().repeatMode = "list";
+    const player = await playing([track(1), track(2)]);
+    engine.ready();
+    await settle();
+    expect(engine.preloaded).toBe("/audio/2");
+    useStatusStore().repeatMode = "one";
+    player.preloadNext();
+    expect(engine.preloaded).toBeNull();
+    useStatusStore().repeatMode = "list";
+    player.preloadNext();
+    await settle();
+    expect(engine.preloaded).toBe("/audio/2");
+    useSettingStore().useNextPrefetch = false;
+    player.preloadNext();
+    expect(engine.preloaded).toBeNull();
+  });
+
+  it("插入下一首后预加载新的下一首", async () => {
+    useStatusStore().repeatMode = "off";
+    const player = await playing([track(1), track(2)]);
+    engine.ready();
+    await settle();
+    await player.addNextSong(track(5));
+    player.preloadNext();
+    await settle();
+    expect(engine.preloaded).toBe("/audio/5");
   });
 });
 

@@ -101,6 +101,8 @@ import SongPlayList from "@/components/List/SongPlayList.vue";
 import FullPlayer from "@/components/Player/FullPlayer.vue";
 import PlayerProvider from "@/components/Global/PlayerProvider.vue";
 import { initPlayer } from "@/core/player/PlayerController";
+import { initSettingsSync } from "@/core/settings/sync";
+import { useShortcut } from "@/composables/useShortcut";
 import {
   useMusicStore,
   useSettingStore,
@@ -142,6 +144,10 @@ void useUserStore()
 void initPlayer().catch((error: unknown) =>
   console.error("载入播放器失败", error),
 );
+// 设置与服务端同步（阶段 5）
+initSettingsSync();
+// 页面内快捷键
+useShortcut();
 </script>
 
 <style lang="scss" scoped src="@/style/layout.scss"></style>

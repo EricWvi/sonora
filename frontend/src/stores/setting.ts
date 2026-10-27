@@ -4,7 +4,8 @@ import type { ThemeColorType } from "@/types/color";
 /**
  * 设置。字段名、含义与默认值照搬 SPlayer stores/setting.ts，只保留阶段 2 确定保留的设置项
  * （见 docs/phase/phase-2-player-baseline.md 的“设置”）；在线服务、下载、本地歌曲等不做的项不迁入。
- * 外观与歌词设置以后按用户保存在服务端，标为“设备”的项只保存在浏览器中。
+ * 阶段 5 补充了全屏播放器元素、歌单界面元素与右键菜单的显示设置，去掉动态封面与音量平衡。
+ * 除标为“设备”的项外都按用户保存在服务端（见 core/settings/sync.ts）。
  */
 export interface SettingState {
   // ---- 外观 ----
@@ -60,8 +61,6 @@ export interface SettingState {
   playerExpandAnimation: "up" | "flow";
   /** 播放器跟随封面主色 */
   playerFollowCoverColor: boolean;
-  /** 动态封面 */
-  dynamicCover: boolean;
   /** 是否显示音乐频谱 */
   showSpectrums: boolean;
   /** 播放器元素自动隐藏 */
@@ -74,8 +73,6 @@ export interface SettingState {
   timeFormat: "current-total" | "remaining-total" | "current-remaining";
   /** 显示播放列表数量 */
   showPlaylistCount: boolean;
-  /** 展示当前歌曲歌词状态信息 */
-  showPlayMeta: boolean;
   /** 封面显示配置（SPlayer 的在线页面项不迁入） */
   hiddenCovers: {
     /** 首页 */
@@ -106,6 +103,27 @@ export interface SettingState {
     lyricOffset: boolean;
     lyricSettings: boolean;
   };
+  /** 歌单界面元素显示配置（Sonora 没有歌单标签，不迁入 tags） */
+  playlistPageElements: {
+    /** 创建者/艺术家 */
+    creator: boolean;
+    /** 创建/更新时间 */
+    time: boolean;
+    /** 描述 */
+    description: boolean;
+  };
+  /** 右键菜单显示配置（只有 Sonora 的条目，album、artist 为新增） */
+  contextMenuOptions: {
+    play: boolean;
+    playNext: boolean;
+    addToPlaylist: boolean;
+    more: boolean;
+    deleteFromPlaylist: boolean;
+    album: boolean;
+    artist: boolean;
+    search: boolean;
+    copyName: boolean;
+  };
   /** 显示歌曲专辑 */
   showSongAlbum: boolean;
   /** 显示歌曲时长 */
@@ -126,7 +144,7 @@ export interface SettingState {
     | "mask-top";
   /** 菜单显示封面 */
   menuShowCover: boolean;
-  /** 菜单展开项 */
+  /** 菜单展开项（设备） */
   menuExpandedKeys: (string | number)[];
   /** 侧边栏隐藏（只保留 Sonora 侧栏中可隐藏的项） */
   sidebarHide: {
@@ -202,7 +220,7 @@ export interface SettingState {
   // ---- 播放 ----
   /** 自动播放 */
   autoPlay: boolean;
-  /** 预载下一首 */
+  /** 预载下一首（Sonora 为预加载下一首的音频） */
   useNextPrefetch: boolean;
   /** 记忆最后进度 */
   memoryLastSeek: boolean;
@@ -222,10 +240,6 @@ export interface SettingState {
   playDevice: "default" | string;
   /** 音频延迟手动补偿（毫秒，设备） */
   audioDelayCompensation: number;
-  /** 是否启用 ReplayGain (音量平衡) */
-  enableReplayGain: boolean;
-  /** ReplayGain 模式: 轨道增益 (track) 或 专辑增益 (album) */
-  replayGainMode: "track" | "album";
 
   // ---- 常规 ----
   /** 显示搜索历史 */
@@ -247,122 +261,137 @@ export interface SettingState {
   useKeepAlive: boolean;
 }
 
+/** 默认设置，同步时用来补齐与校验服务端的设置 */
+export const defaultSettingState = (): SettingState => ({
+  themeMode: "auto",
+  themeColorType: "default",
+  themeCustomColor: "#fe7971",
+  themeFollowCover: false,
+  themeGlobalColor: false,
+  themeVariant: "secondary",
+  fontSettingStyle: "single",
+  globalFont: "default",
+  LyricFont: "follow",
+  japaneseLyricFont: "follow",
+  englishLyricFont: "follow",
+  koreanLyricFont: "follow",
+  playerType: "cover",
+  playerStyleRatio: 50,
+  playerFullscreenGradient: 15,
+  playerBackgroundType: "blur",
+  playerBackgroundFps: 30,
+  playerBackgroundFlowSpeed: 4,
+  playerBackgroundPause: false,
+  playerBackgroundLowFreqVolume: false,
+  playerBackgroundRenderScale: 0.5,
+  playerExpandAnimation: "up",
+  playerFollowCoverColor: true,
+  showSpectrums: false,
+  autoHidePlayerMeta: true,
+  countDownShow: true,
+  barLyricShow: true,
+  timeFormat: "current-total",
+  showPlaylistCount: true,
+  hiddenCovers: {
+    home: false,
+    playlist: false,
+    artist: false,
+    player: false,
+    list: false,
+    artistDetail: false,
+    album: false,
+  },
+  hideAllCovers: false,
+  hideMiniPlayerCover: false,
+  fullscreenPlayerElements: {
+    like: true,
+    addToPlaylist: true,
+    moreSettings: true,
+    copyLyric: true,
+    lyricOffset: true,
+    lyricSettings: true,
+  },
+  playlistPageElements: {
+    creator: true,
+    time: true,
+    description: true,
+  },
+  contextMenuOptions: {
+    play: true,
+    playNext: true,
+    addToPlaylist: true,
+    more: true,
+    deleteFromPlaylist: true,
+    album: true,
+    artist: true,
+    search: true,
+    copyName: true,
+  },
+  showSongAlbum: true,
+  showSongDuration: true,
+  showSongOperations: true,
+  showSongArtist: true,
+  routeAnimation: "slide",
+  menuShowCover: true,
+  menuExpandedKeys: [],
+  sidebarHide: {
+    hideHistory: false,
+    hideUserPlaylists: false,
+  },
+  lyricFontSizeMode: "adaptive",
+  lyricFontSize: 46,
+  lyricTranFontSize: 22,
+  lyricRomaFontSize: 18,
+  lyricFontWeight: 700,
+  showWordLyrics: true,
+  showTran: true,
+  showRoma: true,
+  swapTranRoma: false,
+  showWordsRoma: true,
+  lyricTransition: "slide",
+  lyricsPosition: "flex-start",
+  lyricsScrollOffset: 0.25,
+  lyricHorizontalOffset: 10,
+  lyricAlignRight: false,
+  lyricsBlur: false,
+  lyricsBlendMode: "screen",
+  hideBracketedContent: false,
+  replaceLyricBrackets: false,
+  bracketReplacementPreset: "dash",
+  customBracketReplacement: "-",
+  enableExcludeLyrics: true,
+  enableExcludeLyricsTTML: false,
+  excludeLyricsUserKeywords: [],
+  excludeLyricsUserRegexes: [],
+  useAMLyrics: false,
+  useAMSpring: false,
+  hidePassedLines: false,
+  wordFadeWidth: 0.5,
+  lyricOffsetStep: 500,
+  autoPlay: false,
+  useNextPrefetch: true,
+  memoryLastSeek: true,
+  preventSleep: false,
+  progressTooltipShow: true,
+  progressLyricShow: true,
+  progressAdjustLyric: false,
+  songVolumeFade: true,
+  songVolumeFadeTime: 300,
+  playDevice: "default",
+  audioDelayCompensation: 0,
+  showSearchHistory: true,
+  enableSearchKeyword: true,
+  searchInputBehavior: "normal",
+  showHomeGreeting: true,
+  homePageSections: [
+    { key: "album", name: "最近添加的专辑", visible: true, order: 0 },
+    { key: "history", name: "最近播放", visible: true, order: 1 },
+  ],
+  useKeepAlive: true,
+});
+
 export const useSettingStore = defineStore("setting", {
-  state: (): SettingState => ({
-    themeMode: "auto",
-    themeColorType: "default",
-    themeCustomColor: "#fe7971",
-    themeFollowCover: false,
-    themeGlobalColor: false,
-    themeVariant: "secondary",
-    fontSettingStyle: "single",
-    globalFont: "default",
-    LyricFont: "follow",
-    japaneseLyricFont: "follow",
-    englishLyricFont: "follow",
-    koreanLyricFont: "follow",
-    playerType: "cover",
-    playerStyleRatio: 50,
-    playerFullscreenGradient: 15,
-    playerBackgroundType: "blur",
-    playerBackgroundFps: 30,
-    playerBackgroundFlowSpeed: 4,
-    playerBackgroundPause: false,
-    playerBackgroundLowFreqVolume: false,
-    playerBackgroundRenderScale: 0.5,
-    playerExpandAnimation: "up",
-    playerFollowCoverColor: true,
-    dynamicCover: false,
-    showSpectrums: false,
-    autoHidePlayerMeta: true,
-    countDownShow: true,
-    barLyricShow: true,
-    timeFormat: "current-total",
-    showPlaylistCount: true,
-    showPlayMeta: true,
-    hiddenCovers: {
-      home: false,
-      playlist: false,
-      artist: false,
-      player: false,
-      list: false,
-      artistDetail: false,
-      album: false,
-    },
-    hideAllCovers: false,
-    hideMiniPlayerCover: false,
-    fullscreenPlayerElements: {
-      like: true,
-      addToPlaylist: true,
-      moreSettings: true,
-      copyLyric: true,
-      lyricOffset: true,
-      lyricSettings: true,
-    },
-    showSongAlbum: true,
-    showSongDuration: true,
-    showSongOperations: true,
-    showSongArtist: true,
-    routeAnimation: "slide",
-    menuShowCover: true,
-    menuExpandedKeys: [],
-    sidebarHide: {
-      hideHistory: false,
-      hideUserPlaylists: false,
-    },
-    lyricFontSizeMode: "adaptive",
-    lyricFontSize: 46,
-    lyricTranFontSize: 22,
-    lyricRomaFontSize: 18,
-    lyricFontWeight: 700,
-    showWordLyrics: true,
-    showTran: true,
-    showRoma: true,
-    swapTranRoma: false,
-    showWordsRoma: true,
-    lyricTransition: "slide",
-    lyricsPosition: "flex-start",
-    lyricsScrollOffset: 0.25,
-    lyricHorizontalOffset: 10,
-    lyricAlignRight: false,
-    lyricsBlur: false,
-    lyricsBlendMode: "screen",
-    hideBracketedContent: false,
-    replaceLyricBrackets: false,
-    bracketReplacementPreset: "dash",
-    customBracketReplacement: "-",
-    enableExcludeLyrics: true,
-    enableExcludeLyricsTTML: false,
-    excludeLyricsUserKeywords: [],
-    excludeLyricsUserRegexes: [],
-    useAMLyrics: false,
-    useAMSpring: false,
-    hidePassedLines: false,
-    wordFadeWidth: 0.5,
-    lyricOffsetStep: 500,
-    autoPlay: false,
-    useNextPrefetch: true,
-    memoryLastSeek: true,
-    preventSleep: false,
-    progressTooltipShow: true,
-    progressLyricShow: true,
-    progressAdjustLyric: false,
-    songVolumeFade: true,
-    songVolumeFadeTime: 300,
-    playDevice: "default",
-    audioDelayCompensation: 0,
-    enableReplayGain: false,
-    replayGainMode: "track",
-    showSearchHistory: true,
-    enableSearchKeyword: true,
-    searchInputBehavior: "normal",
-    showHomeGreeting: true,
-    homePageSections: [
-      { key: "album", name: "最近添加的专辑", visible: true, order: 0 },
-      { key: "history", name: "最近播放", visible: true, order: 1 },
-    ],
-    useKeepAlive: true,
-  }),
+  state: defaultSettingState,
   getters: {
     /** 获取淡入淡出时间 */
     getFadeTime(state): number {

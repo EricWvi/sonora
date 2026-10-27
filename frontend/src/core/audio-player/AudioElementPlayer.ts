@@ -9,7 +9,8 @@ import type { AudioEventType } from "./IPlaybackEngine";
  * 基于 HTMLAudioElement 的播放器实现
  *
  * 照搬 SPlayer core/audio-player/AudioElementPlayer.ts：使用原生 HTML5 Audio 元素播放，
- * 通过 MediaElementAudioSourceNode 连接到 Web Audio API 音频图谱。去掉倍速、音高与延迟补偿。
+ * 通过 MediaElementAudioSourceNode 连接到 Web Audio API 音频图谱。去掉倍速与音高；
+ * 延迟补偿只保留手动补偿（阶段 5 的决定），不减去 outputLatency 与 baseLatency。
  */
 export class AudioElementPlayer extends BaseAudioPlayer {
   /** 内部 Audio 元素 */
@@ -21,6 +22,10 @@ export class AudioElementPlayer extends BaseAudioPlayer {
   private isInternalSeeking = false;
   /** 目标时间缓存，用于在 seek 过程中返回稳定的 currentTime */
   private targetSeekTime = 0;
+
+  /** 预加载下一首的元素，保留到下一次预加载，切歌时主元素复用它下载的数据 */
+  private preloadElement: HTMLAudioElement | null = null;
+  private preloadUrl: string | null = null;
 
   constructor() {
     super();
@@ -64,6 +69,28 @@ export class AudioElementPlayer extends BaseAudioPlayer {
     this.isInternalSeeking = false;
     this.audioElement.src = url;
     this.audioElement.load();
+  }
+
+  /**
+   * 预加载下一首。Chrome 中同一地址、同样 crossOrigin 的媒体元素共享已下载的数据，
+   * 主元素切到这首时不再等待开头的下载；用 fetch 预取不起作用（见
+   * scripts/experiments/preload-next.mjs）。preload 为 metadata，只下载到能开始播放为止。
+   * @param url 下一首的地址，null 时释放
+   */
+  public preload(url: string | null): void {
+    if (url === this.preloadUrl) return;
+    if (this.preloadElement) {
+      this.preloadElement.removeAttribute("src");
+      this.preloadElement.load();
+      this.preloadElement = null;
+    }
+    this.preloadUrl = url;
+    if (!url) return;
+    const element = new Audio();
+    element.crossOrigin = "anonymous";
+    element.preload = "metadata";
+    element.src = url;
+    this.preloadElement = element;
   }
 
   /**
@@ -142,7 +169,10 @@ export class AudioElementPlayer extends BaseAudioPlayer {
     if (this.isInternalSeeking) {
       return this.targetSeekTime;
     }
-    return this.audioElement.currentTime || 0;
+    // 基础时间 + 手动延迟补偿（SPlayer 只在延迟策略为 playback 时补偿，并减去自动延迟）
+    return (
+      (this.audioElement.currentTime || 0) + this.audioDelayCompensation / 1000
+    );
   }
 
   /** 获取是否暂停状态 */

@@ -4,3 +4,4 @@ export { useStatusStore } from "./status";
 export { useMusicStore } from "./music";
 export { useDataStore } from "./data";
 export { useUserStore } from "./user";
+export { useShortcutStore } from "./shortcut";

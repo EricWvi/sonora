@@ -33,12 +33,14 @@
 | 歌曲列表、详情页头部 | `src/components/List/SongList.vue`、`ListDetail.vue` | 1425 | 视觉语言一致，结构按阶段 2 决定 | 已照搬（阶段 3.4，2026-10-25）：排序改由服务端完成，去掉电台、大小列、移动端菜单、播放量、标签与评论；增加碟号分组标题与专辑年份、总时长、歌单创建与更新时间等信息项（待 Eric 确认）。另照搬右键菜单 `SongListMenu.vue`、`useSongMenu.ts`（条目按阶段 2）与 `CoverList.vue`、`ArtistList.vue` |
 | 卡片 | `src/components/Card/` | 831 | 视觉语言一致 | 已照搬 `SongCard.vue`（歌曲行，去掉音质、原唱、特权、云盘、MV、脏标标签）与 `SongListCard.vue`（首页快捷入口）；`SongDataCard.vue` 不迁入（阶段 3.4，2026-10-25） |
 | 布局、导航、侧栏、顶栏 | `src/components/Layout/`、`src/layout/` | 1505 | 视觉语言一致 | 已改编主框架、导航与主题初始化 |
-| 通用组件：图片、输入框、虚拟滚动 | `src/components/UI/` | 737 | 照搬 | 已照搬 `VirtualScroll.vue`、`s-image.vue`；`s-input.vue` 未用到（搜索框与列表内搜索在 SPlayer 中用的是 `n-input`） |
+| 通用组件：图片、输入框、虚拟滚动 | `src/components/UI/` | 737 | 照搬 | 已照搬 `VirtualScroll.vue`、`s-image.vue`；`s-input.vue` 在阶段 5 随字体设置照搬（2026-10-27） |
 | 搜索框、搜索建议与搜索历史 | `src/components/Search/` | 816 | 照搬，建议改为曲库搜索 | 已照搬（阶段 3.4，2026-10-25），去掉热搜榜、推荐关键词、分享链接识别与搜索框右键菜单 |
 | 页面：最近播放、专辑与歌单详情、我喜欢、艺术家详情、搜索结果、首页 | `src/views/History.vue`、`views/List/`、`views/Artist/`、`views/Search/`、`views/Home/` | — | 视觉语言一致，结构按阶段 2 决定 | 已改编（阶段 3.4，2026-10-25），列表组合函数 `useListDetail`、`useListSearch`、`useListScroll`、`useListActions` 一并照搬 |
 | 弹窗：新建、编辑歌单与添加到歌单 | `src/components/Modal/CreatePlaylist.vue`、`UpdatePlaylist.vue`、`PlaylistAdd.vue`、`src/utils/rules.ts` | 567 | 照搬 | 已照搬（阶段 5，2026-10-25）：新建用其本地歌单的表单（名称、描述），编辑去掉网易的歌单分类，添加到歌单列出自己的歌单、不含“我喜欢的音乐”；`rules.ts` 只取 `textRule` |
 | 弹窗：跳转到歌手、复制歌词、均衡器 | `src/components/Modal/JumpArtist.vue`、`CopyLyrics.vue`、`Equalizer.vue` | 509 | 照搬 | 已照搬（阶段 5，2026-10-25）：跳转到歌手去掉按名称在线搜索，图片取艺术家图片；均衡器去掉只在 Electron 中启用的限制。`CopySongInfo.vue`（歌曲详情复制）不迁入，Eric 决定不要这个功能 |
-| 外观与歌词设置项 | `src/components/Setting/config/appearance.ts`、`lyric.ts`、`components/LyricPreview.vue` | 1735 | 照搬保留的设置项（[阶段 2 的设置表](phase/phase-2-player-baseline.md#设置)） | 未开始 |
+| 外观与歌词设置项 | `src/components/Setting/config/appearance.ts`、`lyric.ts`、`components/LyricPreview.vue` | 1735 | 照搬保留的设置项（[阶段 2 的设置表](phase/phase-2-player-baseline.md#设置)） | 已照搬（阶段 5，2026-10-27），条目按阶段 2 的设置表与[阶段 5 的补充](phase/phase-5-player-pages.md#已确定2026-10-25) |
+| 设置界面与其余设置项 | `src/components/Setting/`（`MainSetting.vue`、`UniversalSetting.vue`、`SettingItemRenderer.vue`、`SettingSearch.vue`、`config/play.ts`、`general.ts`、`keyboard.ts`、`components/ShortcutRecorder.vue`）、`src/types/settings.ts`、`src/stores/shortcut.ts` | 3163 | 照搬 | 已照搬（阶段 5，2026-10-27）：去掉移动端分支与“本地与缓存”“网络与连接”“关于与鸣谢”；左栏底部只显示“Sonora”与版本号；快捷键只在页面内生效 |
+| 主题配置与设置弹窗 | `src/components/Modal/ThemeConfig.vue`、`src/components/Modal/Setting/`（`FontManager.vue`、`CoverManager.vue`、`SidebarHideManager.vue`、`HomePageSectionManager.vue`、`PlaylistPageManager.vue`、`FullscreenPlayerManager.vue`、`ContextMenuManager.vue`、`ExcludeLyrics.vue`） | 1808 | 照搬 | 已照搬（阶段 5，2026-10-27）：主题配置去掉自定义背景；字体用 Chrome 的 Local Font Access 列出；各管理弹窗的条目换成 Sonora 中有的项 |
 
 ## 3. 运行时依赖
 
@@ -54,7 +56,8 @@
 | `@applemusic-like-lyrics/lyric` | LRC、TTML 等歌词解析 | 1.0.1 | AGPL-3.0-only | 已用，同版本（2026-10-25），播放端用它解析 TTML，fixture 脚本用它转换歌词。其依赖 `@applemusic-like-lyrics/ttml` 1.0.1（AGPL-3.0-only）与 SPlayer 相同，`pako` 解析为 2.2.0（SPlayer 锁定 2.1.0，MIT AND Zlib，用于 QRC 解压，与视觉无关） |
 | `@pixi/app`、`@pixi/core`、`@pixi/display`、`@pixi/sprite`、`@pixi/filter-blur`、`@pixi/filter-color-matrix` | AMLL 的对等依赖 | 7.4.3 | MIT | 已用，同版本（2026-10-25） |
 | `@pixi/filter-bulge-pinch` | AMLL 的对等依赖 | 5.1.1 | MIT | 已用，同版本（2026-10-25） |
-| `sortablejs` | 设置中首页栏目的拖动排序（经 `@vueuse/integrations` 的 `useSortable`） | 1.15.7 | MIT | 阶段 5 接入设置时引入。播放队列与歌曲列表的拖动排序用 SPlayer 自己的 `useDragSort`，不依赖它 |
+| `sortablejs` | 设置中首页栏目的拖动排序（经 `@vueuse/integrations` 的 `useSortable`） | 1.15.7 | MIT | 已用，同版本（阶段 5，2026-10-27）。播放队列与歌曲列表的拖动排序用 SPlayer 自己的 `useDragSort`，不依赖它 |
+| `@vueuse/integrations` | `useSortable` | 14.3.0 | MIT | 已用，同版本（阶段 5，2026-10-27） |
 | `@vueuse/core` | 组合式工具（自动隐藏计时、媒体查询等） | 14.3.0 | MIT | 已用 |
 | `dayjs` | 播放时间显示（`msToTime`） | 1.11.21 | MIT | 已用，同版本（2026-10-25） |
 | `fuse.js` | 列表内模糊搜索（`fuzzySearch`） | 7.4.1 | Apache-2.0 | 已用，同版本（阶段 3.4，2026-10-25） |
@@ -86,7 +89,7 @@ SPlayer 的 147 个图标在 `src/assets/icons/`，由 `SvgIcon.vue` 内联渲�
 
 **署名要求：** IconaMoon 的 CC-BY-4.0 要求注明作者、许可证与修改情况。Sonora 复制 `Repeat`、`RepeatSong`、`Shuffle` 时，在 THIRD_PARTY_NOTICES.md 加入 IconaMoon（作者 Dariush Habibpour，<https://github.com/dariushhpg1/IconaMoon>）的署名。Apache-2.0 与 MIT 的图标集同样在该文件中列出版权与许可证。
 
-`frontend/src/assets/icons/` 现有 58 个图标，与 SPlayer 的文件逐字节一致（2026-10-25 阶段 3.4 页面模板后，`cmp` 核对）：Google Material Icons 22 个（`Add`、`DarkTheme`、`Delete`、`EditNote`、`Favorite`、`FavoriteBorder`、`FormatList`、`LightTheme`、`List`、`Menu`、`Music`、`NavigateBefore`、`NavigateNext`、`Pause`、`Person`、`Play`、`Refresh`、`Right`、`SkipNext`、`SkipPrev`、`Time`、`Update`）、Material Symbols 12 个（`AddList`、`Copy`、`DeleteSweep`、`Eq`、`Expand`、`Home`、`MusicList`、`PlayList`、`Search`、`VolumeDown`、`VolumeMute`、`VolumeUp`）、Material Symbols Light 1 个（`DropDown`）、Material Design Icons 1 个（`TextPlay`）、Fluent UI System Icons 1 个（`Calendar-Empty`）、IconaMoon 3 个（`Repeat`、`RepeatSong`、`Shuffle`），近似项 10 个（`Artist`、`AutoTheme`、`History`、`PlayNext`、`PlaylistAdd`、`Power`、`Replay5`、`SearchOff`、`Settings`、`VolumeOff`），未确认 8 个（`Album`、`Controls`、`Down`、`Forward5`、`Fullscreen`、`FullscreenExit`、`Location`、`Up`）。侧栏的歌曲、专辑、艺术家图标沿用 SPlayer 流媒体页面标签的 `Music`、`Album`、`Artist`。
+`frontend/src/assets/icons/` 现有 62 个图标，与 SPlayer 的文件逐字节一致（2026-10-27 阶段 5 设置界面后，`cmp` 核对）：Google Material Icons 24 个（`Add`、`DarkTheme`、`Delete`、`EditNote`、`Favorite`、`FavoriteBorder`、`FormatList`、`Keyboard`、`LightTheme`、`List`、`Lyrics`、`Menu`、`Music`、`NavigateBefore`、`NavigateNext`、`Pause`、`Person`、`Play`、`Refresh`、`Right`、`SkipNext`、`SkipPrev`、`Time`、`Update`）、Material Symbols 13 个（`AddList`、`Check`、`Copy`、`DeleteSweep`、`Eq`、`Expand`、`Home`、`MusicList`、`PlayList`、`Search`、`VolumeDown`、`VolumeMute`、`VolumeUp`）、Material Symbols Light 1 个（`DropDown`）、Material Design Icons 1 个（`TextPlay`）、Fluent UI System Icons 1 个（`Calendar-Empty`）、IconaMoon 3 个（`Repeat`、`RepeatSong`、`Shuffle`），近似项 10 个（`Artist`、`AutoTheme`、`History`、`PlayNext`、`PlaylistAdd`、`Power`、`Replay5`、`SearchOff`、`Settings`、`VolumeOff`），未确认 9 个（`Album`、`Down`、`Forward5`、`Fullscreen`、`FullscreenExit`、`Location`、`Palette`、`SettingsLine`、`Up`）。侧栏的歌曲、专辑、艺术家图标沿用 SPlayer 流媒体页面标签的 `Music`、`Album`、`Artist`。底部栏的“其他控制”只剩均衡器，改用 `Eq` 图标、点击直接打开（2026-10-27，Eric 确认），`Controls` 已删除。
 
 ## 5. 字体
 
@@ -117,4 +120,4 @@ SPlayer 的 147 个图标在 `src/assets/icons/`，由 `SvgIcon.vue` 内联渲�
 
 2026-10-25 已补：Logo 字体 Poppins Medium 的 OFL 声明，全文放在 `frontend/public/fonts/OFL.txt`；`frontend/src/assets/icons/` 中 Google Material Icons、Material Symbols 与 Phosphor 的版权与许可证。阶段 3.1 删除 `HeartBit` 后不再含 Phosphor 图标，该声明已移除，复制 `SortDown`、`SortUp` 时再加回。
 
-`@imsyy/color-utils` 与 `lodash-es` 已在阶段 3.2 加入；IconaMoon 的署名在阶段 3.5 底部播放栏时加入；AMLL core、PixiJS 与 Material Design Icons 在阶段 3.5 全屏播放器时加入（2026-10-25）。Fluent UI System Icons（专辑详情的年份图标 `Calendar-Empty`）与 Fuse.js 在阶段 3.4 页面模板时加入（2026-10-25）。SortableJS 在阶段 5 接入设置时加入。
+`@imsyy/color-utils` 与 `lodash-es` 已在阶段 3.2 加入；IconaMoon 的署名在阶段 3.5 底部播放栏时加入；AMLL core、PixiJS 与 Material Design Icons 在阶段 3.5 全屏播放器时加入（2026-10-25）。Fluent UI System Icons（专辑详情的年份图标 `Calendar-Empty`）与 Fuse.js 在阶段 3.4 页面模板时加入（2026-10-25）。SortableJS 与 `@vueuse/integrations` 在阶段 5 接入设置时加入（2026-10-27）。
