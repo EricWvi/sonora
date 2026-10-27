@@ -1,6 +1,7 @@
 import { watch } from "vue";
 import { isPlainObject } from "lodash-es";
 import { source, type DataSource } from "@/api/source";
+import { connection } from "@/api/connection";
 import { useSettingStore, useShortcutStore } from "@/stores";
 import { defaultSettingState, type SettingState } from "@/stores/setting";
 import { defaultShortcutState, type ShortcutList } from "@/stores/shortcut";
@@ -244,6 +245,8 @@ export function initSettingsSync() {
     if (document.visibilityState === "visible") sync.visible();
   });
   window.addEventListener("pagehide", () => sync.pagehide());
+  // 服务恢复后：上传期间积累的改动，或重新读取
+  connection.onReconnect(() => sync.visible());
   void sync.load();
   return sync;
 }

@@ -85,6 +85,7 @@
       <ListError
         v-else-if="error"
         :error="error"
+        :missing="missing"
         @retry="getArtistDetail(artistId)"
       />
       <div v-else class="detail">
@@ -135,7 +136,8 @@
 
 <script setup lang="ts">
 import type { Artist } from "@/api/types";
-import { ApiError, source } from "@/api/source";
+import { source } from "@/api/source";
+import { useLoadError } from "@/composables/List/useLoadError";
 import { coverLoaded } from "@/utils/helper";
 import { renderToolbar } from "@/utils/meta";
 import { removeBrackets } from "@/utils/format";
@@ -159,7 +161,10 @@ const artistType = ref<string>((route.name as string) || "artist-songs");
 
 // 歌手数据
 const artistDetailData = ref<Artist | null>(null);
-const error = ref<string>("");
+const { error, missing, setError, clearError } = useLoadError(
+  "艺术家不存在或已被删除",
+  "获取歌手详情失败",
+);
 
 // 图片：SPlayer 的 coverSize.m，预览原图
 const coverSrc = computed(() =>
@@ -178,11 +183,11 @@ const getArtistDetail = async (id: number) => {
     if (!id) return;
     listScrolling.value = false;
     artistDetailData.value = null;
-    error.value = "";
+    clearError();
     artistDetailData.value = await source.artist(id);
   } catch (e) {
     console.error("Erorr getting artist detail:", e);
-    error.value = e instanceof ApiError ? e.message : "获取歌手详情失败";
+    setError(e);
   }
 };
 

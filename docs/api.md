@@ -80,7 +80,7 @@
 
 会话 Cookie 为 `sonora_session`，`Path=/`、`HttpOnly`、`SameSite=Lax`，https 时带 `Secure`。服务端会话不过期，直到退出；使用中每天续发一次 Cookie，避免浏览器 400 天上限。用户按 `(issuer, subject)` 识别，名称与邮箱每次登录时刷新。开发模式不走 OIDC，所有请求都以写死的用户 `listener` 登录，`/auth/login` 直接跳回 `/`。
 
-未登录访问播放端 API 返回 401 `{"error": "未登录"}`，播放端应跳转 `/auth/login`；跨站写请求返回 403。管理会话与播放端会话互不通用。
+未登录访问播放端 API 返回 401 `{"error": "未登录"}`，播放端应跳转 `/auth/login`；跨站写请求返回 403。Go 服务的错误响应都带 `{"error"}` 正文，播放端把没有这个正文的 5xx（来自服务前面的代理）视为服务不可达。管理会话与播放端会话互不通用。
 
 ## 播放端 API
 

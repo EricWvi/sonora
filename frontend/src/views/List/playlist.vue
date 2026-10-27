@@ -34,6 +34,7 @@
     <ListError
       v-if="error"
       :error="error"
+      :missing="missing"
       @retry="getPlaylistDetail(playlistId)"
     />
     <!-- 歌曲列表 -->
@@ -65,7 +66,8 @@
 
 <script setup lang="ts">
 import type { DropdownOption } from "naive-ui";
-import { ApiError, source } from "@/api/source";
+import { source } from "@/api/source";
+import { useLoadError } from "@/composables/List/useLoadError";
 import { fetchAll } from "@/api/pages";
 import { useStatusStore } from "@/stores";
 import { renderIcon } from "@/utils/helper";
@@ -103,7 +105,8 @@ const { listScrolling, handleListScroll, resetScroll } = useListScroll();
 const { playAllSongs: playAllSongsAction } = useListActions();
 
 // 加载错误
-const error = ref<string>("");
+const { error, missing, setError, clearError } =
+  useLoadError("歌单不存在或已被删除");
 
 // 歌单 ID
 const playlistId = computed<number>(() =>
@@ -171,7 +174,7 @@ const getPlaylistDetail = async (id: number) => {
   currentRequestId.value = id;
   setLoading(true);
   clearSearch();
-  error.value = "";
+  clearError();
   if (detailData.value?.id !== id) resetData(true);
   try {
     const [playlist, songs] = await Promise.all([
@@ -192,7 +195,7 @@ const getPlaylistDetail = async (id: number) => {
     setListData(songs);
   } catch (e) {
     if (currentRequestId.value !== id) return;
-    error.value = e instanceof ApiError ? e.message : "加载失败";
+    setError(e);
   } finally {
     if (currentRequestId.value === id) setLoading(false);
   }

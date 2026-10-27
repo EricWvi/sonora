@@ -1,4 +1,5 @@
 import { ApiError } from "./error";
+import { connection } from "./connection";
 import type {
   Album,
   AlbumQuery,
@@ -117,19 +118,33 @@ async function request<T>(
           }),
     });
   } catch {
+    connection.unreachable();
     throw new ApiError(0, "无法连接服务器");
   }
   const data: unknown = await res.json().catch(() => null);
+  const failure = data as { error?: string; code?: string } | null;
+  if (proxyFailure(res.status, !!failure?.error)) {
+    connection.unreachable();
+    throw new ApiError(0, "无法连接服务器");
+  }
+  connection.reached();
   if (!res.ok) {
-    const body = data as { error?: string; code?: string } | null;
+    if (res.status === 401) connection.unauthorized();
     throw new ApiError(
       res.status,
-      body?.error ?? `请求失败（${res.status}）`,
-      body?.code,
+      failure?.error ?? `请求失败（${res.status}）`,
+      failure?.code,
     );
   }
   return data as T;
 }
+
+/**
+ * Go 服务的错误响应都带 `{error}` 正文；没有正文的 5xx 来自服务前面的代理
+ * （Vite 或反向代理），说明服务没有响应，按不可达处理。
+ */
+const proxyFailure = (status: number, hasErrorBody: boolean) =>
+  status >= 500 && !hasErrorBody;
 
 const get = <T>(path: string, query?: object) =>
   request<T>("GET", withQuery(api + path, query));
@@ -182,8 +197,17 @@ const httpSource: DataSource = {
         cache: "no-store",
       });
       await res.body?.cancel();
+      const json = !!res.headers
+        .get("Content-Type")
+        ?.includes("application/json");
+      if (proxyFailure(res.status, json)) {
+        connection.unreachable();
+        return 0;
+      }
+      connection.reached();
       return res.status;
     } catch {
+      connection.unreachable();
       return 0;
     }
   },

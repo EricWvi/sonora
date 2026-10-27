@@ -1,8 +1,18 @@
-<!-- 列表加载失败。样式沿用 SPlayer 流媒体页面的空状态（n-empty 加主色按钮）。 -->
+<!-- 列表加载失败。样式沿用 SPlayer 流媒体页面的空状态（n-empty 加主色按钮）。
+内容已被删除（missing）时重试没有意义，按钮换成 404 页的“返回上一级”。 -->
 <template>
   <n-empty :description="error" size="large" class="list-error">
     <template #extra>
-      <n-button type="primary" strong secondary @click="emit('retry')">
+      <n-button
+        v-if="missing"
+        type="primary"
+        strong
+        secondary
+        @click="router.go(-1)"
+      >
+        返回上一级
+      </n-button>
+      <n-button v-else type="primary" strong secondary @click="emit('retry')">
         <template #icon>
           <SvgIcon name="Refresh" />
         </template>
@@ -13,8 +23,9 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{ error: string }>();
+defineProps<{ error: string; missing?: boolean }>();
 const emit = defineEmits<{ retry: [] }>();
+const router = useRouter();
 </script>
 
 <style lang="scss" scoped>

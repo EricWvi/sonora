@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { ApiError, loginUrl, source } from "@/api/source";
+import { connection } from "@/api/connection";
 import type { Playlist, User } from "@/api/types";
 
 /** 当前登录用户与其歌单。 */
@@ -9,10 +10,15 @@ export const useUserStore = defineStore("sonora-user", () => {
   /** 本浏览器已退出登录，等待用户重新登录。 */
   const signedOut = ref(false);
 
-  // 会话已失效：回到登录页。
+  // 会话已失效：回到登录页。本浏览器已退出时停在退出页，否则 Authelia 会立即重新登录。
+  function toLogin() {
+    if (!signedOut.value) location.assign(loginUrl);
+  }
+  connection.onUnauthorized(toLogin);
+
   function unauthorized(error: unknown): boolean {
     if (!(error instanceof ApiError) || error.status !== 401) return false;
-    location.assign(loginUrl);
+    toLogin();
     return true;
   }
 
@@ -34,6 +40,14 @@ export const useUserStore = defineStore("sonora-user", () => {
       if (!unauthorized(error)) console.error("❌ 读取歌单失败:", error);
     }
   }
+
+  // 服务恢复后重新读取用户与歌单（启动时不可达则一直为空）
+  connection.onReconnect(() => {
+    if (!signedOut.value)
+      load().catch((error: unknown) =>
+        console.error("重新读取用户数据失败", error),
+      );
+  });
 
   async function logout(): Promise<void> {
     await source.logout();

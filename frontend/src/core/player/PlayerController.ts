@@ -1,4 +1,5 @@
 import { fixturePlayer, source, type DataSource } from "@/api/source";
+import { connection } from "@/api/connection";
 import type { Track } from "@/api/types";
 import {
   AudioErrorCode,
@@ -1196,10 +1197,14 @@ export async function initPlayer() {
   const dataStore = useDataStore();
   const statusStore = useStatusStore();
   const settingStore = useSettingStore();
-  const loadLikes = source.likeIds().then(
-    (ids) => (dataStore.userLikeData.songs = ids),
-    (error: unknown) => console.error("加载喜爱的歌曲失败", error),
-  );
+  const readLikes = () =>
+    source.likeIds().then(
+      (ids) => (dataStore.userLikeData.songs = ids),
+      (error: unknown) => console.error("加载喜爱的歌曲失败", error),
+    );
+  const loadLikes = readLikes();
+  // 服务恢复后重新读取喜爱的歌曲
+  connection.onReconnect(() => void readLikes());
   mediaSessionManager.init(player);
   // 均衡器
   watch(

@@ -15,7 +15,12 @@
       @update:search-value="handleSearchUpdate"
       @play-all="playAllSongs"
     />
-    <ListError v-if="error" :error="error" @retry="getAlbumDetail(albumId)" />
+    <ListError
+      v-if="error"
+      :error="error"
+      :missing="missing"
+      @retry="getAlbumDetail(albumId)"
+    />
     <!-- 歌曲列表 -->
     <SongList
       v-else-if="!searchValue || searchData?.length"
@@ -43,7 +48,8 @@
 
 <script setup lang="ts">
 import type { DropdownOption } from "naive-ui";
-import { ApiError, source } from "@/api/source";
+import { source } from "@/api/source";
+import { useLoadError } from "@/composables/List/useLoadError";
 import { fetchAll } from "@/api/pages";
 import { useStatusStore } from "@/stores";
 import { renderIcon } from "@/utils/helper";
@@ -80,7 +86,8 @@ const { listScrolling, handleListScroll, resetScroll } = useListScroll();
 const { playAllSongs: playAllSongsAction } = useListActions();
 
 // 加载错误
-const error = ref<string>("");
+const { error, missing, setError, clearError } =
+  useLoadError("专辑不存在或已被删除");
 
 // 专辑 ID
 const albumId = computed<number>(() =>
@@ -143,7 +150,7 @@ const getAlbumDetail = async (id: number) => {
   currentRequestId.value = id;
   setLoading(true);
   clearSearch();
-  error.value = "";
+  clearError();
   if (detailData.value?.id !== id) resetData(true);
   try {
     const [album, songs] = await Promise.all([
@@ -164,7 +171,7 @@ const getAlbumDetail = async (id: number) => {
     setListData(songs);
   } catch (e) {
     if (currentRequestId.value !== id) return;
-    error.value = e instanceof ApiError ? e.message : "加载失败";
+    setError(e);
   } finally {
     if (currentRequestId.value === id) setLoading(false);
   }

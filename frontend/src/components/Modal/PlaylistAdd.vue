@@ -95,6 +95,12 @@ const addToPlaylist = debounce(
         location.assign(loginUrl);
         return;
       }
+      // 404：歌单或所选歌曲已在别处被删除，重新读取歌单列表
+      if (error instanceof ApiError && error.status === 404) {
+        window.$message.error("歌单或歌曲已被删除");
+        await userStore.loadPlaylists();
+        return;
+      }
       window.$message.error(
         error instanceof ApiError ? error.message : "添加失败，请重试",
       );
