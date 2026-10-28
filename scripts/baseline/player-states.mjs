@@ -244,6 +244,9 @@ export const states = [
     // AMLL animates lines with JS springs, which CSS animation control
     // does not stop; give them time to settle.
     settle: 3000,
+    // Word-by-word lines kept their raster from mid-spring; see
+    // rerasterize. Captured this way since 2026-10-28.
+    reraster: true,
   },
 
   // Appearance and lyric settings (phase 3.2): each state moves several
@@ -352,6 +355,7 @@ export const states = [
     },
     full: true,
     settle: 3000,
+    reraster: true,
   },
   {
     // Compared by renderer input, like full-cover-animation-*.
@@ -392,6 +396,26 @@ export const states = [
 export async function hideMain(page) {
   await page.addStyleTag({
     content: "#main, body > .list-menu { visibility: hidden !important; }",
+  });
+}
+
+// rerasterize makes Chromium draw the full player's will-change layers
+// again where they now stand. AMLL's lines and word wrappers carry
+// will-change: transform, so Chromium rasterizes them once, wherever the
+// springs happened to be, and afterwards only moves the result: the same
+// final positions gave different text pixels from run to run (2026-10-28).
+export async function rerasterize(page) {
+  await page.evaluate(async () => {
+    const frames = () =>
+      new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const layers = [...document.querySelectorAll(".full-player *")].filter(
+      (el) => getComputedStyle(el).willChange !== "auto",
+    );
+    for (const el of layers)
+      el.style.setProperty("will-change", "auto", "important");
+    await frames();
+    for (const el of layers) el.style.removeProperty("will-change");
+    await frames();
   });
 }
 

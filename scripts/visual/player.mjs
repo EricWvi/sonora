@@ -27,6 +27,7 @@ import {
   clipFor,
   hideMain,
   mergeManifest,
+  rerasterize,
   setStore,
   settingsFor,
   settled,
@@ -56,6 +57,16 @@ const [width, height] = args.viewport.split("x").map(Number);
 const base = args.base;
 const out = join(repo, ".local/visual", args.run, args.viewport);
 
+// A fixed-offset zone where the page's clock reads ten in the morning. The
+// home page behind the player greets by the hour; "晚上好" and "夜深了"
+// draw 晚 and 夜 first, and Chrome's font fallback then sets the whole
+// translation line holding them in Noto Sans CJK JP instead of SC, so the
+// full player differed from the reference in the evening (2026-10-28).
+const morning = (() => {
+  const east = ((10 - new Date().getUTCHours() + 36) % 24) - 12;
+  return east ? `Etc/GMT${east > 0 ? "-" : "+"}${Math.abs(east)}` : "Etc/GMT";
+})();
+
 // The settings the reference states start from (splayer-player.mjs),
 // under Sonora's setting store.
 const baseSettings = { themeMode: "light", autoHidePlayerMeta: false };
@@ -72,7 +83,7 @@ async function openState(browser, state) {
     viewport: { width, height },
     deviceScaleFactor: 1,
     locale: "zh-CN",
-    timezoneId: "Asia/Shanghai",
+    timezoneId: morning,
     colorScheme: "light",
   });
   const settings = settingsFor(baseSettings, state);
@@ -116,6 +127,7 @@ async function prepareState(context, state) {
   await page.waitForTimeout(1000);
   if (state.settle) await page.waitForTimeout(state.settle);
   if (state.act) await state.act(page);
+  if (state.reraster) await rerasterize(page);
   return { page, errors };
 }
 
@@ -153,6 +165,7 @@ const manifest = {
     viewport: { width, height },
     deviceScaleFactor: 1,
     locale: "zh-CN",
+    timezoneId: morning,
   },
   baseSettings,
   states: [],

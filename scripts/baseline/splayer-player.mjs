@@ -40,6 +40,7 @@ import {
   hideMain,
   mergeManifest,
   PINIA,
+  rerasterize,
   setStore,
   settingsFor,
   settled,
@@ -238,6 +239,7 @@ async function prepareState(context, state) {
   await page.waitForTimeout(1000);
   if (state.settle) await page.waitForTimeout(state.settle);
   if (state.act) await state.act(page);
+  if (state.reraster) await rerasterize(page);
   return { page, errors };
 }
 
@@ -268,14 +270,15 @@ async function fontsOf(page, selectors) {
 
 // snapshot saves what Sonora needs to replay the same data: song details,
 // lyrics and cover images.
-async function snapshot(browser) {
+async function snapshot(browser, keys) {
   const context = await browser.newContext();
   await prepareSPlayerSession(context, base);
   const page = await context.newPage();
   await page.goto(base + "/#/", { waitUntil: "networkidle" });
   const dir = join(out, "data");
   await mkdir(dir, { recursive: true });
-  for (const [key, song] of Object.entries(songs)) {
+  for (const key of keys) {
+    const song = songs[key];
     const data = await page.evaluate(async ({ album, id }) => {
       const get = async (path) => (await fetch(path)).json();
       return {
@@ -301,7 +304,7 @@ async function snapshot(browser) {
     }
   }
   await context.close();
-  for (const key of Object.keys(songs)) await snapshotPlayer(browser, key);
+  for (const key of keys) await snapshotPlayer(browser, key);
 }
 
 // snapshotPlayer saves what the player holds once the song is paused at
@@ -374,8 +377,16 @@ const manifest = {
 try {
   if (!args["data-only"])
     await mkdir(join(out, args.viewport), { recursive: true });
-  await snapshot(browser);
   const only = args.only ? new RegExp(args.only) : null;
+  // With --only, only the songs those states play, so the reference
+  // instance plays no more than it needs to.
+  await snapshot(browser, [
+    ...new Set(
+      states
+        .filter((s) => s.song && (!only || only.test(s.id)))
+        .map((s) => s.song),
+    ),
+  ]);
   let fontsRecorded = false;
   for (const state of args["data-only"] ? [] : states) {
     if (only && !only.test(state.id)) continue;
