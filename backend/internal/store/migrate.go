@@ -252,7 +252,11 @@ func migrate(db *sql.DB) error {
 	if err := db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
 		return fmt.Errorf("read schema version: %w", err)
 	}
-	if version >= len(migrations) {
+	if version > len(migrations) {
+		return fmt.Errorf("database schema version %d is newer than this release supports (%d): "+
+			"run the release that wrote it, or restore the database backed up before upgrading", version, len(migrations))
+	}
+	if version == len(migrations) {
 		return nil
 	}
 	// Rebuilding a referenced table needs foreign keys off, which only
