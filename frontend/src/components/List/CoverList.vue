@@ -1,98 +1,104 @@
 <!-- 专辑、歌单封面网格。照搬 SPlayer components/List/CoverList.vue，数据是播放端 API 的
 Album 与 Playlist；不迁入视频、电台、播放量与卡片右键菜单。专辑卡片在名称下显示艺术家
-（沿用 SPlayer 视频卡片的艺术家样式），再显示“N首 · 年份”。 -->
+（沿用 SPlayer 视频卡片的艺术家样式），再显示“N首 · 年份”。
+与 SPlayer 不同（阶段 6）：网格是虚拟的，只渲染视口附近的行；分页列表滚动到底时自动载入
+下一页，不用“加载更多”按钮。 -->
 <template>
   <Transition name="fade" mode="out-in">
     <div v-if="data.length > 0" :class="['cover-list', type]">
-      <div class="cover-grid">
+      <div
+        ref="gridRef"
+        class="cover-rows"
+        :style="{ paddingTop: `${padTop}px`, paddingBottom: `${padBottom}px` }"
+      >
         <div
-          v-for="(item, index) in data"
-          :key="index"
-          :class="['cover-item', { 'no-cover': hiddenCover }]"
-          @click="goDetail(item)"
+          v-for="row in rows"
+          :key="row.index"
+          :data-row="row.index"
+          :style="{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }"
+          class="cover-grid"
         >
-          <!-- 封面 -->
-          <div v-if="!hiddenCover" class="cover">
-            <s-image
-              :key="coverOf(item)"
-              :src="coverOf(item)"
-              default-src="/images/album.jpg?asset"
-              class="cover-img"
-              once
-            />
-            <!-- 简介 -->
-            <div
-              v-if="'description' in item && item.description"
-              class="description"
-            >
-              <n-text class="text-hidden"> {{ item.description }}</n-text>
-            </div>
-            <!-- 播放按钮 -->
-            <div class="play-btn" @click.stop>
-              <n-button
-                :focusable="false"
-                :loading="loadingId === item.id"
-                secondary
-                circle
-                class="play"
-                @click.stop="playList(item)"
+          <div
+            v-for="item in row.items"
+            :key="item.id"
+            :class="['cover-item', { 'no-cover': hiddenCover }]"
+            @click="goDetail(item)"
+          >
+            <!-- 封面 -->
+            <div v-if="!hiddenCover" class="cover">
+              <s-image
+                :key="coverOf(item)"
+                :src="coverOf(item)"
+                default-src="/images/album.jpg?asset"
+                class="cover-img"
+                once
+              />
+              <!-- 简介 -->
+              <div
+                v-if="'description' in item && item.description"
+                class="description"
               >
-                <template #icon>
-                  <SvgIcon
-                    :size="32"
-                    :name="isPlaying(item.id) ? 'Pause' : 'Play'"
-                  />
-                </template>
-              </n-button>
+                <n-text class="text-hidden"> {{ item.description }}</n-text>
+              </div>
+              <!-- 播放按钮 -->
+              <div class="play-btn" @click.stop>
+                <n-button
+                  :focusable="false"
+                  :loading="loadingId === item.id"
+                  secondary
+                  circle
+                  class="play"
+                  @click.stop="playList(item)"
+                >
+                  <template #icon>
+                    <SvgIcon
+                      :size="32"
+                      :name="isPlaying(item.id) ? 'Pause' : 'Play'"
+                    />
+                  </template>
+                </n-button>
+              </div>
             </div>
-          </div>
-          <!-- 信息 -->
-          <div class="cover-data">
-            <n-text class="name text-hidden">{{ nameOf(item) }}</n-text>
-            <!-- 专辑信息 -->
-            <template v-if="'artists' in item">
-              <div class="artists text-hidden">
-                <n-text
-                  v-for="(ar, arIndex) in item.artists"
-                  :key="arIndex"
-                  class="ar"
-                  @click.stop="openJumpArtist(item.artists, ar.id)"
-                >
-                  {{
-                    settingStore.hideBracketedContent
-                      ? removeBrackets(ar.name)
-                      : ar.name
-                  }}
-                </n-text>
-              </div>
-              <div class="meta">
-                <n-text class="count" depth="3"
-                  >{{ item.trackCount || 0 }}首</n-text
-                >
-                <n-text class="date" depth="3">{{
-                  item.year || "未知年份"
-                }}</n-text>
-              </div>
-            </template>
-            <!-- 歌单信息 -->
-            <n-text v-else class="tip" depth="3"
-              >{{ item.trackCount || 0 }}首</n-text
-            >
+            <!-- 信息 -->
+            <div class="cover-data">
+              <n-text class="name text-hidden">{{ nameOf(item) }}</n-text>
+              <!-- 专辑信息 -->
+              <template v-if="'artists' in item">
+                <div class="artists text-hidden">
+                  <n-text
+                    v-for="(ar, arIndex) in item.artists"
+                    :key="arIndex"
+                    class="ar"
+                    @click.stop="openJumpArtist(item.artists, ar.id)"
+                  >
+                    {{
+                      settingStore.hideBracketedContent
+                        ? removeBrackets(ar.name)
+                        : ar.name
+                    }}
+                  </n-text>
+                </div>
+                <div class="meta">
+                  <n-text class="count" depth="3"
+                    >{{ item.trackCount || 0 }}首</n-text
+                  >
+                  <n-text class="date" depth="3">{{
+                    item.year || "未知年份"
+                  }}</n-text>
+                </div>
+              </template>
+              <!-- 歌单信息 -->
+              <n-text v-else class="tip" depth="3"
+                >{{ item.trackCount || 0 }}首</n-text
+              >
+            </div>
           </div>
         </div>
       </div>
-      <!-- 加载更多 -->
-      <n-flex v-if="loadMore" class="load-more" justify="center">
-        <n-button
-          :loading="loading"
-          size="large"
-          strong
-          secondary
-          round
-          @click="emit('loadMore')"
-        >
-          加载更多
-        </n-button>
+      <!-- 载入下一页（沿用 SongList 的样式） -->
+      <n-flex v-if="loadMore && loading" class="load-more" justify="center">
+        <n-spin size="small" />
+        <n-text>{{ loadingText || "努力加载中" }}</n-text>
       </n-flex>
     </div>
     <div v-else-if="loading" :class="['cover-list', 'loading', type]">
@@ -133,6 +139,7 @@ import { removeBrackets } from "@/utils/format";
 import { coverUrl, defaultCovers } from "@/utils/cover";
 import { openJumpArtist } from "@/utils/modal";
 import { usePlayerController } from "@/core/player/PlayerController";
+import { useVirtualGrid } from "@/composables/List/useVirtualGrid";
 
 const props = defineProps<{
   data: (Album | Playlist)[];
@@ -146,9 +153,27 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  // 加载更多
+  // 载入下一页
   loadMore: [];
 }>();
+
+// 虚拟网格：列宽与间距同下方 .cover-grid 的 minmax(160px, 1fr) 与 gap
+const {
+  container: gridRef,
+  columns,
+  rows,
+  padTop,
+  padBottom,
+  reset: resetGrid,
+} = useVirtualGrid({
+  items: () => props.data,
+  minWidth: 160,
+  gap: 20,
+  onReachEnd: () => {
+    if (props.loadMore && !props.loading) emit("loadMore");
+  },
+});
+watch(() => props.hiddenCover, resetGrid);
 
 const router = useRouter();
 const musicStore = useMusicStore();
@@ -215,6 +240,11 @@ const getListData = (id: number): Promise<Track[]> =>
 .cover-list {
   width: 100%;
   padding: 20px 4px;
+  .cover-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
   .cover-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -405,6 +435,9 @@ const getListData = (id: number): Promise<Track[]> =>
   }
   .load-more {
     margin: 20px 0;
+    .n-spin-body {
+      --n-size: 20px;
+    }
   }
   &.video {
     .cover-grid {

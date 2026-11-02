@@ -1,62 +1,68 @@
-<!-- 艺术家网格。照搬 SPlayer components/List/ArtistList.vue，数据是播放端 API 的 Artist。 -->
+<!-- 艺术家网格。照搬 SPlayer components/List/ArtistList.vue，数据是播放端 API 的 Artist。
+与 SPlayer 不同（阶段 6）：网格是虚拟的，只渲染视口附近的行；滚动到底时自动载入下一页，
+不用“加载更多”按钮。 -->
 <template>
   <Transition name="fade" mode="out-in">
     <div v-if="data.length > 0" class="artist-list">
-      <div class="artist-grid">
+      <div
+        ref="gridRef"
+        class="artist-rows"
+        :style="{ paddingTop: `${padTop}px`, paddingBottom: `${padBottom}px` }"
+      >
         <div
-          v-for="(item, index) in data"
-          :key="index"
-          :class="['artist-item', { 'no-cover': hiddenCover }]"
-          @click="
-            router.push({
-              name: 'artist',
-              query: { id: item.id },
-            })
-          "
+          v-for="row in rows"
+          :key="row.index"
+          :data-row="row.index"
+          :style="{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }"
+          class="artist-grid"
         >
-          <!-- 封面 -->
-          <div v-if="!hiddenCover" class="cover">
-            <s-image
-              :src="coverUrl(item.image, 'm', defaultCovers.artist)"
-              default-src="/images/artist.jpg?asset"
-              class="cover-img"
-            />
-            <!-- 封面背板 -->
-            <s-image
-              :src="coverUrl(item.image, 'm', defaultCovers.artist)"
-              default-src="/images/artist.jpg?asset"
-              class="cover-shadow"
-            />
-            <!-- 图标 -->
-            <SvgIcon name="Artist" />
-          </div>
-          <!-- 信息 -->
-          <div class="cover-data">
-            <n-text class="name text-hidden">{{
-              settingStore.hideBracketedContent
-                ? removeBrackets(item.name)
-                : item.name
-            }}</n-text>
-            <!-- 数量 -->
-            <div v-if="item.trackCount" class="num">
-              <SvgIcon name="Music" :depth="3" />
-              <n-text class="num" :depth="3">{{ item.trackCount }}</n-text>
+          <div
+            v-for="item in row.items"
+            :key="item.id"
+            :class="['artist-item', { 'no-cover': hiddenCover }]"
+            @click="
+              router.push({
+                name: 'artist',
+                query: { id: item.id },
+              })
+            "
+          >
+            <!-- 封面 -->
+            <div v-if="!hiddenCover" class="cover">
+              <s-image
+                :src="coverUrl(item.image, 'm', defaultCovers.artist)"
+                default-src="/images/artist.jpg?asset"
+                class="cover-img"
+              />
+              <!-- 封面背板 -->
+              <s-image
+                :src="coverUrl(item.image, 'm', defaultCovers.artist)"
+                default-src="/images/artist.jpg?asset"
+                class="cover-shadow"
+              />
+              <!-- 图标 -->
+              <SvgIcon name="Artist" />
+            </div>
+            <!-- 信息 -->
+            <div class="cover-data">
+              <n-text class="name text-hidden">{{
+                settingStore.hideBracketedContent
+                  ? removeBrackets(item.name)
+                  : item.name
+              }}</n-text>
+              <!-- 数量 -->
+              <div v-if="item.trackCount" class="num">
+                <SvgIcon name="Music" :depth="3" />
+                <n-text class="num" :depth="3">{{ item.trackCount }}</n-text>
+              </div>
             </div>
           </div>
         </div>
       </div>
-      <!-- 加载更多 -->
-      <n-flex v-if="loadMore" class="load-more" justify="center">
-        <n-button
-          :loading="loading"
-          size="large"
-          strong
-          secondary
-          round
-          @click="emit('loadMore')"
-        >
-          加载更多
-        </n-button>
+      <!-- 载入下一页（沿用 SongList 的样式） -->
+      <n-flex v-if="loadMore && loading" class="load-more" justify="center">
+        <n-spin size="small" />
+        <n-text>{{ loadingText || "努力加载中" }}</n-text>
       </n-flex>
     </div>
     <div v-else-if="loading" class="artist-list">
@@ -85,8 +91,9 @@ import type { Artist } from "@/api/types";
 import { removeBrackets } from "@/utils/format";
 import { coverUrl, defaultCovers } from "@/utils/cover";
 import { useSettingStore } from "@/stores";
+import { useVirtualGrid } from "@/composables/List/useVirtualGrid";
 
-defineProps<{
+const props = defineProps<{
   data: Artist[];
   loadMore?: boolean;
   loading?: boolean;
@@ -95,9 +102,27 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{
-  // 加载更多
+  // 载入下一页
   loadMore: [];
 }>();
+
+// 虚拟网格：列宽与间距同下方 .artist-grid 的 minmax(120px, 1fr) 与 gap
+const {
+  container: gridRef,
+  columns,
+  rows,
+  padTop,
+  padBottom,
+  reset: resetGrid,
+} = useVirtualGrid({
+  items: () => props.data,
+  minWidth: 120,
+  gap: 20,
+  onReachEnd: () => {
+    if (props.loadMore && !props.loading) emit("loadMore");
+  },
+});
+watch(() => props.hiddenCover, resetGrid);
 
 const router = useRouter();
 const settingStore = useSettingStore();
@@ -107,6 +132,11 @@ const settingStore = useSettingStore();
 .artist-list {
   width: 100%;
   padding: 20px 4px;
+  .artist-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
   .artist-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
@@ -229,6 +259,9 @@ const settingStore = useSettingStore();
   }
   .load-more {
     margin: 20px 0;
+    .n-spin-body {
+      --n-size: 20px;
+    }
   }
 }
 .n-empty {

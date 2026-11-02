@@ -146,18 +146,13 @@ const formatTooltip = (value: number) => {
 </script>
 
 <style scoped lang="scss">
+// SPlayer 给 width 与 left 加了 0.3s 过渡。进度约每 250ms 更新一次，过渡始终
+// 进行，播放时每帧都要重新布局（阶段 6 实测）；Sonora 去掉过渡，进度直接移动。
+// will-change 保留，它不引起布局，去掉会改变合成分层，底部栏的封面与文字光栅化随之不同
 .player-slider {
   width: 100%;
-  &:not(.drag) {
-    :deep(.n-slider-rail) {
-      .n-slider-rail__fill {
-        transition: width 0.3s;
-      }
-      .n-slider-handle-wrapper {
-        will-change: left;
-        transition: left 0.3s;
-      }
-    }
+  &:not(.drag) :deep(.n-slider-handle-wrapper) {
+    will-change: left;
   }
   :deep(.n-slider-handles) {
     .n-slider-handle {
