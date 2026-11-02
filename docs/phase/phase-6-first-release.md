@@ -33,9 +33,10 @@
 
   - CPU 不设预算：无头 Chromium 没有 GPU，全屏播放器的流动背景由软件渲染，整个浏览器约 110%，不能代表桌面 Chrome。
   - 只留底部栏时 CPU 高于全屏播放器：照搬的进度条给 `width`、`left` 加了 0.3s 过渡，进度约每 250ms 更新一次，过渡始终进行，每秒约 60 次布局。SPlayer 参考实例同条件下相同（每 3 秒 187 次布局，隐藏进度条后 4 次；Eric 同意用其网易云账号播放约 15 秒）。按 Eric 的决定去掉过渡（[PlayerSlider.vue](../../frontend/src/components/Player/PlayerComponents/PlayerSlider.vue)），每 3 秒的布局由 181 次降到 12 次，主线程占用由约 10% 降到 1.6%。
-- [ ] 部署：容器镜像由 CI 构建，包含 Go 服务、播放端与管理后台的生产产物；提供存储卷与数据卷的挂载说明、管理员初始化说明（从容器日志获取初始化 token），以及在 Authelia 中注册 OIDC 客户端的说明；只在桌面版 Chrome 上验证。首次部署时在真实 Authelia 下用浏览器走一遍播放端登录与退出（由阶段 4 转入）。
+- [x] 部署：容器镜像由 CI 构建，包含 Go 服务、播放端与管理后台的生产产物；提供存储卷与数据卷的挂载说明、管理员初始化说明（从容器日志获取初始化 token），以及在 Authelia 中注册 OIDC 客户端的说明；只在桌面版 Chrome 上验证。首次部署时在真实 Authelia 下用浏览器走一遍播放端登录与退出（由阶段 4 转入）。
   - 镜像（2026-11-02）：[Dockerfile](../../Dockerfile) 与 [release.yml](../../.github/workflows/release.yml) 照搬 `../homepage`（distroless nonroot，tag `v*` 触发，推到 ghcr），只构建 amd64；构建步骤同 `scripts/build.sh`，另加两份前端的 ESLint 与产物不含 fixture 的检查。本机不构建镜像：在干净的 clone 中逐条执行同样的步骤（冻结锁文件安装、lint、构建、fixture 检查、`go test`、`CGO_ENABLED=0` 编译）全部通过；release 二进制以正式配置启动，播放端与管理后台返回 200，`/api/v1/me` 未登录 401，`/auth/login` 跳转 Authelia，日志打印初始化 token。挂载、Compose 与 Authelia 客户端写入[部署说明](../deployment.md#镜像)。
   - dotfiles（Claude 本地修改，Eric 部署）：compose 的 sonora 服务换成 `1.0.0`，去掉 Postgres 依赖与 8765 端口，挂载 `/root/only/selfhost/sonora/{data,config.yaml}` 与 `/root/only/music`；Caddyfile 去掉 forward_auth，转发到 `sonora:14560`。frpc 是 https 直通 Caddy，域名不变，不用改。
+  - 发布与部署（2026-11-02）：GitHub 上旧版 EricWvi/sonora 的历史按 Eric 的决定强推覆盖；tag `v1.0.0` 触发的 Actions 成功，`ghcr.io/ericwvi/sonora:1.0.0` 与 `latest` 同一 digest（`sha256:d4a36b06…a3d0`）。Eric 在 only 上部署，替换旧版；Authelia 注册客户端，凭初始化 token 创建管理员。运行确认（2026-11-03，Eric，桌面 Chrome）：管理后台登录，播放端经真实 Authelia 登录与退出（由阶段 4 转入的一项完成）。旧版在 Postgres 中的 `sonora` 库已由 Eric 删除（2026-11-03）。
 - [x] 处理所有占位入口，不保留看似可用却无行为的界面。源码中没有空操作的按钮与菜单；设置项都有使用方（`hideAllCovers`、`hideMiniPlayerCover` 在 SPlayer 中同样没有使用，也不在界面上显示）。运行确认（2026-11-02，同一实例；脚本 `/tmp` 下，未入库）：逐页找出所有可见的、最外层的 `cursor: pointer` 元素（同类的行与卡片只测一次），每个都在重新载入的页面上真实点击，记录 DOM 变化、请求、路由与剪贴板，四项都没有变化的列为无反应。
   - 播放端 16 个页面与状态（首页、三个列表、我喜欢、最近播放、专辑、艺术家两个标签页、歌单、四个搜索结果页、404、全屏播放器），共约 70 个元素。无反应的都有原因：点的是当前页（标志、侧栏“首页”、艺术家页的“歌曲”标签与歌曲数）；单击歌曲行（双击播放）与当前曲已在视野中的“定位”按钮；与 SPlayer 源码相同的手形光标（底部栏歌名只在隐藏封面时打开全屏播放器、全屏播放器顶部的空白区域、禁用排序时表头的“标题”）。首页栏目标题被记为无反应，单独复核时正常跳转。
   - 管理后台 5 个页面共 103 个元素，无反应的只有当前页“概况”的菜单项。
