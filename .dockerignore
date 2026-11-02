@@ -1,0 +1,13 @@
+.git
+.github
+.local
+**/node_modules
+**/dist
+memories
+reference
+release
+backend/.data
+backend/config.yaml
+backend/web/*/*
+!backend/web/*/.gitkeep
+*.log

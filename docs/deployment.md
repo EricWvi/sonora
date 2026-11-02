@@ -1,10 +1,55 @@
 # 部署 Sonora
 
-更新日期：2026-11-02。容器镜像与发布流程属于[阶段 6](phase/phase-6-first-release.md)，尚未提供 Dockerfile；本文记录阶段 1 与阶段 4 已确定的运行方式，镜像就绪后补充 Compose 示例。不在开发机上构建镜像。
+更新日期：2026-11-02。镜像由 CI 构建（[阶段 6](phase/phase-6-first-release.md)），不在开发机上构建镜像。
 
 ## 构建
 
 `task build`（即 `scripts/build.sh`）构建播放端与管理后台，把两份产物复制到 `backend/web/` 并嵌入二进制，输出 `release/sonora`。二进制不依赖 CGO，可直接放入 distroless 等最小镜像。
+
+## 镜像
+
+推送 `v*` tag（例如 `v1.0.0`）后，GitHub Actions（[release.yml](../.github/workflows/release.yml)）按 [Dockerfile](../Dockerfile) 构建并推送 `ghcr.io/ericwvi/sonora:<版本>`；正式版同时更新 `latest`，预发布版（如 `1.1.0-rc.1`）不更新。也可以在 Actions 页面手动运行并填写版本号。只构建 `linux/amd64`。
+
+构建步骤与 `scripts/build.sh` 相同，另加两项检查：两份前端的 ESLint，以及产物中不含开发 fixture。运行层是 `gcr.io/distroless/static-debian12:nonroot`（用户 65532）：
+
+| 路径 | 用途 |
+| --- | --- |
+| `/app/config.yaml` | 配置文件，只读挂载 |
+| `/data` | 数据卷：`sonora.db` 与 `covers/` |
+| `/media` | 存储卷：上传的音频 |
+| 端口 `14560` | HTTP，放在反向代理之后 |
+
+两个卷在宿主机上须属于 `65532:65532`，否则服务无法写入。
+
+## Compose 示例
+
+```yaml
+services:
+  sonora:
+    image: ghcr.io/ericwvi/sonora:1.0.0
+    restart: unless-stopped
+    volumes:
+      - ./sonora/data:/data
+      - ./sonora/media:/media
+      - ./sonora/config.yaml:/app/config.yaml:ro
+    environment:
+      - TZ=Asia/Shanghai
+      - SONORA_OIDC_CLIENT_SECRET=${SONORA_OIDC_CLIENT_SECRET}
+```
+
+`config.yaml`：
+
+```yaml
+listen: ":14560"
+data_dir: "/data"
+media_dir: "/media"
+public_url: "https://music.example.com"
+oidc:
+  issuer: "https://auth.example.com"
+  client_id: "sonora"
+```
+
+反向代理把整个域名转发到 `sonora:14560`，不要加 forward_auth：播放端自己走 OIDC，管理后台有自己的登录（密码 bcrypt，失败全局每分钟至多 10 次）。
 
 ## 配置
 
@@ -24,7 +69,26 @@
 
 ## Authelia 客户端
 
-播放端认证照搬 `../homepage`。在 Authelia 中注册一个机密客户端：`redirect_uris` 为 `<public_url>/auth/callback`；`require_pkce: true`、`pkce_challenge_method: S256`；scope 为 `openid profile email`；`token_endpoint_auth_method: client_secret_basic`。可参照契约测试的 [configuration.yml](../backend/internal/auth/testdata/authelia/configuration.yml)。Sonora 首次有人登录时才去发现 issuer，Authelia 不可用时服务照常启动，只是暂时无法登录。
+播放端认证照搬 `../homepage`。在 Authelia 中注册一个机密客户端：`redirect_uris` 为 `<public_url>/auth/callback`；`require_pkce: true`、`pkce_challenge_method: S256`；scope 为 `openid profile email`；`token_endpoint_auth_method: client_secret_basic`。可参照契约测试的 [configuration.yml](../backend/internal/auth/testdata/authelia/configuration.yml)，在 `identity_providers.oidc.clients` 下加入：
+
+```yaml
+- client_id: sonora
+  client_name: Sonora
+  # authelia crypto hash generate pbkdf2 --variant sha512 生成；明文给 SONORA_OIDC_CLIENT_SECRET
+  client_secret: '$pbkdf2-sha512$...'
+  public: false
+  authorization_policy: two_factor  # 按自己的策略
+  require_pkce: true
+  pkce_challenge_method: S256
+  redirect_uris:
+    - https://music.example.com/auth/callback
+  scopes: [openid, profile, email]
+  grant_types: [authorization_code]
+  response_types: [code]
+  token_endpoint_auth_method: client_secret_basic
+```
+
+Sonora 首次有人登录时才去发现 issuer，Authelia 不可用时服务照常启动，只是暂时无法登录。
 
 ## 首次初始化
 
