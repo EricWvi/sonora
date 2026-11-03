@@ -296,10 +296,12 @@ const measureItemHeights = () => {
   if (!itemRefs.value.length || props.items.length === 0) return;
 
   let hasChanges = false;
-  itemRefs.value.forEach((el, index) => {
+  itemRefs.value.forEach((el) => {
     if (!el) return;
 
-    const actualIndex = actualStartIndex.value + index;
+    // 与 SPlayer 不同：按元素自己的 data-index 取行号。v-for 的 ref 数组不保证与渲染顺序
+    // 一致，按数组位置推算会把某行的高度记到别的行上（多碟专辑中歌曲行与碟号标题错位）
+    const actualIndex = Number(el.dataset.index);
     if (actualIndex < 0 || actualIndex >= props.items.length) return;
 
     try {
