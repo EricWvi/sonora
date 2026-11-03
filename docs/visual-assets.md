@@ -95,7 +95,7 @@ SPlayer 的 147 个图标在 `src/assets/icons/`，由 `SvgIcon.vue` 内联渲�
 
 | 字体 | 位置 | 来源与许可证 | 用途 | Sonora |
 | --- | --- | --- | --- | --- |
-| `logo` | `public/fonts/logo.woff2`、`font.css` | Poppins Medium（Indian Type Foundry），SIL OFL 1.1。由 `fc-scan` 读取字体名称表确认 | 侧栏标志文字 | 已复制到 `frontend/public/fonts/`，附 `OFL.txt` |
+| `logo` | `public/fonts/logo.woff2`、`font.css` | Poppins Medium（Indian Type Foundry），SIL OFL 1.1。由 `fc-scan` 读取字体名称表确认 | 侧栏标志文字 | 已复制到 `frontend/public/fonts/`，附 `OFL.txt`；2026-11-03 从完整字体重新取子集，补上 “Sonora” 的 `n`、`o`，见 [THIRD_PARTY_NOTICES](../THIRD_PARTY_NOTICES.md#poppins) |
 | 界面字体 | `Provider.vue` 的 `fontFamily` | 不随项目分发 | 全局 | 见下文 |
 
 界面字体栈为 `v-sans, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"`（设置为“默认”时）。SPlayer 没有引入定义 `v-sans` 的 `vfonts`，因此实际字体由 `system-ui` 决定，随系统变化。视觉对照必须在同一环境中进行；[基线采集脚本](../scripts/baseline/splayer-player.mjs)在 manifest 中记录了 Chrome 实际使用的平台字体。

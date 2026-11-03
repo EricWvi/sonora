@@ -1,3 +1,5 @@
+/* 与 SPlayer 不同：SPlayer 的子集只有 "SPlayer" 的字母，这里从完整的 Poppins Medium
+   重新取子集，加入 "Sonora" 的 n、o，见 THIRD_PARTY_NOTICES.md。 */
 @font-face {
   font-family: "logo";
   src: url("./logo.woff2") format("woff2");

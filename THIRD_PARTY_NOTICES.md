@@ -30,7 +30,7 @@
 
 # Poppins
 
-`frontend/public/fonts/logo.woff2` 是 SPlayer 随附的 Logo 字体，经字体名称表确认为 Poppins Medium（Indian Type Foundry），SIL Open Font License 1.1。许可证全文随字体放在 [frontend/public/fonts/OFL.txt](frontend/public/fonts/OFL.txt)：
+`frontend/public/fonts/logo.woff2` 是 Logo 字体 Poppins Medium（Indian Type Foundry，4.004），SIL Open Font License 1.1。SPlayer 随附的子集只有 “SPlayer” 的 7 个字母；2026-11-03 改为从 [google/fonts](https://github.com/google/fonts/tree/main/ofl/poppins) 的 `Poppins-Medium.ttf` 重新取子集，加入 “Sonora” 用到的 `n`、`o`（`pyftsubset Poppins-Medium.ttf --text=PSaelryon --layout-features='' --flavor=woff2`），原有字形的轮廓与字宽不变。许可证全文随字体放在 [frontend/public/fonts/OFL.txt](frontend/public/fonts/OFL.txt)：
 
 > Copyright 2020 The Poppins Project Authors (https://github.com/itfoundry/Poppins)
 

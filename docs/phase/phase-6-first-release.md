@@ -59,6 +59,7 @@
 - **进度条**（Eric 决定）：只留底部栏时 CPU 反而高于全屏播放器，需要改进。去掉进度条 `width`、`left` 的 0.3s 过渡，进度随每次更新直接移动（约每秒 4 次，每次移动不到 2 px），点击跳转时直接到位。手柄的 `will-change: left` 保留：它不引起布局，去掉会改变合成分层，底部栏封面与文字的光栅化随之不同，截图对照会出现 15 个不符。改后 `task test:visual` 54 个状态 12 一致、42 例外、0 不符，与 2026-10-28 的基线相同；`task lint:frontend`、`task test:frontend`（55 个测试，新增 `gridWindow` 的 4 个）与生产构建通过，产物不含 fixture。
 - **专辑与艺术家网格**（Eric 决定）：真实曲库要点多次“加载更多”才能载完，体验不好。改为虚拟网格：页面照旧整体滚动，只渲染视口附近的行，滚动到底时自动载入下一页，去掉“加载更多”按钮；卡片样式不变，载入中显示与歌曲列表相同的“努力加载中”。实现见 [useVirtualGrid.ts](../../frontend/src/composables/List/useVirtualGrid.ts)，用于 [CoverList.vue](../../frontend/src/components/List/CoverList.vue)（专辑、艺术家的专辑、搜索结果、首页）与 [ArtistList.vue](../../frontend/src/components/List/ArtistList.vue)。
 - **性能预算**（Eric 确认）：按“性能”工作包中的表格。
+- **标志字体**（Eric 同意，2026-11-03，1.1.0 部署后发现）：SPlayer 的 `logo.woff2` 只有 “SPlayer” 的 7 个字母（`PSaelry`），“Sonora” 的 `o`、`n` 落到回退字体，标志文字混用两种字体。改为从 google/fonts 的完整 Poppins Medium（同为 4.004）重新取子集，加入 `n`、`o`，同样不带布局特性；原有 8 个字形的轮廓与字宽逐一比对不变，文件由 916 B 变为 1,036 B，22px 下 “Sonora” 宽 79px（容器 90px）。见 [font.css](../../frontend/public/fonts/font.css) 与 [THIRD_PARTY_NOTICES](../../THIRD_PARTY_NOTICES.md#poppins)。无头 Chromium 渲染确认整词为 Poppins；`task test:visual` 54 个状态 12 一致、42 例外、0 不符，与基线相同。
 - **不照搬改动的手感**（Eric，2026-11-03，桌面 Chrome，线上 1.0.0）：去掉过渡后的进度条，以及专辑与艺术家的虚拟网格，用起来都没有问题。
 
 ## 已知缺陷与支持限制（1.0.0）
