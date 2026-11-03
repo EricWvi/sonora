@@ -49,7 +49,7 @@ oidc:
   client_id: "sonora"
 ```
 
-反向代理把整个域名转发到 `sonora:14560`，不要加 forward_auth：播放端自己走 OIDC，管理后台有自己的登录（密码 bcrypt，失败全局每分钟至多 10 次）。
+反向代理把整个域名转发到 `sonora:14560`，不要加 forward_auth：播放端自己走 OIDC，管理后台有自己的登录（密码 bcrypt，失败全局每分钟至多 10 次）。Sonora 本身不压缩响应，建议在反向代理上开启压缩（Caddy 为 `encode zstd gzip`），播放端的 JS 与 CSS 约 1.6 MB，压缩后约 0.5 MB；缓存头由 Sonora 设置，反向代理不必改。
 
 ## 配置
 
