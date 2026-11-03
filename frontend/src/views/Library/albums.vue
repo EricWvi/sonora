@@ -6,7 +6,8 @@
       <template #status>
         <n-text class="item">
           <SvgIcon name="Album" :depth="3" />
-          <n-number-animation :from="0" :to="list.total.value" /> 张专辑
+          <!-- 与 SPlayer 不同：总数直接显示，不用 n-number-animation 从 0 滚动 -->
+          {{ list.total.value }} 张专辑
         </n-text>
       </template>
       <template #left>
