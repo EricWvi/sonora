@@ -144,6 +144,8 @@ export interface Album {
   artists: Ref[];
   year: number;
   cover: Cover | null;
+  // An album that only holds singles; the player's album page hides it.
+  single: boolean;
   trackCount: number;
   durationMs: number;
   createdAt: string;

@@ -122,7 +122,13 @@ const getHomeData = async () => {
     const [likes, songs, albums, history] = await Promise.all([
       source.likes({ limit: 50 }),
       source.tracks({ limit: 50 }),
-      source.albums({ sort: "createTime", order: "desc", limit: 12 }),
+      // 与 SPlayer 不同：最近添加的专辑不含标记为单曲的专辑
+      source.albums({
+        sort: "createTime",
+        order: "desc",
+        limit: 12,
+        hideSingles: true,
+      }),
       source.history({ limit: 10 }),
     ]);
     likedSongs.value = likes.items;

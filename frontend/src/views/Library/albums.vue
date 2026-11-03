@@ -106,6 +106,8 @@ const list = usePagedList(
   (offset, limit) =>
     source.albums({
       q: searchKeyword.value,
+      // 与 SPlayer 不同：不显示标记为单曲的专辑，只列真专辑
+      hideSingles: true,
       offset,
       limit,
       ...(sort.value === "createTime"

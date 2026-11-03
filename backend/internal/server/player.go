@@ -175,10 +175,11 @@ func (s *server) getPlayerLyrics(w http.ResponseWriter, r *http.Request) {
 func (s *server) listPlayerAlbums(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	page, err := s.store.Albums(r.Context(), store.AlbumQuery{
-		Q:        q.Get("q"),
-		ArtistID: queryInt(q.Get("artistId")),
-		Sort:     listSort(r),
-		Window:   window(r),
+		Q:           q.Get("q"),
+		ArtistID:    queryInt(q.Get("artistId")),
+		HideSingles: q.Get("hideSingles") == "true",
+		Sort:        listSort(r),
+		Window:      window(r),
 	})
 	respond(w, r, mapPage(page, toPlayerAlbum), err)
 }

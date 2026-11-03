@@ -12,6 +12,7 @@ import {
   NInputNumber,
   NModal,
   NSpace,
+  NSwitch,
   NTag,
   useDialog,
   useMessage,
@@ -111,7 +112,12 @@ const label = (a: Album) =>
 const editing = ref<Album | null>(null);
 // Kept separate from `editing` so the content survives the leave transition.
 const showEdit = ref(false);
-const form = reactive({ title: "", artists: [] as string[], year: 0 });
+const form = reactive({
+  title: "",
+  artists: [] as string[],
+  year: 0,
+  single: false,
+});
 const saving = ref(false);
 
 function edit(a: Album) {
@@ -121,6 +127,7 @@ function edit(a: Album) {
     title: a.title,
     artists: a.artists.map((r) => r.name),
     year: a.year,
+    single: a.single,
   });
 }
 
@@ -219,7 +226,16 @@ const columns: DataTableColumns<Album> = [
     title: "专辑",
     key: "title",
     ellipsis: { tooltip: true },
-    render: (a) => h("a", { class: "link", onClick: () => edit(a) }, a.title),
+    render: (a) => [
+      h("a", { class: "link", onClick: () => edit(a) }, a.title),
+      a.single
+        ? h(
+            NTag,
+            { size: "small", bordered: false, style: "margin-left: 8px" },
+            () => "单曲",
+          )
+        : null,
+    ],
   },
   {
     title: "专辑艺术家",
@@ -334,6 +350,12 @@ const pagination = computed(() => ({
             :max="9999"
             :show-button="false"
           />
+        </n-form-item>
+        <n-form-item
+          label="单曲"
+          feedback="单曲自动建的专辑，或只是同名的几首单曲；播放端的专辑页与首页不显示"
+        >
+          <n-switch v-model:value="form.single" />
         </n-form-item>
         <n-button type="primary" attr-type="submit" :loading="saving"
           >保存</n-button

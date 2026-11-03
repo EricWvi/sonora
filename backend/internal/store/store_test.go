@@ -493,6 +493,37 @@ func TestMergeAlbumsUnifyingCoversDropsTheOthers(t *testing.T) {
 	}
 }
 
+func TestSingleAlbums(t *testing.T) {
+	s := openTest(t)
+	ctx := context.Background()
+	single := newAlbumTrack(t, s, "tagged.mp3", "甲")
+	real := newAlbumTrack(t, s, "tagged.flac", "乙")
+	if single.Album == nil || real.Album == nil {
+		t.Fatal("tracks have no album")
+	}
+	if a, _ := s.Album(ctx, single.Album.ID); a.Single {
+		t.Fatal("a new album starts single")
+	}
+	yes := true
+	a, err := s.UpdateAlbum(ctx, single.Album.ID, AlbumInput{Title: "原声带", Artists: []string{"甲"}, Single: &yes})
+	if err != nil || !a.Single {
+		t.Fatalf("mark single = %+v, %v", a, err)
+	}
+	// omitting single keeps the mark
+	if a, err = s.UpdateAlbum(ctx, single.Album.ID, AlbumInput{Title: "原声带", Artists: []string{"甲"}, Year: 2020}); err != nil || !a.Single {
+		t.Fatalf("keep single = %+v, %v", a, err)
+	}
+	all, _ := s.Albums(ctx, AlbumQuery{})
+	shown, _ := s.Albums(ctx, AlbumQuery{HideSingles: true})
+	if all.Total != 2 || shown.Total != 1 || shown.Items[0].ID != real.Album.ID {
+		t.Fatalf("all = %d, shown = %+v", all.Total, shown)
+	}
+	no := false
+	if a, err = s.UpdateAlbum(ctx, single.Album.ID, AlbumInput{Title: "原声带", Artists: []string{"甲"}, Single: &no}); err != nil || a.Single {
+		t.Fatalf("unmark single = %+v, %v", a, err)
+	}
+}
+
 func TestDeleteRemovesFilesAndOrphans(t *testing.T) {
 	s := openTest(t)
 	ctx := context.Background()

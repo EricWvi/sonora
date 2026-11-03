@@ -115,4 +115,6 @@ export type AlbumQuery = Omit<ListQuery, "sort"> & {
   /** 专辑列表只接受按标题（`default`）与入库时间排序。 */
   sort?: "default" | "createTime";
   artistId?: number;
+  /** 不含标记为单曲的专辑（专辑页与首页用，Sonora 新增）。 */
+  hideSingles?: boolean;
 };

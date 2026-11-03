@@ -52,7 +52,7 @@
 | `PUT/DELETE tracks/{id}/cover` | 请求体为图片原始字节；单曲封面优先于专辑封面 |
 | `PUT/DELETE tracks/{id}/lyrics` | 请求体为 LRC 或 TTML 歌词的原始字节，服务识别 UTF-8、UTF-16 与 GB18030 |
 | `GET tracks/{id}/audio` | 音频流，支持 Range，用于试听 |
-| `GET albums`、`GET/PUT/DELETE albums/{id}` | 列表（`q`、`artistId`、`sort`、`order`）/ 详情 / 修改 `{title, artists, year}` / 删除专辑及其全部歌曲 |
+| `GET albums`、`GET/PUT/DELETE albums/{id}` | 列表（`q`、`artistId`、`sort`、`order`）/ 详情 / 修改 `{title, artists, year, single}` / 删除专辑及其全部歌曲。`single` 标记只含单曲的专辑（单曲自动建的专辑，或只是同名的几首单曲），省略时保持原值；新入库的专辑为 `false` |
 | `POST albums/{id}/merge` | `{sourceIds, keepCovers}` 合并到路径中的专辑。目标没有封面或年份时，沿用第一个有封面或年份的来源专辑。`keepCovers` 默认 `false`，合并后只留目标的封面；为 `true` 时，来源专辑中没有单曲封面的歌曲以原专辑的封面作为单曲封面（与目标封面相同或原专辑没有封面时不设） |
 | `PUT/DELETE albums/{id}/cover` | 同单曲封面 |
 | `GET artists`、`GET/PUT artists/{id}` | 列表（`q`）/ 详情 / 重命名 `{name}` |
@@ -93,7 +93,7 @@
 | `GET tracks/{id}` | 歌曲详情 |
 | `GET tracks/{id}/lyrics` | `{format, lyrics}`：`format` 为 `lrc` 或 `ttml`，`lyrics` 为原文；没有歌词时都是空字符串。解析由播放端完成 |
 | `GET tracks/{id}/audio` | 音频流，支持 Range |
-| `GET albums`、`GET albums/{id}` | 列表（`q`、`artistId`、`sort`、`order`）/ 详情；首页“最近添加的专辑”用 `sort=createTime&order=desc` |
+| `GET albums`、`GET albums/{id}` | 列表（`q`、`artistId`、`sort`、`order`、`hideSingles`）/ 详情；`hideSingles=true` 时不含标记为单曲的专辑，专辑页与首页使用；首页“最近添加的专辑”用 `sort=createTime&order=desc&hideSingles=true` |
 | `GET artists`、`GET artists/{id}` | 列表（`q`）/ 详情；艺术家的歌曲与专辑用 `tracks?artistId=`、`albums?artistId=` 获取 |
 | `GET covers/{name}` | 封面与艺术家图片，与管理 API 相同，支持同样的 `?size=`。播放端按 SPlayer 的封面尺寸取 `100`（小图：底部栏、背景与取色）、`300`、`1024`（全屏播放器的大封面），2026-10-25 增加 `100` 与 `1024` |
 

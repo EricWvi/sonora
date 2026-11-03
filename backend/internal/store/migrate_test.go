@@ -99,3 +99,35 @@ func TestOpenRefusesNewerSchema(t *testing.T) {
 		t.Fatalf("version = %d", v)
 	}
 }
+
+func TestMigrationMarksOneTrackAlbumsSingle(t *testing.T) {
+	dataDir := t.TempDir()
+	schemaAt(t, dataDir, 6)
+	db, err := sql.Open("sqlite", "file:"+filepath.Join(dataDir, "sonora.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{
+		`INSERT INTO albums (id, title) VALUES (1, 'one'), (2, 'two')`,
+		`INSERT INTO tracks (title, album_id, duration_ms, format, size, sha256, file, original_name) VALUES
+			('a', 1, 1, 'mp3', 1, 'h1', 'f1', 'a.mp3'),
+			('b', 2, 1, 'mp3', 1, 'h2', 'f2', 'b.mp3'),
+			('c', 2, 1, 'mp3', 1, 'h3', 'f3', 'c.mp3')`,
+	} {
+		if _, err := db.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	db.Close()
+	s, err := Open(dataDir, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	for id, want := range map[int64]bool{1: true, 2: false} {
+		a, err := s.Album(t.Context(), id)
+		if err != nil || a.Single != want {
+			t.Errorf("album %d single = %v, %v; want %v", id, a.Single, err, want)
+		}
+	}
+}

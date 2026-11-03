@@ -245,6 +245,15 @@ var migrations = []migration{
 		updated_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 	);
 	`),
+
+	// albums.single marks an album that only holds singles: created for
+	// one track, or singles that merely share a title. The player's album
+	// page leaves them out. Existing albums of one track start marked; the
+	// admin corrects the rest by hand.
+	execSQL(`
+	ALTER TABLE albums ADD COLUMN single INTEGER NOT NULL DEFAULT 0;
+	UPDATE albums SET single = 1 WHERE (SELECT COUNT(*) FROM tracks WHERE album_id = albums.id) = 1;
+	`),
 }
 
 func migrate(db *sql.DB) error {

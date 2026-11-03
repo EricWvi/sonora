@@ -73,11 +73,13 @@ type TrackDetail struct {
 
 // Album is a release. Artists are the album artists.
 type Album struct {
-	ID         int64  `json:"id"`
-	Title      string `json:"title"`
-	Artists    []Ref  `json:"artists"`
-	Year       int    `json:"year"`
-	Cover      *Cover `json:"cover"`
+	ID      int64  `json:"id"`
+	Title   string `json:"title"`
+	Artists []Ref  `json:"artists"`
+	Year    int    `json:"year"`
+	Cover   *Cover `json:"cover"`
+	// Single marks an album that only holds singles, see AlbumInput.
+	Single     bool   `json:"single"`
 	TrackCount int    `json:"trackCount"`
 	DurationMs int64  `json:"durationMs"`
 	CreatedAt  string `json:"createdAt"`
@@ -500,16 +502,17 @@ func (s *Store) deleteTracks(ctx context.Context, cond string, id int64) error {
 // --- albums ----------------------------------------------------------------
 
 // AlbumQuery filters the album list. Sort accepts SortCreateTime besides
-// the default order by title.
+// the default order by title. HideSingles leaves out albums marked single.
 type AlbumQuery struct {
-	Q        string
-	ArtistID int64
-	Sort     Sort
+	Q           string
+	ArtistID    int64
+	HideSingles bool
+	Sort        Sort
 	Window
 }
 
 var albumSelect = `
-	SELECT al.id, al.title, al.year, al.cover, ` + placeholderOf("al.cover") + `, al.created_at, ` +
+	SELECT al.id, al.title, al.year, al.cover, ` + placeholderOf("al.cover") + `, al.single, al.created_at, ` +
 	artistsJSON("album_artists", "album_id", "al.id") + `,
 		(SELECT COUNT(*) FROM tracks WHERE album_id = al.id),
 		(SELECT IFNULL(SUM(duration_ms), 0) FROM tracks WHERE album_id = al.id)
@@ -518,7 +521,7 @@ var albumSelect = `
 func scanAlbum(row scanner) (Album, error) {
 	var a Album
 	var cover, coverHash sql.NullString
-	err := row.Scan(&a.ID, &a.Title, &a.Year, &cover, &coverHash, &a.CreatedAt, (*refs)(&a.Artists), &a.TrackCount, &a.DurationMs)
+	err := row.Scan(&a.ID, &a.Title, &a.Year, &cover, &coverHash, &a.Single, &a.CreatedAt, (*refs)(&a.Artists), &a.TrackCount, &a.DurationMs)
 	a.Cover = coverOf(cover, coverHash)
 	return a, err
 }
@@ -546,6 +549,9 @@ func (s *Store) Albums(ctx context.Context, q AlbumQuery) (Page[Album], error) {
 	if q.ArtistID > 0 {
 		where = append(where, `EXISTS (SELECT 1 FROM album_artists WHERE album_id = al.id AND artist_id = ?)`)
 		args = append(args, q.ArtistID)
+	}
+	if q.HideSingles {
+		where = append(where, `NOT al.single`)
 	}
 	cond := ""
 	if len(where) > 0 {
@@ -587,11 +593,13 @@ func (s *Store) album(ctx context.Context, q querier, id int64) (Album, error) {
 }
 
 // AlbumInput is the editable metadata of an album. Artists are the album
-// artists' names; empty leaves the album without any.
+// artists' names; empty leaves the album without any. Single marks an
+// album that only holds singles; nil keeps the current mark.
 type AlbumInput struct {
 	Title   string   `json:"title"`
 	Artists []string `json:"artists"`
 	Year    int      `json:"year"`
+	Single  *bool    `json:"single"`
 }
 
 // UpdateAlbum replaces an album's metadata. Renaming onto another album of
@@ -628,8 +636,9 @@ func (s *Store) UpdateAlbum(ctx context.Context, id int64, in AlbumInput) (Album
 		if !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
-		res, err := tx.ExecContext(ctx, `UPDATE albums SET title = ?, artist_key = ?, year = ? WHERE id = ?`,
-			in.Title, albumKey(artists), in.Year, id)
+		res, err := tx.ExecContext(ctx, `
+			UPDATE albums SET title = ?, artist_key = ?, year = ?, single = IFNULL(?, single) WHERE id = ?`,
+			in.Title, albumKey(artists), in.Year, in.Single, id)
 		if err != nil {
 			return err
 		}
