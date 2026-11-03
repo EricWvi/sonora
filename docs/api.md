@@ -53,7 +53,7 @@
 | `PUT/DELETE tracks/{id}/lyrics` | 请求体为 LRC 或 TTML 歌词的原始字节，服务识别 UTF-8、UTF-16 与 GB18030 |
 | `GET tracks/{id}/audio` | 音频流，支持 Range，用于试听 |
 | `GET albums`、`GET/PUT/DELETE albums/{id}` | 列表（`q`、`artistId`、`sort`、`order`）/ 详情 / 修改 `{title, artists, year}` / 删除专辑及其全部歌曲 |
-| `POST albums/{id}/merge` | `{sourceIds}` 合并到路径中的专辑 |
+| `POST albums/{id}/merge` | `{sourceIds, keepCovers}` 合并到路径中的专辑。目标没有封面或年份时，沿用第一个有封面或年份的来源专辑。`keepCovers` 默认 `false`，合并后只留目标的封面；为 `true` 时，来源专辑中没有单曲封面的歌曲以原专辑的封面作为单曲封面（与目标封面相同或原专辑没有封面时不设） |
 | `PUT/DELETE albums/{id}/cover` | 同单曲封面 |
 | `GET artists`、`GET/PUT artists/{id}` | 列表（`q`）/ 详情 / 重命名 `{name}` |
 | `POST artists/{id}/merge` | `{sourceIds}`；合并后艺术家组合相同的同名专辑一并合并；目标没有图片时沿用来源的图片 |

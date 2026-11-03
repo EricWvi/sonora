@@ -183,10 +183,15 @@ function confirmDelete(a: Album) {
 // --- merging ----------------------------------------------------------------
 
 const merging = ref(false);
-async function merge(target: number, sources: number[]) {
+const mergeOption = {
+  label: "统一使用保留专辑的封面",
+  hint: "关闭时，其他专辑的歌曲改用原专辑的封面作为单曲封面；已有单曲封面的歌曲不变。",
+};
+async function merge(target: number, sources: number[], unifyCovers: boolean) {
   try {
     await request<Album>("POST", `/albums/${target}/merge`, {
       sourceIds: sources,
+      keepCovers: !unifyCovers,
     });
     message.success("已合并");
     clearSelection();
@@ -352,6 +357,7 @@ const pagination = computed(() => ({
     :show="merging"
     title="合并专辑"
     :items="[...selected.values()].map((a) => ({ id: a.id, label: label(a) }))"
+    :option="mergeOption"
     :merge="merge"
     @close="merging = false"
   />

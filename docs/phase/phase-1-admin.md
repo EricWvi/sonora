@@ -83,6 +83,7 @@
 
 - 没有单独删除艺术家的接口：艺术家随歌曲自动清理。删除专辑会删除其全部歌曲与文件。
 - 合并艺术家时，同一首歌或专辑上同时出现的来源与目标只保留目标；合并后艺术家组合与另一张同名专辑相同的专辑一并合并。证据：`TestMergeArtistsCollapsesLinksAndAlbums`。
+- 合并专辑时可以不统一封面（2026-11-03，部署后实际使用中发现，Eric 提出方案）：不同艺术家的同名专辑各自以歌曲内嵌的封面入库，原来合并后只留目标专辑的封面，其余封面连同文件被清除。合并弹窗新增“统一使用保留专辑的封面”开关，默认打开，行为与原来相同；关闭时（`keepCovers: true`），来源专辑中没有单曲封面的歌曲以原专辑的封面作为单曲封面，与目标封面相同或原专辑没有封面时不设。合并艺术家时顺带的专辑合并仍统一封面。已经合并过的专辑，丢失的封面不能由此恢复。证据：`TestMergeAlbumsKeepingCovers`、`TestMergeAlbumsWithoutCoverTakesTheFirstSourceCover`、`TestMergeAlbumsUnifyingCoversDropsTheOthers`；运行确认（开发模式临时实例，Playwright Chromium 无头）：三张同名专辑（红、绿、无封面）关闭开关后合并，请求为 `keepCovers: true`，原绿色专辑的歌曲以绿色封面为单曲封面，另两首不设，两个封面文件都保留。
 - 契约验证目前是 Go 的 HTTP 测试，没有独立的契约测试工具；管理后台的类型定义手工维护在 [api.ts](../../admin/src/api.ts)。
 
 ### 1.5 管理后台界面

@@ -364,7 +364,7 @@ func TestMergeAlbumsAndRenameConflicts(t *testing.T) {
 	if _, err := s.UpdateAlbum(ctx, b2.Album.ID, AlbumInput{Title: "叶惠美", Artists: []string{"周杰伦"}}); !errors.Is(err, ErrConflict) {
 		t.Fatalf("rename onto existing album: %v", err)
 	}
-	album, err := s.MergeAlbums(ctx, a.Album.ID, []int64{b2.Album.ID})
+	album, err := s.MergeAlbums(ctx, a.Album.ID, []int64{b2.Album.ID}, false)
 	if err != nil || album.TrackCount != 2 || album.Cover == nil {
 		t.Fatalf("merged = %+v, %v", album, err)
 	}
@@ -378,6 +378,118 @@ func TestMergeAlbumsAndRenameConflicts(t *testing.T) {
 	}
 	if _, err := s.RenameArtist(ctx, other.Artists[0].ID, "周杰伦"); !errors.Is(err, ErrConflict) {
 		t.Fatalf("rename onto existing artist: %v", err)
+	}
+}
+
+// newAlbumTrack ingests file as the only track of album "原声带" by artist.
+func newAlbumTrack(t *testing.T, s *testStore, file, artist string) Track {
+	t.Helper()
+	tr := ingest(t, s, sample(t, file), file, nil).Track
+	d, err := s.UpdateTrack(context.Background(), tr.ID, TrackInput{Title: file, Artists: []string{artist}, Album: "原声带"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return d.Track
+}
+
+func TestMergeAlbumsKeepingCovers(t *testing.T) {
+	s := openTest(t)
+	ctx := context.Background()
+	target := newAlbumTrack(t, s, "tagged.mp3", "甲")
+	diff := newAlbumTrack(t, s, "tagged.flac", "乙")
+	same := newAlbumTrack(t, s, "tagged.m4a", "丙")
+	bare := newAlbumTrack(t, s, "untagged.mp3", "丁")
+	own := newAlbumTrack(t, s, "tagged.ogg", "戊")
+	targetAlbum, err := s.SetAlbumCover(ctx, target.Album.ID, gradient(t, 3, 3))
+	if err != nil {
+		t.Fatal(err)
+	}
+	diffAlbum, err := s.SetAlbumCover(ctx, diff.Album.ID, gradient(t, 2, 2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`UPDATE albums SET cover = ? WHERE id = ?`, targetAlbum.Cover.Name, same.Album.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`UPDATE albums SET cover = NULL WHERE id = ?`, bare.Album.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SetAlbumCover(ctx, own.Album.ID, gradient(t, 5, 5)); err != nil {
+		t.Fatal(err)
+	}
+	ownTrack, err := s.SetTrackCover(ctx, own.ID, gradient(t, 4, 4))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sources := []int64{diff.Album.ID, same.Album.ID, bare.Album.ID, own.Album.ID}
+	album, err := s.MergeAlbums(ctx, target.Album.ID, sources, true)
+	if err != nil || album.TrackCount != 5 || album.Cover.Name != targetAlbum.Cover.Name {
+		t.Fatalf("merged = %+v, %v", album, err)
+	}
+	want := map[int64]*Cover{
+		target.ID: nil,             // shows the album cover
+		diff.ID:   diffAlbum.Cover, // keeps the cover of its old album
+		same.ID:   nil,             // its old album had the same cover
+		bare.ID:   nil,             // its old album had none
+		own.ID:    ownTrack.Cover,  // its own cover stays
+	}
+	for id, c := range want {
+		tr, err := s.Track(ctx, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if (tr.Cover == nil) != (c == nil) || c != nil && tr.Cover.Name != c.Name {
+			t.Errorf("track %d cover = %+v, want %+v", id, tr.Cover, c)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(s.dataDir, "covers", diffAlbum.Cover.Name)); err != nil {
+		t.Errorf("kept cover file: %v", err)
+	}
+}
+
+func TestMergeAlbumsWithoutCoverTakesTheFirstSourceCover(t *testing.T) {
+	for _, keep := range []bool{false, true} {
+		s := openTest(t)
+		ctx := context.Background()
+		bare := newAlbumTrack(t, s, "untagged.mp3", "甲")
+		src := newAlbumTrack(t, s, "tagged.mp3", "乙")
+		if _, err := s.db.Exec(`UPDATE albums SET cover = NULL WHERE id = ?`, bare.Album.ID); err != nil {
+			t.Fatal(err)
+		}
+		srcAlbum, err := s.SetAlbumCover(ctx, src.Album.ID, gradient(t, 2, 2))
+		if err != nil {
+			t.Fatal(err)
+		}
+		album, err := s.MergeAlbums(ctx, bare.Album.ID, []int64{src.Album.ID}, keep)
+		if err != nil || album.Cover == nil || album.Cover.Name != srcAlbum.Cover.Name {
+			t.Fatalf("keepCovers=%v: merged = %+v, %v", keep, album, err)
+		}
+		if tr, _ := s.Track(ctx, src.ID); tr.Cover != nil {
+			t.Errorf("keepCovers=%v: track cover = %+v, want the album's", keep, tr.Cover)
+		}
+	}
+}
+
+func TestMergeAlbumsUnifyingCoversDropsTheOthers(t *testing.T) {
+	s := openTest(t)
+	ctx := context.Background()
+	target := newAlbumTrack(t, s, "tagged.mp3", "甲")
+	src := newAlbumTrack(t, s, "tagged.flac", "乙")
+	if _, err := s.SetAlbumCover(ctx, target.Album.ID, gradient(t, 3, 3)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SetAlbumCover(ctx, src.Album.ID, gradient(t, 2, 2)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.MergeAlbums(ctx, target.Album.ID, []int64{src.Album.ID}, false); err != nil {
+		t.Fatal(err)
+	}
+	if tr, _ := s.Track(ctx, src.ID); tr.Cover != nil {
+		t.Errorf("track cover = %+v, want the album's", tr.Cover)
+	}
+	if n := coverFiles(t, s); n != 1 {
+		t.Errorf("cover files = %d, want 1", n)
 	}
 }
 

@@ -652,8 +652,12 @@ func (s *Store) UpdateAlbum(ctx context.Context, id int64, in AlbumInput) (Album
 }
 
 // MergeAlbums moves the tracks of the source albums into target and
-// deletes the sources. The target keeps its own cover and year when set.
-func (s *Store) MergeAlbums(ctx context.Context, target int64, sources []int64) (Album, error) {
+// deletes the sources. The target keeps its own cover and year when set,
+// taking them from the first source that has them otherwise. With
+// keepCovers, a moved track without a cover of its own takes the cover of
+// its old album when that differs from the target's, so albums of a
+// compilation keep their artwork; otherwise the other covers are dropped.
+func (s *Store) MergeAlbums(ctx context.Context, target int64, sources []int64, keepCovers bool) (Album, error) {
 	if err := checkMerge(target, sources); err != nil {
 		return Album{}, err
 	}
@@ -665,7 +669,7 @@ func (s *Store) MergeAlbums(ctx context.Context, target int64, sources []int64) 
 			return err
 		}
 		for _, src := range sources {
-			if err := mergeAlbumInto(ctx, tx, target, src); err != nil {
+			if err := mergeAlbumInto(ctx, tx, target, src, keepCovers); err != nil {
 				return err
 			}
 		}
@@ -682,15 +686,24 @@ func (s *Store) MergeAlbums(ctx context.Context, target int64, sources []int64) 
 	return a, err
 }
 
-func mergeAlbumInto(ctx context.Context, tx *sql.Tx, target, src int64) error {
-	if _, err := tx.ExecContext(ctx, `UPDATE tracks SET album_id = ? WHERE album_id = ?`, target, src); err != nil {
-		return err
-	}
+func mergeAlbumInto(ctx context.Context, tx *sql.Tx, target, src int64, keepCovers bool) error {
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE albums SET
 			cover = IFNULL(cover, (SELECT cover FROM albums WHERE id = ?)),
 			year = CASE WHEN year = 0 THEN (SELECT year FROM albums WHERE id = ?) ELSE year END
 		WHERE id = ?`, src, src, target); err != nil {
+		return err
+	}
+	if keepCovers {
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE tracks SET cover = (SELECT cover FROM albums WHERE id = ?1)
+			WHERE album_id = ?1 AND cover IS NULL
+				AND (SELECT cover FROM albums WHERE id = ?1) IS NOT (SELECT cover FROM albums WHERE id = ?2)`,
+			src, target); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE tracks SET album_id = ? WHERE album_id = ?`, target, src); err != nil {
 		return err
 	}
 	_, err := tx.ExecContext(ctx, `DELETE FROM albums WHERE id = ?`, src)
@@ -883,7 +896,7 @@ func rekeyAlbums(ctx context.Context, tx *sql.Tx, artist int64) error {
 			a.title, key, a.id).Scan(&into)
 		switch {
 		case err == nil:
-			err = mergeAlbumInto(ctx, tx, into, a.id)
+			err = mergeAlbumInto(ctx, tx, into, a.id, false)
 		case errors.Is(err, sql.ErrNoRows):
 			_, err = tx.ExecContext(ctx, `UPDATE albums SET artist_key = ? WHERE id = ?`, key, a.id)
 		}

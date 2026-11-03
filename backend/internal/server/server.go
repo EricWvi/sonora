@@ -348,6 +348,8 @@ func (s *server) deleteAlbum(w http.ResponseWriter, r *http.Request) {
 
 type mergeInput struct {
 	SourceIDs []int64 `json:"sourceIds"`
+	// KeepCovers applies to albums only, see store.MergeAlbums.
+	KeepCovers bool `json:"keepCovers"`
 }
 
 // mergeAlbums merges the albums in the body into the one in the path.
@@ -360,7 +362,7 @@ func (s *server) mergeAlbums(w http.ResponseWriter, r *http.Request) {
 	if !admin.Decode(w, r, &in) {
 		return
 	}
-	a, err := s.store.MergeAlbums(r.Context(), id, in.SourceIDs)
+	a, err := s.store.MergeAlbums(r.Context(), id, in.SourceIDs, in.KeepCovers)
 	respond(w, r, a, err)
 }
 
