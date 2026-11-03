@@ -282,7 +282,10 @@ const props = withDefaults(
     disableHeightTransition?: boolean;
     /** 是否可拖拽排序 */
     draggable?: boolean;
-    /** 按碟号分组（专辑详情）：多于一张碟、默认排序时显示碟号标题，序号按碟重新开始 */
+    /**
+     * 专辑详情：多于一张碟、默认排序时显示碟号标题，序号按碟重新开始；默认排序且每首歌都有
+     * 曲目序号时，序号显示曲目序号
+     */
     groupByDisc?: boolean;
   }>(),
   {
@@ -378,6 +381,15 @@ const discGrouped = computed(
     new Set(listData.value.map((song) => song.discNo)).size > 1,
 );
 
+// 序号显示曲目序号（Sonora，与 SPlayer 不同）：专辑中的歌可能不全，按位置编号会与曲目序号
+// 对不上；有歌没有曲目序号时仍按位置编号，免得号码重复或缺失
+const trackNumbered = computed(
+  () =>
+    !!props.groupByDisc &&
+    statusStore.listSortField === "default" &&
+    listData.value.every((song) => song.trackNo > 0),
+);
+
 // 虚拟列表数据（包含歌曲、碟号标题和 footer）
 const virtualListItems = computed<VirtualListItem[]>(() => {
   const items: VirtualListItem[] = [];
@@ -393,7 +405,8 @@ const virtualListItems = computed<VirtualListItem[]>(() => {
       type: "song" as const,
       data: song,
       key: song.id,
-      index: i - discStart,
+      // SongCard 显示 index + 1
+      index: trackNumbered.value ? song.trackNo - 1 : i - discStart,
     });
   });
   // 如果有加载更多，添加 footer
