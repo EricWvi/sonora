@@ -15,6 +15,11 @@ declare global {
     $loadingBar: LoadingBarApi;
     $modal: ModalApi;
   }
+
+  interface ImportMetaEnv {
+    // 构建时注入的版本号，见 Dockerfile 与 scripts/build.sh
+    readonly VITE_APP_VERSION?: string;
+  }
 }
 
 export {};

@@ -11,7 +11,8 @@ COPY admin/package.json admin/
 RUN pnpm install --frozen-lockfile
 COPY frontend/ frontend/
 COPY admin/ admin/
-RUN pnpm lint && pnpm lint:admin && pnpm build && pnpm build:admin
+ARG VERSION=dev
+RUN pnpm lint && pnpm lint:admin && VITE_APP_VERSION=$VERSION pnpm build && pnpm build:admin
 # Development fixtures must never reach a release build.
 RUN ! grep -rl -e "listener@sonora.test" -e "fixtures/baseline" -e "fixture:audio" frontend/dist admin/dist
 

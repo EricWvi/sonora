@@ -8,7 +8,7 @@
 
 ## 镜像
 
-推送 `v*` tag（例如 `v1.0.0`）后，GitHub Actions（[release.yml](../.github/workflows/release.yml)）按 [Dockerfile](../Dockerfile) 构建并推送 `ghcr.io/ericwvi/sonora:<版本>`；正式版同时更新 `latest`，预发布版（如 `1.1.0-rc.1`）不更新。也可以在 Actions 页面手动运行并填写版本号。只构建 `linux/amd64`。
+推送 `v*` tag（例如 `v1.0.0`）后，GitHub Actions（[release.yml](../.github/workflows/release.yml)）按 [Dockerfile](../Dockerfile) 构建并推送 `ghcr.io/ericwvi/sonora:<版本>`；正式版同时更新 `latest`，预发布版（如 `1.1.0-rc.1`）不更新。也可以在 Actions 页面手动运行并填写版本号。只构建 `linux/amd64`。版本号在构建时同时写入二进制（`GET /api/version`）与播放端（设置页左下角），两处都来自 tag，不读 `package.json`。
 
 构建步骤与 `scripts/build.sh` 相同，另加两项检查：两份前端的 ESLint，以及产物中不含开发 fixture。运行层是 `gcr.io/distroless/static-debian12:nonroot`（用户 65532）：
 

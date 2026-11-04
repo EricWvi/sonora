@@ -3,7 +3,8 @@
 #   pnpm install → lint and build both apps → copy dist → go test → go build
 #
 # Environment:
-#   VERSION, COMMIT   injected into the binary (default: from git)
+#   VERSION, COMMIT   injected into the binary, and VERSION into the player's
+#                     settings page (default: from git)
 #   OUT               output path (default: release/sonora)
 #   GOOS, GOARCH      honoured by go build for cross-compiling
 set -euo pipefail
@@ -15,7 +16,7 @@ OUT="${OUT:-release/sonora}"
 
 echo "==> web apps"
 pnpm install --frozen-lockfile
-pnpm build
+VITE_APP_VERSION="$VERSION" pnpm build
 pnpm build:admin
 
 echo "==> embed"
