@@ -1,6 +1,7 @@
 <!-- 艺术家详情。照搬 SPlayer views/Artist/layout.vue：圆形图片、名称、歌曲数与专辑数，
 “歌曲 / 专辑”标签页。图片是管理后台上传的艺术家图片，没有时为 SPlayer 的默认图片。
-不迁入别名、身份、简介、视频、关注与“更多”（批量操作、分享、源页面）。 -->
+不迁入别名、身份、视频、关注与“更多”（批量操作、分享、源页面）。
+简介（2026-11-04 起）照搬 SPlayer，内容由管理后台填写。 -->
 <template>
   <div :key="artistId" :class="['artist', { small: listScrolling }]">
     <Transition name="fade" mode="out-in">
@@ -62,6 +63,14 @@
                 <n-text>{{ artistDetailData.albumCount || 0 }}</n-text>
               </div>
             </n-flex>
+            <!-- 简介 -->
+            <n-text
+              v-if="artistDetailData.description"
+              class="description text-hidden"
+              @click="openDescModal(artistDetailData.description, '歌手简介')"
+            >
+              {{ artistDetailData.description }}
+            </n-text>
           </n-collapse-transition>
           <n-flex class="menu" justify="space-between">
             <n-flex class="left" align="flex-end">
@@ -143,6 +152,7 @@ import { renderToolbar } from "@/utils/meta";
 import { removeBrackets } from "@/utils/format";
 import { coverUrl, defaultCovers } from "@/utils/cover";
 import { useSettingStore } from "@/stores";
+import { openDescModal } from "@/utils/modal";
 import ListError from "@/components/List/ListError.vue";
 import ArtistSongs from "./songs.vue";
 

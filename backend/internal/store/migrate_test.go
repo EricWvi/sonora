@@ -108,6 +108,7 @@ func TestMigrationMarksOneTrackAlbumsSingle(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, q := range []string{
+		`INSERT INTO artists (id, name) VALUES (1, 'x')`,
 		`INSERT INTO albums (id, title) VALUES (1, 'one'), (2, 'two')`,
 		`INSERT INTO tracks (title, album_id, duration_ms, format, size, sha256, file, original_name) VALUES
 			('a', 1, 1, 'mp3', 1, 'h1', 'f1', 'a.mp3'),
@@ -132,6 +133,19 @@ func TestMigrationMarksOneTrackAlbumsSingle(t *testing.T) {
 		// migration 8 leaves existing albums without a description
 		if a.Description != "" {
 			t.Errorf("album %d description = %q", id, a.Description)
+		}
+	}
+	// migration 9 leaves existing artists without one too
+	artists, err := s.Artists(t.Context(), "", Window{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if artists.Total != 1 {
+		t.Errorf("artists = %d", artists.Total)
+	}
+	for _, a := range artists.Items {
+		if a.Description != "" {
+			t.Errorf("artist %d description = %q", a.ID, a.Description)
 		}
 	}
 }

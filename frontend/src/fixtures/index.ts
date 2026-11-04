@@ -55,6 +55,8 @@ function fictionalLibrary(): Library {
     id: i + 1,
     name,
     image: null,
+    // 第一位艺术家带简介，用来查看艺术家页的简介行与弹窗
+    description: i ? "" : "开发数据的歌手简介。\n第二行用来确认弹窗保留换行。",
     trackCount: 0,
     albumCount: 0,
   }));

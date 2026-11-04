@@ -377,7 +377,7 @@ func TestMergeAlbumsAndRenameConflicts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.RenameArtist(ctx, other.Artists[0].ID, "周杰伦"); !errors.Is(err, ErrConflict) {
+	if _, err := s.UpdateArtist(ctx, other.Artists[0].ID, ArtistInput{Name: "周杰伦"}); !errors.Is(err, ErrConflict) {
 		t.Fatalf("rename onto existing artist: %v", err)
 	}
 }
@@ -553,6 +553,35 @@ func TestAlbumDescription(t *testing.T) {
 	}
 	empty := " "
 	if got, _ = s.UpdateAlbum(ctx, a.ID, AlbumInput{Title: merged.Title, Artists: []string{"甲"}, Description: &empty}); got.Description != "" {
+		t.Fatalf("clear = %q", got.Description)
+	}
+}
+
+func TestArtistDescription(t *testing.T) {
+	s := openTest(t)
+	ctx := context.Background()
+	jia := newAlbumTrack(t, s, "tagged.mp3", "甲").Artists[0]
+	yi := newAlbumTrack(t, s, "tagged.flac", "乙").Artists[0]
+	desc := "  第一行\n第二行  "
+	got, err := s.UpdateArtist(ctx, yi.ID, ArtistInput{Name: "乙", Description: &desc})
+	if err != nil || got.Description != "第一行\n第二行" {
+		t.Fatalf("set = %q, %v", got.Description, err)
+	}
+	// renaming without a description keeps it
+	if got, err = s.UpdateArtist(ctx, yi.ID, ArtistInput{Name: "乙二"}); err != nil || got.Name != "乙二" || got.Description != "第一行\n第二行" {
+		t.Fatalf("keep = %+v, %v", got, err)
+	}
+	long := strings.Repeat("长", maxAlbumDescription+1)
+	if _, err := s.UpdateArtist(ctx, yi.ID, ArtistInput{Name: "乙二", Description: &long}); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("too long: %v", err)
+	}
+	// a merge target without a description takes the source's
+	merged, err := s.MergeArtists(ctx, jia.ID, []int64{yi.ID})
+	if err != nil || merged.Description != "第一行\n第二行" {
+		t.Fatalf("merge = %q, %v", merged.Description, err)
+	}
+	empty := ""
+	if got, _ = s.UpdateArtist(ctx, jia.ID, ArtistInput{Name: "甲", Description: &empty}); got.Description != "" {
 		t.Fatalf("clear = %q", got.Description)
 	}
 }

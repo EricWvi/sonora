@@ -90,7 +90,7 @@ func New(st *store.Store, authn *admin.Service, listeners *auth.Service, player,
 
 	private.HandleFunc("GET "+p+"artists", s.listArtists)
 	private.HandleFunc("GET "+p+"artists/{id}", s.getArtist)
-	private.HandleFunc("PUT "+p+"artists/{id}", s.renameArtist)
+	private.HandleFunc("PUT "+p+"artists/{id}", s.updateArtist)
 	private.HandleFunc("POST "+p+"artists/{id}/merge", s.mergeArtists)
 	private.HandleFunc("PUT "+p+"artists/{id}/image", s.setArtistImage)
 	private.HandleFunc("DELETE "+p+"artists/{id}/image", s.clearArtistImage)
@@ -404,18 +404,16 @@ func (s *server) getArtist(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, a, err)
 }
 
-func (s *server) renameArtist(w http.ResponseWriter, r *http.Request) {
+func (s *server) updateArtist(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r)
 	if !ok {
 		return
 	}
-	var in struct {
-		Name string `json:"name"`
-	}
+	var in store.ArtistInput
 	if !admin.Decode(w, r, &in) {
 		return
 	}
-	a, err := s.store.RenameArtist(r.Context(), id, in.Name)
+	a, err := s.store.UpdateArtist(r.Context(), id, in)
 	respond(w, r, a, err)
 }
 

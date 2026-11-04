@@ -260,6 +260,12 @@ var migrations = []migration{
 	execSQL(`
 	ALTER TABLE albums ADD COLUMN description TEXT NOT NULL DEFAULT '';
 	`),
+
+	// artists.description is the artist's blurb, written by the admin like
+	// an album's. The player's artist page shows it as SPlayer does.
+	execSQL(`
+	ALTER TABLE artists ADD COLUMN description TEXT NOT NULL DEFAULT '';
+	`),
 }
 
 func migrate(db *sql.DB) error {

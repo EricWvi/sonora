@@ -61,6 +61,8 @@ export type Artist = {
   name: string;
   /** 管理后台上传的艺术家图片。 */
   image: Cover | null;
+  /** 管理后台填写的简介，没有时为空字符串。 */
+  description: string;
   trackCount: number;
   albumCount: number;
 };

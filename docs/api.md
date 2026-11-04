@@ -55,8 +55,8 @@
 | `GET albums`、`GET/PUT/DELETE albums/{id}` | 列表（`q`、`artistId`、`sort`、`order`）/ 详情 / 修改 `{title, artists, year, single, description}` / 删除专辑及其全部歌曲。`single` 标记只含单曲的专辑（单曲自动建的专辑，或只是同名的几首单曲），省略时保持原值；新入库的专辑为 `false`。`description` 为专辑简介（2026-11-04 起），去掉首尾空白后最多 10000 个字符，省略时保持原值，空字符串清除 |
 | `POST albums/{id}/merge` | `{sourceIds, keepCovers}` 合并到路径中的专辑。目标没有封面或年份时，沿用第一个有封面或年份的来源专辑。`keepCovers` 默认 `false`，合并后只留目标的封面；为 `true` 时，来源专辑中没有单曲封面的歌曲以原专辑的封面作为单曲封面（与目标封面相同或原专辑没有封面时不设） |
 | `PUT/DELETE albums/{id}/cover` | 同单曲封面 |
-| `GET artists`、`GET/PUT artists/{id}` | 列表（`q`）/ 详情 / 重命名 `{name}` |
-| `POST artists/{id}/merge` | `{sourceIds}`；合并后艺术家组合相同的同名专辑一并合并；目标没有图片时沿用来源的图片 |
+| `GET artists`、`GET/PUT artists/{id}` | 列表（`q`）/ 详情 / 修改 `{name, description}`。`description` 为歌手简介（2026-11-04 起），去掉首尾空白后最多 10000 个字符，省略时保持原值，空字符串清除 |
+| `POST artists/{id}/merge` | `{sourceIds}`；合并后艺术家组合相同的同名专辑一并合并；目标没有图片或简介时沿用来源的 |
 | `PUT/DELETE artists/{id}/image` | 艺术家图片，请求体为图片原始字节，存储与缩略图同封面 |
 | `GET covers/{name}` | 封面或艺术家图片的原图，按内容哈希命名，可长期缓存。`?size=` 取 `96`、`100`、`300` 或 `1024`，返回长边不超过该值的 JPEG 缩略图，首次请求时生成；原图已不大于该尺寸或无法解码时返回原图；其他尺寸 400 |
 
@@ -101,7 +101,7 @@
 
 - 歌曲 `{id, title, artists, album, trackNo, discNo, year, durationMs, format, cover, hasLyrics}`。`album` 为 `{id, title, artists}` 或 `null`；`cover` 是歌曲实际显示的封面，单曲封面优先，否则为专辑封面，都没有时为 `null`。
 - 专辑 `{id, title, artists, year, cover, description, trackCount, durationMs}`。`description` 为管理后台填写的简介，没有时为空字符串。
-- 艺术家 `{id, name, image, trackCount, albumCount}`，`image` 是管理后台上传的图片，没有时为 `null`。
+- 艺术家 `{id, name, image, description, trackCount, albumCount}`，`image` 是管理后台上传的图片，没有时为 `null`；`description` 为管理后台填写的简介，没有时为空字符串。
 - `artists` 与 `cover` 的形态和管理 API 一致：`[{id, name}]` 与 `{name, thumbhash}`。
 
 ## 播放端用户数据

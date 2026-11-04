@@ -90,12 +90,14 @@ type Album struct {
 // Artist is a performer, of tracks or as an album artist. Image is
 // uploaded by the admin and stored like a cover.
 type Artist struct {
-	ID         int64  `json:"id"`
-	Name       string `json:"name"`
-	Image      *Cover `json:"image"`
-	TrackCount int    `json:"trackCount"`
-	AlbumCount int    `json:"albumCount"`
-	CreatedAt  string `json:"createdAt"`
+	ID    int64  `json:"id"`
+	Name  string `json:"name"`
+	Image *Cover `json:"image"`
+	// Description is written by the admin; empty when there is none.
+	Description string `json:"description"`
+	TrackCount  int    `json:"trackCount"`
+	AlbumCount  int    `json:"albumCount"`
+	CreatedAt   string `json:"createdAt"`
 }
 
 // Page is one slice of a list and the size of the whole list.
@@ -115,8 +117,8 @@ const (
 	maxLimit     = 500
 	maxNameLen   = 300
 	maxArtists   = 50
-	// Album blurbs copied from a store page can run to a few thousand
-	// characters, far more than a playlist's.
+	// Album and artist blurbs copied from a store page can run to a few
+	// thousand characters, far more than a playlist's.
 	maxAlbumDescription = 10000
 )
 
@@ -625,14 +627,10 @@ func (s *Store) UpdateAlbum(ctx context.Context, id int64, in AlbumInput) (Album
 	case in.Year < 0 || in.Year > 9999:
 		return Album{}, invalid("年份超出范围")
 	}
-	if in.Description != nil {
-		d := strings.TrimSpace(*in.Description)
-		if utf8.RuneCountInString(d) > maxAlbumDescription {
-			return Album{}, invalid(fmt.Sprintf("简介不能超过 %d 个字符", maxAlbumDescription))
-		}
-		in.Description = &d
-	}
 	var err error
+	if in.Description, err = normalizeDescription(in.Description); err != nil {
+		return Album{}, err
+	}
 	if in.Artists, err = normalizeNames(in.Artists); err != nil {
 		return Album{}, err
 	}
@@ -743,7 +741,7 @@ func mergeAlbumInto(ctx context.Context, tx *sql.Tx, target, src int64, keepCove
 // --- artists ---------------------------------------------------------------
 
 var artistSelect = `
-	SELECT a.id, a.name, a.image, ` + placeholderOf("a.image") + `, a.created_at,
+	SELECT a.id, a.name, a.image, ` + placeholderOf("a.image") + `, a.description, a.created_at,
 		(SELECT COUNT(*) FROM track_artists WHERE artist_id = a.id),
 		(SELECT COUNT(*) FROM album_artists WHERE artist_id = a.id)
 	FROM artists a`
@@ -751,7 +749,7 @@ var artistSelect = `
 func scanArtist(row scanner) (Artist, error) {
 	var a Artist
 	var image, imageHash sql.NullString
-	err := row.Scan(&a.ID, &a.Name, &image, &imageHash, &a.CreatedAt, &a.TrackCount, &a.AlbumCount)
+	err := row.Scan(&a.ID, &a.Name, &image, &imageHash, &a.Description, &a.CreatedAt, &a.TrackCount, &a.AlbumCount)
 	a.Image = coverOf(image, imageHash)
 	return a, err
 }
@@ -802,18 +800,42 @@ func (s *Store) artist(ctx context.Context, q querier, id int64) (Artist, error)
 	return a, err
 }
 
-// RenameArtist renames an artist. Taking another artist's name is a
-// conflict: merge them instead.
-func (s *Store) RenameArtist(ctx context.Context, id int64, name string) (Artist, error) {
-	name = strings.TrimSpace(name)
+// normalizeDescription trims an album's or artist's blurb and checks its
+// length; nil stays nil, keeping the current one.
+func normalizeDescription(d *string) (*string, error) {
+	if d == nil {
+		return nil, nil
+	}
+	t := strings.TrimSpace(*d)
+	if utf8.RuneCountInString(t) > maxAlbumDescription {
+		return nil, invalid(fmt.Sprintf("简介不能超过 %d 个字符", maxAlbumDescription))
+	}
+	return &t, nil
+}
+
+// ArtistInput is the editable metadata of an artist. Description is
+// trimmed; nil keeps the current one.
+type ArtistInput struct {
+	Name        string  `json:"name"`
+	Description *string `json:"description"`
+}
+
+// UpdateArtist renames an artist and sets their description. Taking
+// another artist's name is a conflict: merge them instead.
+func (s *Store) UpdateArtist(ctx context.Context, id int64, in ArtistInput) (Artist, error) {
+	name := strings.TrimSpace(in.Name)
 	switch {
 	case name == "":
 		return Artist{}, invalid("艺术家名不能为空")
 	case utf8.RuneCountInString(name) > maxNameLen:
 		return Artist{}, invalid(fmt.Sprintf("名称不能超过 %d 个字符", maxNameLen))
 	}
+	desc, err := normalizeDescription(in.Description)
+	if err != nil {
+		return Artist{}, err
+	}
 	var a Artist
-	err := s.inTx(ctx, func(tx *sql.Tx) error {
+	err = s.inTx(ctx, func(tx *sql.Tx) error {
 		var other int64
 		err := tx.QueryRowContext(ctx, `SELECT id FROM artists WHERE name = ? AND id <> ?`, name, id).Scan(&other)
 		if err == nil {
@@ -822,7 +844,8 @@ func (s *Store) RenameArtist(ctx context.Context, id int64, name string) (Artist
 		if !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
-		res, err := tx.ExecContext(ctx, `UPDATE artists SET name = ? WHERE id = ?`, name, id)
+		res, err := tx.ExecContext(ctx,
+			`UPDATE artists SET name = ?, description = IFNULL(?, description) WHERE id = ?`, name, desc, id)
 		if err != nil {
 			return err
 		}
@@ -836,8 +859,10 @@ func (s *Store) RenameArtist(ctx context.Context, id int64, name string) (Artist
 }
 
 // MergeArtists moves the tracks and albums of the source artists to target
-// and deletes the sources. The target keeps its own image when set. An album whose artists then match another
-// album of the same title is merged into it.
+// and deletes the sources. The target keeps its own image and
+// description when set, taking them from the first source that has them
+// otherwise. An album whose artists then match another album of the same
+// title is merged into it.
 func (s *Store) MergeArtists(ctx context.Context, target int64, sources []int64) (Artist, error) {
 	if err := checkMerge(target, sources); err != nil {
 		return Artist{}, err
@@ -860,8 +885,9 @@ func (s *Store) MergeArtists(ctx context.Context, target int64, sources []int64)
 					return err
 				}
 			}
-			if _, err := tx.ExecContext(ctx, `UPDATE artists SET image = IFNULL(image, (SELECT image FROM artists WHERE id = ?))
-				WHERE id = ?`, src, target); err != nil {
+			if _, err := tx.ExecContext(ctx, `UPDATE artists SET image = IFNULL(image, (SELECT image FROM artists WHERE id = ?1)),
+				description = CASE WHEN description = '' THEN (SELECT description FROM artists WHERE id = ?1) ELSE description END
+				WHERE id = ?2`, src, target); err != nil {
 				return err
 			}
 			if _, err := tx.ExecContext(ctx, `DELETE FROM artists WHERE id = ?`, src); err != nil {

@@ -157,6 +157,8 @@ export interface Artist {
   id: number;
   name: string;
   image: Cover | null;
+  // Written by the admin; the player's artist page shows it.
+  description: string;
   trackCount: number;
   albumCount: number;
   createdAt: string;

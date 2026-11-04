@@ -85,22 +85,24 @@ function clearSelection() {
 const showEdit = ref(false);
 const editing = ref<Artist | null>(null);
 const name = ref("");
+const description = ref("");
 const saving = ref(false);
 
 function edit(a: Artist) {
   editing.value = a;
   name.value = a.name;
+  description.value = a.description;
   showEdit.value = true;
 }
 
-async function rename() {
+async function save() {
   if (!editing.value) return;
   saving.value = true;
   try {
     editing.value = await request<Artist>(
       "PUT",
       `/artists/${editing.value.id}`,
-      { name: name.value },
+      { name: name.value, description: description.value },
     );
     message.success("已保存");
     load();
@@ -239,9 +241,18 @@ const pagination = computed(() => ({
     @after-leave="editing = null"
   >
     <template v-if="editing">
-      <n-form @submit.prevent="rename">
+      <n-form @submit.prevent="save">
         <n-form-item label="名称">
           <n-input v-model:value="name" autofocus />
+        </n-form-item>
+        <n-form-item label="简介">
+          <n-input
+            v-model:value="description"
+            type="textarea"
+            :autosize="{ minRows: 3, maxRows: 10 }"
+            :maxlength="10000"
+            show-count
+          />
         </n-form-item>
         <n-button type="primary" attr-type="submit" :loading="saving"
           >保存</n-button
