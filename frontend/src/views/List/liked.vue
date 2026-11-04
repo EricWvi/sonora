@@ -1,6 +1,6 @@
 <!-- 我喜欢的音乐。照搬 SPlayer views/List/liked.vue：头部为 ListDetail，封面为 SPlayer 的
 默认封面，信息只有歌曲数（阶段 2 的“详情页头部”）；歌曲一次载入全部，默认最近喜欢的在前。
-不迁入歌单编辑、拖动排序、评论、批量操作与分享。 -->
+不迁入歌单编辑、拖动排序、评论与分享。“更多”只有批量操作（阶段 7），其中“取消喜欢”是 Sonora 新增。 -->
 <template>
   <div class="liked-list">
     <ListDetail
@@ -12,6 +12,7 @@
       :search-value="searchValue"
       :config="listConfig"
       :play-button-text="playButtonText"
+      :more-options="moreOptions"
       title-text="我喜欢的音乐"
       @update:search-value="handleSearchUpdate"
       @play-all="playAllSongs"
@@ -51,6 +52,9 @@ import { useListDetail } from "@/composables/List/useListDetail";
 import { useListSearch } from "@/composables/List/useListSearch";
 import { useListScroll } from "@/composables/List/useListScroll";
 import { useListActions } from "@/composables/List/useListActions";
+import type { DropdownOption } from "naive-ui";
+import { renderIcon } from "@/utils/helper";
+import { openBatchList } from "@/utils/modal";
 import ListDetail from "@/components/List/ListDetail.vue";
 import ListError from "@/components/List/ListError.vue";
 import SongList from "@/components/List/SongList.vue";
@@ -100,6 +104,29 @@ const playButtonText = computed(() => {
   }
   return "播放";
 });
+
+// 更多操作
+const moreOptions = computed<DropdownOption[]>(() => [
+  {
+    label: "批量操作",
+    key: "batch",
+    props: {
+      onClick: () =>
+        openBatchList(displayData.value, {
+          liked: true,
+          onRemoved: removeSongs,
+        }),
+    },
+    icon: renderIcon("Batch"),
+  },
+]);
+
+// 取消喜欢后从列表移除，并更新头部的数量
+const removeSongs = (ids: number[]) => {
+  setListData(listData.value.filter((song) => !ids.includes(song.id)));
+  if (detailData.value)
+    setDetailData({ ...detailData.value, count: listData.value.length });
+};
 
 // 获取喜欢的歌曲（按当前排序）
 const getLikedSongs = async () => {

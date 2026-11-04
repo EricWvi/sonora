@@ -12,11 +12,25 @@
     :collapsed-icon-size="22"
     :options="options"
     :render-label="renderLabel"
+    :node-props="nodeProps"
     @update:value="select"
+  />
+  <!-- 歌单项右键菜单（Sonora 新增，SPlayer 的侧边栏没有右键菜单） -->
+  <n-dropdown
+    :x="playlistMenu.x"
+    :y="playlistMenu.y"
+    :show="playlistMenu.show"
+    :options="playlistMenuOptions"
+    placement="bottom-start"
+    trigger="manual"
+    @select="playlistMenu.show = false"
+    @clickoutside="playlistMenu.show = false"
   />
 </template>
 
 <script setup lang="ts">
+import type { DropdownOption } from "naive-ui";
+import type { Playlist } from "@/api/types";
 import {
   NAvatar,
   NButton,
@@ -24,13 +38,19 @@ import {
   NText,
   type MenuInst,
   type MenuOption,
+  type MenuProps,
 } from "naive-ui";
 import { RouterLink } from "vue-router";
 import { source } from "@/api/source";
 import SvgIcon from "@/components/Global/SvgIcon.vue";
 import { useSettingStore } from "@/stores/setting";
 import { useUserStore } from "@/stores/user";
-import { openCreatePlaylist } from "@/utils/modal";
+import { openCreatePlaylist, openUpdatePlaylist } from "@/utils/modal";
+import { copyData, renderIcon as renderMenuIcon } from "@/utils/helper";
+import { deletePlaylist } from "@/utils/auth";
+import { fetchAll } from "@/api/pages";
+import { useMusicStore, useStatusStore } from "@/stores";
+import { usePlayerController } from "@/core/player/PlayerController";
 
 const props = defineProps<{ collapsed: boolean }>();
 const emit = defineEmits<{ "menu-click": [key: string | number] }>();
@@ -121,6 +141,113 @@ const options = computed<MenuOption[]>(() => [
     })),
   },
 ]);
+
+// 歌单项右键菜单：条目与专辑、歌单卡片的 CoverMenu 一致（查看详情、播放或暂停、复制名称与 ID），
+// 另加编辑歌单、删除歌单，复用歌单详情页的弹窗与确认（Eric 确认，2026-11-04）
+const musicStore = useMusicStore();
+const statusStore = useStatusStore();
+const player = usePlayerController();
+const playlistMenu = reactive({ x: 0, y: 0, show: false });
+const playlistMenuOptions = ref<DropdownOption[]>([]);
+
+const playPlaylist = async (playlist: Playlist) => {
+  const pid = `playlist-${playlist.id}`;
+  if (musicStore.playPlaylistId === pid) return player.playOrPause();
+  try {
+    const list = await fetchAll((offset, limit) =>
+      source.playlistTracks(playlist.id, { offset, limit }),
+    );
+    if (!list.length) return window.$message.warning("歌单中没有歌曲");
+    await player.updatePlayList(list, undefined, pid);
+  } catch (error) {
+    console.error("播放歌单失败：", error);
+    window.$message.error("播放歌单失败，请重试");
+  }
+};
+
+const openPlaylistMenu = (e: MouseEvent, playlist: Playlist) => {
+  e.preventDefault();
+  playlistMenu.show = false;
+  const playing =
+    musicStore.playPlaylistId === `playlist-${playlist.id}` &&
+    statusStore.playStatus;
+  nextTick().then(() => {
+    playlistMenuOptions.value = [
+      {
+        key: "open",
+        label: "查看详情",
+        props: { onClick: () => select(playlist.id) },
+        icon: renderMenuIcon("Eye"),
+      },
+      {
+        key: playing ? "pause" : "play",
+        label: playing ? "暂停" : "播放",
+        props: { onClick: () => playPlaylist(playlist) },
+        icon: renderMenuIcon(playing ? "Pause" : "Play"),
+      },
+      { key: "line", type: "divider" },
+      {
+        key: "edit",
+        label: "编辑歌单",
+        props: {
+          onClick: () =>
+            openUpdatePlaylist(
+              playlist.id,
+              { name: playlist.name, description: playlist.description },
+              async () => {},
+            ),
+        },
+        icon: renderMenuIcon("EditNote"),
+      },
+      {
+        key: "delete",
+        label: "删除歌单",
+        props: {
+          onClick: () =>
+            deletePlaylist(playlist.id, () => {
+              // 正在查看这个歌单时回到首页
+              if (
+                route.name === "playlist" &&
+                Number(route.query.id) === playlist.id
+              )
+                void router.push({ name: "home" });
+            }),
+        },
+        icon: renderMenuIcon("Delete"),
+      },
+      { key: "line-two", type: "divider" },
+      {
+        key: "code-name",
+        label: "复制歌单名称",
+        props: { onClick: () => copyData(playlist.name) },
+        icon: renderMenuIcon("Copy", { size: 18 }),
+      },
+      {
+        key: "code-id",
+        label: "复制歌单 ID",
+        props: { onClick: () => copyData(playlist.id) },
+        icon: renderMenuIcon("Copy", { size: 18 }),
+      },
+    ];
+    playlistMenu.x = e.clientX;
+    playlistMenu.y = e.clientY;
+    playlistMenu.show = true;
+  });
+};
+
+// 菜单项的 props 只作用于分隔线，事件要经 node-props 绑定到歌单项
+const nodeProps = (option: MenuOption) => {
+  const playlist =
+    typeof option.key === "number"
+      ? userStore.playlists.find((item) => item.id === option.key)
+      : undefined;
+  // MenuNodeProps 的类型只允许字符串与数字属性，事件处理函数在运行时照常绑定
+  return (
+    playlist
+      ? { onContextmenu: (e: MouseEvent) => openPlaylistMenu(e, playlist) }
+      : {}
+  ) as ReturnType<NonNullable<MenuProps["nodeProps"]>>;
+};
 
 const renderLabel = (option: MenuOption) => {
   if ("link" in option)

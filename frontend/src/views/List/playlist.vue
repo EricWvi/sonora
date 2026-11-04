@@ -1,6 +1,6 @@
 <!-- 歌单详情。照搬 SPlayer views/List/playlist.vue（用户自己的歌单）：头部为 ListDetail，
 歌曲一次载入全部；“编辑歌单”与“更多 → 删除歌单”沿用 SPlayer，弹窗与写入在阶段 5 接入。
-默认排序且未搜索时可拖动排序。不迁入收藏、评论、隐私、缓存、批量操作与分享。 -->
+默认排序且未搜索时可拖动排序。不迁入收藏、评论、隐私、缓存与分享。“更多 → 批量操作”在阶段 7 加入。 -->
 <template>
   <div class="playlist-list">
     <ListDetail
@@ -69,10 +69,10 @@ import type { DropdownOption } from "naive-ui";
 import { source } from "@/api/source";
 import { useLoadError } from "@/composables/List/useLoadError";
 import { fetchAll } from "@/api/pages";
-import { useStatusStore } from "@/stores";
+import { useStatusStore, useUserStore } from "@/stores";
 import { renderIcon } from "@/utils/helper";
 import { listSortQuery } from "@/utils/meta";
-import { openUpdatePlaylist } from "@/utils/modal";
+import { openBatchList, openUpdatePlaylist } from "@/utils/modal";
 import { deletePlaylist, savePlaylistOrder } from "@/utils/auth";
 import { useListDetail } from "@/composables/List/useListDetail";
 import { useListSearch } from "@/composables/List/useListSearch";
@@ -85,6 +85,7 @@ import SongList from "@/components/List/SongList.vue";
 
 const router = useRouter();
 const statusStore = useStatusStore();
+const userStore = useUserStore();
 
 // 是否激活
 const isActivated = ref<boolean>(false);
@@ -154,6 +155,18 @@ const moreOptions = computed<DropdownOption[]>(() => [
       onClick: toDeletePlaylist,
     },
     icon: renderIcon("Delete"),
+  },
+  {
+    label: "批量操作",
+    key: "batch",
+    props: {
+      onClick: () =>
+        openBatchList(displayData.value, {
+          playlistId: playlistId.value,
+          onRemoved: removeSong,
+        }),
+    },
+    icon: renderIcon("Batch"),
   },
 ]);
 
@@ -270,6 +283,26 @@ const handleReorder = async (fromIndex: number, toIndex: number) => {
   );
   if (!saved && playlistId.value === id) getPlaylistDetail(id);
 };
+
+// 别处（如侧边栏右键菜单）编辑了这个歌单：按刷新后的歌单列表更新头部，不重新读取歌曲
+watch(
+  () => userStore.playlists.find((item) => item.id === playlistId.value),
+  (playlist) => {
+    const detail = detailData.value;
+    if (!playlist || detail?.id !== playlist.id) return;
+    if (
+      detail.name === playlist.name &&
+      detail.description === playlist.description
+    )
+      return;
+    setDetailData({
+      ...detail,
+      name: playlist.name,
+      description: playlist.description,
+      updateTime: playlist.updatedAt,
+    });
+  },
+);
 
 onBeforeRouteUpdate((to) => {
   if (to.name !== "playlist") return;

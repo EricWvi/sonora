@@ -1,10 +1,11 @@
 <!-- 专辑、歌单封面网格。照搬 SPlayer components/List/CoverList.vue，数据是播放端 API 的
-Album 与 Playlist；不迁入视频、电台、播放量与卡片右键菜单。专辑卡片在名称下显示艺术家
+Album 与 Playlist；不迁入视频、电台与播放量。专辑、歌单卡片的右键菜单为 CoverMenu（阶段 7）。专辑卡片在名称下显示艺术家
 （沿用 SPlayer 视频卡片的艺术家样式），再显示“N首 · 年份”。
 与 SPlayer 不同（阶段 6）：网格是虚拟的，只渲染视口附近的行；分页列表滚动到底时自动载入
 下一页，不用“加载更多”按钮。
 与 SPlayer 不同（首页“最近添加的歌曲”）：增加歌曲卡片。歌曲没有详情页，点卡片与播放按钮
-都是播放这首，名称下的第三行换成专辑名，点击进入专辑。 -->
+都是播放这首，名称下的第三行换成专辑名，点击进入专辑；右键菜单用歌曲列表的 SongListMenu
+（阶段 7），补上收藏、加入歌单、下一首播放等操作。 -->
 <template>
   <Transition name="fade" mode="out-in">
     <div v-if="data.length > 0" :class="['cover-list', type]">
@@ -25,6 +26,7 @@ Album 与 Playlist；不迁入视频、电台、播放量与卡片右键菜单�
             :key="item.id"
             :class="['cover-item', { 'no-cover': hiddenCover }]"
             @click="openItem(item)"
+            @contextmenu="openMenu($event, item)"
           >
             <!-- 封面 -->
             <div v-if="!hiddenCover" class="cover">
@@ -138,6 +140,9 @@ Album 与 Playlist；不迁入视频、电台、播放量与卡片右键菜单�
       size="large"
     />
   </Transition>
+  <!-- 右键菜单 -->
+  <CoverMenu v-if="type !== 'song'" ref="coverMenuRef" @to-play="playList" />
+  <SongListMenu v-else ref="songMenuRef" />
 </template>
 
 <script setup lang="ts">
@@ -151,6 +156,8 @@ import { coverUrl, defaultCovers } from "@/utils/cover";
 import { openJumpArtist } from "@/utils/modal";
 import { usePlayerController } from "@/core/player/PlayerController";
 import { useVirtualGrid } from "@/composables/List/useVirtualGrid";
+import CoverMenu from "@/components/Menu/CoverMenu.vue";
+import SongListMenu from "@/components/Menu/SongListMenu.vue";
 
 const props = defineProps<{
   data: (Album | Playlist | Track)[];
@@ -219,6 +226,18 @@ const isTrack = (item: Album | Playlist | Track): item is Track =>
 const openItem = (item: Album | Playlist | Track) => {
   if (isTrack(item)) playList(item);
   else router.push({ name: props.type, query: { id: item.id } });
+};
+
+// 右键菜单
+const coverMenuRef = ref<InstanceType<typeof CoverMenu> | null>(null);
+const songMenuRef = ref<InstanceType<typeof SongListMenu> | null>(null);
+const openMenu = (e: MouseEvent, item: Album | Playlist | Track) => {
+  if (isTrack(item)) {
+    const list = props.data as Track[];
+    songMenuRef.value?.openDropdown(e, list, item, list.indexOf(item));
+  } else if (props.type !== "song") {
+    coverMenuRef.value?.openDropdown(e, item, props.type);
+  }
 };
 
 // 歌曲所属的专辑

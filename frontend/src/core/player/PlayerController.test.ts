@@ -361,6 +361,14 @@ describe("队列编辑", () => {
     expect(player.playbackState).toBe("playing");
   });
 
+  it("批量下一首播放按给定顺序插到当前曲目之后", async () => {
+    const player = await playing([track(1), track(2), track(3)], 1);
+    player.addNextSongs([track(7), track(8), track(9)]);
+    expect(ids()).toEqual([1, 2, 7, 8, 9, 3]);
+    expect(useStatusStore().playIndex).toBe(1);
+    expect(player.playbackState).toBe("playing");
+  });
+
   it("移除最后一首（不是当前曲目）时当前曲目不变", async () => {
     const player = await playing([track(1), track(2), track(3)], 1);
     player.removeSongIndex(2);

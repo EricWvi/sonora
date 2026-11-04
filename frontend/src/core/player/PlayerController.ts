@@ -969,6 +969,27 @@ export class PlayerController {
   }
 
   /**
+   * 批量下一首播放（Sonora 新增，用于批量操作）：按给定顺序插到当前曲目之后，
+   * 当前播放不变
+   * @param songs 歌曲
+   */
+  public addNextSongs(songs: Track[]) {
+    if (!songs.length) return;
+    const dataStore = useDataStore();
+    const current = this.currentEntry();
+    let list: QueueEntry[] = [...dataStore.playList];
+    let original: QueueEntry[] = [...dataStore.originalPlayList];
+    // 倒序逐个插到当前曲目之后，结果保持给定顺序
+    for (const entry of songs.map(newEntry).reverse()) {
+      list = insertAfter(list, current, entry).list;
+      if (original.length)
+        original = insertAfter(original, current, entry).list;
+    }
+    this.setLists(list, original);
+    this.deps.message.success(`已添加 ${songs.length} 首至下一首播放`);
+  }
+
+  /**
    * 切换播放索引
    * @param index 播放索引
    * @param play 是否立即播放

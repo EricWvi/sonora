@@ -126,6 +126,40 @@ export const openPlaylistAdd = async (data: Track[]) => {
   });
 };
 
+/**
+ * 开启批量操作（照搬 SPlayer 的 openBatchList；参数按 Sonora 的操作调整，见 BatchList.vue）
+ * @param data 歌曲列表
+ * @param options.playlistId 用户歌单 ID，提供“删除选中的歌曲”
+ * @param options.liked 我喜欢的音乐，提供“取消喜欢”
+ * @param options.onRemoved 歌曲从当前列表移除后调用
+ */
+export const openBatchList = async (
+  data: Track[],
+  options: {
+    playlistId?: number;
+    liked?: boolean;
+    onRemoved?: (ids: number[]) => void;
+  } = {},
+) => {
+  if (!data.length) return window.$message.warning("列表中没有歌曲");
+  const { default: BatchList } =
+    await import("@/components/Modal/BatchList.vue");
+  window.$modal.create({
+    preset: "card",
+    transformOrigin: "center",
+    autoFocus: false,
+    style: { maxWidth: "70vw" },
+    title: "批量操作",
+    content: () =>
+      h(BatchList, {
+        data,
+        playlistId: options.playlistId,
+        liked: options.liked,
+        onRemoved: options.onRemoved,
+      }),
+  });
+};
+
 // 新建歌单
 export const openCreatePlaylist = async () => {
   const { default: CreatePlaylist } =

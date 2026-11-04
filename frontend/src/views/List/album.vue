@@ -1,5 +1,5 @@
 <!-- 专辑详情。照搬 SPlayer views/List/album.vue：头部为 ListDetail，歌曲一次载入全部。
-不迁入收藏专辑、评论、缓存、批量操作与分享；“更多”只有添加到歌单（阶段 2 的“详情页头部”）。 -->
+不迁入收藏专辑、评论、缓存与分享；“更多”有添加到歌单（阶段 2 的“详情页头部”）与批量操作（阶段 7）。 -->
 <template>
   <div class="album-list">
     <ListDetail
@@ -54,7 +54,7 @@ import { fetchAll } from "@/api/pages";
 import { useStatusStore } from "@/stores";
 import { renderIcon } from "@/utils/helper";
 import { listSortQuery } from "@/utils/meta";
-import { openPlaylistAdd } from "@/utils/modal";
+import { openBatchList, openPlaylistAdd } from "@/utils/modal";
 import { useListDetail } from "@/composables/List/useListDetail";
 import { useListSearch } from "@/composables/List/useListSearch";
 import { useListScroll } from "@/composables/List/useListScroll";
@@ -129,6 +129,14 @@ const moreOptions = computed<DropdownOption[]>(() => [
       onClick: () => openPlaylistAdd(displayData.value),
     },
     icon: renderIcon("AddList"),
+  },
+  {
+    label: "批量操作",
+    key: "batch",
+    props: {
+      onClick: () => openBatchList(displayData.value),
+    },
+    icon: renderIcon("Batch"),
   },
 ]);
 
