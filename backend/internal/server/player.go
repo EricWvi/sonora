@@ -359,7 +359,7 @@ type trackIDsInput struct {
 	TrackIDs []int64 `json:"trackIds"`
 }
 
-// addToPlaylist appends {"trackIds": [...]} and answers
+// addToPlaylist puts {"trackIds": [...]} at the head and answers
 // {"added": n, "playlist": {...}}; tracks already in it are skipped.
 func (s *server) addToPlaylist(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r)

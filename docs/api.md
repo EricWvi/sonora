@@ -122,7 +122,7 @@
 | `POST playlists` | `{name, description}` 新建，201。名称 1–100 个字符，简介最多 1000 个字符 |
 | `GET/PUT/DELETE playlists/{id}` | 详情 / 修改 `{name, description}` / 删除 |
 | `GET playlists/{id}/tracks` | 歌单中的歌曲，默认按歌单顺序，分页，可排序 |
-| `POST playlists/{id}/tracks` | `{trackIds}` 按给定顺序追加到末尾，已在歌单中的跳过；返回 `{added, playlist}`。任一歌曲不存在时整体失败（404）；每个歌单最多 10000 首 |
+| `POST playlists/{id}/tracks` | `{trackIds}` 按给定顺序插到歌单开头（2026-11-04 起，原为追加到末尾），已在歌单中的跳过；返回 `{added, playlist}`。任一歌曲不存在时整体失败（404）；每个歌单最多 10000 首 |
 | `DELETE playlists/{id}/tracks/{trackId}` | 移出歌单，返回歌单 |
 | `PUT playlists/{id}/order` | `{trackIds}` 为歌单的全部歌曲的新顺序。与服务端现有歌曲不一致时返回 409 `conflict`，说明客户端的副本已过期，应刷新后重试 |
 

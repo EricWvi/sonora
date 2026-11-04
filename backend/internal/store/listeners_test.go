@@ -162,7 +162,8 @@ func TestPlaylists(t *testing.T) {
 		t.Fatalf("add missing track: %v", err)
 	}
 	page, _ := s.PlaylistTracks(ctx, alice, p.ID, Sort{}, Window{})
-	if !slices.Equal(trackIDs(page.Items), []int64{tracks[1], tracks[0], tracks[2]}) {
+	// New tracks go to the head, in the order given.
+	if !slices.Equal(trackIDs(page.Items), []int64{tracks[2], tracks[1], tracks[0]}) {
 		t.Fatalf("order = %v", trackIDs(page.Items))
 	}
 

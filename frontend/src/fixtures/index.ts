@@ -573,7 +573,7 @@ function librarySource(lib: Library): DataSource {
         const fresh = [...new Set(trackIds)].filter(
           (t) => !found.trackIds.includes(t),
         );
-        found.trackIds.push(...fresh);
+        found.trackIds.unshift(...fresh);
         return { added: fresh.length, playlist: touch(found) };
       }),
     removeFromPlaylist: (id, trackId) =>

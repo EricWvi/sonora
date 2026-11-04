@@ -374,44 +374,59 @@ func touchPlaylist(ctx context.Context, tx *sql.Tx, id int64) error {
 	return err
 }
 
-// AddToPlaylist appends tracks to the end of a playlist in the given
+// AddToPlaylist puts tracks at the head of a playlist in the given
 // order, skipping those already in it. It reports how many were added.
 // A missing track fails the whole request.
+//
+// Until 2026-11-04 tracks were appended; Eric asked for the newest
+// first. They take positions below the current minimum (possibly
+// negative), so the tracks already there keep theirs.
 func (s *Store) AddToPlaylist(ctx context.Context, userID, id int64, trackIDs []int64) (int, Playlist, error) {
 	if len(trackIDs) == 0 {
 		return 0, Playlist{}, invalid("请选择要添加的歌曲")
 	}
-	var added int
+	var fresh []int64
 	var p Playlist
 	err := s.inTx(ctx, func(tx *sql.Tx) error {
 		if err := ownPlaylist(ctx, tx, userID, id); err != nil {
 			return err
 		}
-		var count, next int
+		var count, first int
 		if err := tx.QueryRowContext(ctx,
-			`SELECT COUNT(*), IFNULL(MAX(position) + 1, 0) FROM playlist_tracks WHERE playlist_id = ?`, id).
-			Scan(&count, &next); err != nil {
+			`SELECT COUNT(*), IFNULL(MIN(position), 0) FROM playlist_tracks WHERE playlist_id = ?`, id).
+			Scan(&count, &first); err != nil {
 			return err
 		}
+		seen := make(map[int64]bool, len(trackIDs))
 		for _, t := range trackIDs {
 			if err := trackExists(ctx, tx, t); err != nil {
 				return err
 			}
-			res, err := tx.ExecContext(ctx,
-				`INSERT INTO playlist_tracks (playlist_id, track_id, position) VALUES (?, ?, ?) ON CONFLICT DO NOTHING`,
-				id, t, next)
-			if err != nil {
+			if seen[t] {
+				continue
+			}
+			seen[t] = true
+			var in int
+			if err := tx.QueryRowContext(ctx,
+				`SELECT COUNT(*) FROM playlist_tracks WHERE playlist_id = ? AND track_id = ?`, id, t).
+				Scan(&in); err != nil {
 				return err
 			}
-			if n, _ := res.RowsAffected(); n > 0 {
-				added++
-				next++
+			if in == 0 {
+				fresh = append(fresh, t)
 			}
 		}
-		if count+added > MaxPlaylistTracks {
+		if count+len(fresh) > MaxPlaylistTracks {
 			return invalid(fmt.Sprintf("一个歌单最多 %d 首歌", MaxPlaylistTracks))
 		}
-		if added > 0 {
+		for i, t := range fresh {
+			if _, err := tx.ExecContext(ctx,
+				`INSERT INTO playlist_tracks (playlist_id, track_id, position) VALUES (?, ?, ?)`,
+				id, t, first-len(fresh)+i); err != nil {
+				return err
+			}
+		}
+		if len(fresh) > 0 {
 			if err := touchPlaylist(ctx, tx, id); err != nil {
 				return err
 			}
@@ -420,7 +435,10 @@ func (s *Store) AddToPlaylist(ctx context.Context, userID, id int64, trackIDs []
 		p, err = s.playlist(ctx, tx, userID, id)
 		return err
 	})
-	return added, p, err
+	if err != nil {
+		return 0, Playlist{}, err
+	}
+	return len(fresh), p, nil
 }
 
 // RemoveFromPlaylist removes a track from a playlist, if it is there.
