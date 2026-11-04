@@ -66,7 +66,7 @@
 
 歌曲、专辑及歌曲所属专辑的封面为 `cover: {name, thumbhash}`，没有封面时为 `null`；艺术家的图片 `image` 形态相同。`thumbhash` 是 [ThumbHash](https://evanw.github.io/thumbhash/) 的标准 base64，客户端解码为模糊占位图，在缩略图加载完成前显示；图片无法解码时为空字符串。
 
-歌曲、专辑响应中的艺术家是有序数组 `artists: [{id, name}]`，歌曲所属专辑为 `album: {id, title, artists, cover}`；没有艺术家时为空数组。按 `artistId` 筛选歌曲时，包括该艺术家参与的歌曲和其专辑中的歌曲。
+歌曲、专辑响应中的艺术家是有序数组 `artists: [{id, name}]`，歌曲所属专辑为 `album: {id, title, artists, cover}`；没有艺术家时为空数组。按 `artistId` 筛选歌曲时，只包括该艺术家作为歌曲艺术家参与的歌曲，与艺术家的 `trackCount` 一致（2026-11-04 起；原来还包括其专辑中的歌曲）。
 
 ## 播放端登录
 

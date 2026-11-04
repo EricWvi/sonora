@@ -703,6 +703,13 @@ func TestMultipleArtists(t *testing.T) {
 	if artist, _ := s.Artist(ctx, fei.ID); artist.AlbumCount != 0 || artist.TrackCount != 2 {
 		t.Fatalf("费玉清 after album edit = %+v", artist)
 	}
+	// An artist's tracks are those they perform, not those of their albums.
+	if page, _ := s.Tracks(ctx, TrackQuery{ArtistID: album.Artists[0].ID}); page.Total != 0 {
+		t.Fatalf("tracks of 群星 = %d", page.Total)
+	}
+	if page, _ := s.Tracks(ctx, TrackQuery{ArtistID: fei.ID}); page.Total != 2 {
+		t.Fatalf("tracks of 费玉清 after album edit = %d", page.Total)
+	}
 	if _, err := s.UpdateTrack(ctx, a.ID, TrackInput{Title: "x", Artists: make([]string, maxArtists+1)}); err != nil {
 		t.Fatalf("blank names count toward the limit: %v", err)
 	}

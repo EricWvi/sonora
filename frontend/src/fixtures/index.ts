@@ -402,9 +402,8 @@ function librarySource(lib: Library): DataSource {
   };
   // 歌曲默认新入库在前。
   const newestFirst = () => [...lib.tracks].reverse();
-  const byArtist = (t: Track, id: number) =>
-    t.artists.some((a) => a.id === id) ||
-    !!t.album?.artists.some((a) => a.id === id);
+  // 只算艺术家演唱的歌曲，不含其专辑中的其他歌曲（与服务端相同）
+  const byArtist = (t: Track, id: number) => t.artists.some((a) => a.id === id);
 
   // 返回副本，页面修改结果不影响 fixture。
   const reply = async <T>(value: () => T): Promise<T> =>

@@ -217,8 +217,10 @@ func placeholderOf(col string) string {
 type TrackQuery struct {
 	Q string
 	// Missing keeps tracks without an artist or album.
-	Missing  bool
-	AlbumID  int64
+	Missing bool
+	AlbumID int64
+	// ArtistID keeps the tracks the artist performs, not those of their
+	// albums.
 	ArtistID int64
 	Sort     Sort
 	Window
@@ -285,10 +287,12 @@ func (s *Store) Tracks(ctx context.Context, q TrackQuery) (Page[Track], error) {
 		where = append(where, `t.album_id = ?`)
 		args = append(args, q.AlbumID)
 	}
+	// Only the tracks the artist performs, as Artist.TrackCount counts.
+	// Until 2026-11-04 the tracks of their albums were included too,
+	// which buried the artist's own songs under every compilation track.
 	if q.ArtistID > 0 {
-		where = append(where, `(EXISTS (SELECT 1 FROM track_artists WHERE track_id = t.id AND artist_id = ?)
-			OR EXISTS (SELECT 1 FROM album_artists WHERE album_id = t.album_id AND artist_id = ?))`)
-		args = append(args, q.ArtistID, q.ArtistID)
+		where = append(where, `EXISTS (SELECT 1 FROM track_artists WHERE track_id = t.id AND artist_id = ?)`)
+		args = append(args, q.ArtistID)
 	}
 	cond := ""
 	if len(where) > 0 {
