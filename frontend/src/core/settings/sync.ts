@@ -3,7 +3,11 @@ import { isPlainObject } from "lodash-es";
 import { source, type DataSource } from "@/api/source";
 import { connection } from "@/api/connection";
 import { useSettingStore, useShortcutStore } from "@/stores";
-import { defaultSettingState, type SettingState } from "@/stores/setting";
+import {
+  defaultSettingState,
+  withNewHomePageSections,
+  type SettingState,
+} from "@/stores/setting";
 import { defaultShortcutState, type ShortcutList } from "@/stores/shortcut";
 
 /**
@@ -93,11 +97,15 @@ function sameShape(value: object, fallback: object): boolean {
 export function resolveRemote(remote: unknown): SyncedSettings {
   const fallback = defaultSynced();
   const data = isPlainObject(remote) ? (remote as Record<string, unknown>) : {};
+  const setting = conform(
+    data.setting,
+    fallback.setting,
+  ) as SyncedSettings["setting"];
   return {
-    setting: conform(
-      data.setting,
-      fallback.setting,
-    ) as SyncedSettings["setting"],
+    setting: {
+      ...setting,
+      homePageSections: withNewHomePageSections(setting.homePageSections),
+    },
     shortcuts: conform(
       data.shortcuts,
       fallback.shortcuts,

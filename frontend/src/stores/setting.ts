@@ -250,16 +250,19 @@ export interface SettingState {
   searchInputBehavior: "normal" | "clear" | "sync";
   /** 显示主页问好 */
   showHomeGreeting: boolean;
-  /** 首页栏目顺序和显示配置（栏目换成 Sonora 的最近添加的专辑与最近播放） */
-  homePageSections: Array<{
-    key: "album" | "history";
-    name: string;
-    visible: boolean;
-    order: number;
-  }>;
+  /** 首页栏目顺序和显示配置（栏目换成 Sonora 的最近添加的歌曲、专辑与最近播放） */
+  homePageSections: HomePageSection[];
   /** 是否使用 keep-alive */
   useKeepAlive: boolean;
 }
+
+/** 首页栏目 */
+export type HomePageSection = {
+  key: "song" | "album" | "history";
+  name: string;
+  visible: boolean;
+  order: number;
+};
 
 /** 默认设置，同步时用来补齐与校验服务端的设置 */
 export const defaultSettingState = (): SettingState => ({
@@ -384,11 +387,27 @@ export const defaultSettingState = (): SettingState => ({
   searchInputBehavior: "normal",
   showHomeGreeting: true,
   homePageSections: [
-    { key: "album", name: "最近添加的专辑", visible: true, order: 0 },
-    { key: "history", name: "最近播放", visible: true, order: 1 },
+    { key: "song", name: "最近添加的歌曲", visible: true, order: 0 },
+    { key: "album", name: "最近添加的专辑", visible: true, order: 1 },
+    { key: "history", name: "最近播放", visible: true, order: 2 },
   ],
   useKeepAlive: true,
 });
+
+/**
+ * 补上保存设置时还没有的栏目。保存的数组形状合法，校验时会原样保留，不补的话老用户
+ * 看不到新栏目。新栏目排在最前，已有栏目的相对顺序与显示开关不变。
+ */
+export function withNewHomePageSections(
+  sections: HomePageSection[],
+): HomePageSection[] {
+  const added = defaultSettingState().homePageSections.filter(
+    ({ key }) => !sections.some((section) => section.key === key),
+  );
+  if (!added.length) return sections;
+  const saved = [...sections].sort((a, b) => a.order - b.order);
+  return [...added, ...saved].map((section, order) => ({ ...section, order }));
+}
 
 export const useSettingStore = defineStore("setting", {
   state: defaultSettingState,
@@ -430,5 +449,8 @@ export const useSettingStore = defineStore("setting", {
   persist: {
     key: "sonora-setting",
     storage: localStorage,
+    afterHydrate: ({ store }) => {
+      store.homePageSections = withNewHomePageSections(store.homePageSections);
+    },
   },
 });

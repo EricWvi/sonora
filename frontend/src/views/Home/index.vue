@@ -1,6 +1,7 @@
 <!-- 首页。问候语照搬 SPlayer views/Home/index.vue；快捷入口沿用 SPlayer 首页的 SongListCard，
 栏目沿用 HomeOnline 的标题与列表。内容按阶段 2：快捷入口（我喜欢的音乐、歌曲）、
-“最近添加的专辑”、“最近播放”；栏目的显示与顺序由 homePageSections 设置决定。 -->
+“最近添加的歌曲”、“最近添加的专辑”、“最近播放”；栏目的显示与顺序由 homePageSections
+设置决定。 -->
 <template>
   <div class="home">
     <div v-if="settingStore.showHomeGreeting" class="welcome">
@@ -51,11 +52,11 @@
       </n-flex>
       <!-- 列表 -->
       <CoverList
-        v-if="item.key === 'album'"
-        :data="recentAlbums"
+        v-if="item.key !== 'history'"
+        :data="item.key === 'song' ? newSongs : recentAlbums"
         :loading="loading"
-        :loadingNum="12"
-        type="album"
+        :loadingNum="6"
+        :type="item.key"
         :hiddenCover="settingStore.hiddenCovers.home"
       />
       <SongList
@@ -95,6 +96,7 @@ const greetings = computed(() => {
 const likedSongs = shallowRef<Track[]>([]);
 const librarySongs = shallowRef<Track[]>([]);
 const libraryTotal = ref<number>(0);
+const newSongs = shallowRef<Track[]>([]);
 const recentAlbums = shallowRef<Album[]>([]);
 const recentSongs = shallowRef<Track[]>([]);
 const loading = ref<boolean>(true);
@@ -102,6 +104,7 @@ const error = ref<string>("");
 
 // 栏目：路由为标题指向的页面
 const sections = {
+  song: { route: "songs" },
   album: { route: "albums" },
   history: { route: "history" },
 } as const;
@@ -121,12 +124,13 @@ const getHomeData = async () => {
   try {
     const [likes, songs, albums, history] = await Promise.all([
       source.likes({ limit: 50 }),
+      // 默认新入库在前，“最近添加的歌曲”取前 6 首
       source.tracks({ limit: 50 }),
       // 与 SPlayer 不同：最近添加的专辑不含标记为单曲的专辑
       source.albums({
         sort: "createTime",
         order: "desc",
-        limit: 12,
+        limit: 6,
         hideSingles: true,
       }),
       source.history({ limit: 10 }),
@@ -134,6 +138,7 @@ const getHomeData = async () => {
     likedSongs.value = likes.items;
     librarySongs.value = songs.items;
     libraryTotal.value = songs.total;
+    newSongs.value = songs.items.slice(0, 6);
     recentAlbums.value = albums.items;
     recentSongs.value = history.items.map((entry) => entry.track);
   } catch (e) {

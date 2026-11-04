@@ -89,7 +89,7 @@
 | 方法与路径 | 说明 |
 | --- | --- |
 | `GET me` | 当前用户 `{name, email}` |
-| `GET tracks` | `q`（匹配标题、专辑名、艺术家名）、`albumId`、`artistId`、`sort`、`order` |
+| `GET tracks` | `q`（匹配标题、专辑名、艺术家名）、`albumId`、`artistId`、`sort`、`order`；默认新入库在前，首页“最近添加的歌曲”取前 6 首 |
 | `GET tracks/{id}` | 歌曲详情 |
 | `GET tracks/{id}/lyrics` | `{format, lyrics}`：`format` 为 `lrc` 或 `ttml`，`lyrics` 为原文；没有歌词时都是空字符串。解析由播放端完成 |
 | `GET tracks/{id}/audio` | 音频流，支持 Range |

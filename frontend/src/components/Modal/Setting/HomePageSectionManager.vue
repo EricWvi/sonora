@@ -33,7 +33,7 @@
 </template>
 
 <script setup lang="ts">
-// 照搬 SPlayer，栏目换成 Sonora 首页的最近添加的专辑与最近播放（见 stores/setting.ts）。
+// 照搬 SPlayer，栏目换成 Sonora 首页的最近添加的歌曲、专辑与最近播放（见 stores/setting.ts）。
 import { useSettingStore } from "@/stores";
 import { useSortable } from "@vueuse/integrations/useSortable";
 import type { Options } from "sortablejs";

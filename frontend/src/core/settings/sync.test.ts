@@ -141,6 +141,22 @@ describe("设置同步", () => {
     expect(resolved.shortcuts.playOrPause).toBe("CmdOrCtrl+Space");
   });
 
+  it("服务端的首页栏目缺少新栏目时排在最前，已有栏目的顺序与开关不变", () => {
+    const resolved = resolveRemote({
+      setting: {
+        homePageSections: [
+          { key: "album", name: "最近添加的专辑", visible: false, order: 1 },
+          { key: "history", name: "最近播放", visible: true, order: 0 },
+        ],
+      },
+    });
+    expect(resolved.setting.homePageSections).toEqual([
+      { key: "song", name: "最近添加的歌曲", visible: true, order: 0 },
+      { key: "history", name: "最近播放", visible: true, order: 1 },
+      { key: "album", name: "最近添加的专辑", visible: false, order: 2 },
+    ]);
+  });
+
   it("改动 1 秒后整体上传，连续改动只上传一次", async () => {
     const server = fakeServer(
       pickSynced(defaultSettingState(), defaultShortcutState().shortcutList),

@@ -2,7 +2,9 @@
 Album 与 Playlist；不迁入视频、电台、播放量与卡片右键菜单。专辑卡片在名称下显示艺术家
 （沿用 SPlayer 视频卡片的艺术家样式），再显示“N首 · 年份”。
 与 SPlayer 不同（阶段 6）：网格是虚拟的，只渲染视口附近的行；分页列表滚动到底时自动载入
-下一页，不用“加载更多”按钮。 -->
+下一页，不用“加载更多”按钮。
+与 SPlayer 不同（首页“最近添加的歌曲”）：增加歌曲卡片。歌曲没有详情页，点卡片与播放按钮
+都是播放这首，名称下的第三行换成专辑名，点击进入专辑。 -->
 <template>
   <Transition name="fade" mode="out-in">
     <div v-if="data.length > 0" :class="['cover-list', type]">
@@ -22,7 +24,7 @@ Album 与 Playlist；不迁入视频、电台、播放量与卡片右键菜单�
             v-for="item in row.items"
             :key="item.id"
             :class="['cover-item', { 'no-cover': hiddenCover }]"
-            @click="goDetail(item)"
+            @click="openItem(item)"
           >
             <!-- 封面 -->
             <div v-if="!hiddenCover" class="cover">
@@ -78,7 +80,16 @@ Album 与 Playlist；不迁入视频、电台、播放量与卡片右键菜单�
                     }}
                   </n-text>
                 </div>
-                <div class="meta">
+                <!-- 歌曲的专辑 -->
+                <n-text
+                  v-if="'album' in item"
+                  class="album-name text-hidden"
+                  depth="3"
+                  @click.stop="goAlbum(item)"
+                >
+                  {{ item.album?.title || "未知专辑" }}
+                </n-text>
+                <div v-else class="meta">
                   <n-text class="count" depth="3"
                     >{{ item.trackCount || 0 }}首</n-text
                   >
@@ -142,8 +153,8 @@ import { usePlayerController } from "@/core/player/PlayerController";
 import { useVirtualGrid } from "@/composables/List/useVirtualGrid";
 
 const props = defineProps<{
-  data: (Album | Playlist)[];
-  type: "playlist" | "album";
+  data: (Album | Playlist | Track)[];
+  type: "playlist" | "album" | "song";
   loadMore?: boolean;
   loading?: boolean;
   loadingNum?: number;
@@ -185,11 +196,11 @@ const player = usePlayerController();
 const loadingId = ref<number>(0);
 
 // 封面：SPlayer 的 coverSize.m
-const coverOf = (item: Album | Playlist) =>
+const coverOf = (item: Album | Playlist | Track) =>
   coverUrl(item.cover, "m", defaultCovers.album);
 
 // 名称
-const nameOf = (item: Album | Playlist) =>
+const nameOf = (item: Album | Playlist | Track) =>
   "title" in item ? item.title : item.name;
 
 // 播放列表来源（见 music store 的 playPlaylistId）
@@ -197,20 +208,33 @@ const listId = (id: number) => `${props.type}-${id}`;
 
 // 是否处于当前播放列表
 const isPlaying = (id: number) =>
-  musicStore.playPlaylistId === listId(id) && statusStore.playStatus;
+  (props.type === "song"
+    ? musicStore.playSong.id === id
+    : musicStore.playPlaylistId === listId(id)) && statusStore.playStatus;
 
-// 查看详情
-const goDetail = (item: Album | Playlist) => {
-  router.push({
-    name: props.type,
-    query: { id: item.id },
-  });
+const isTrack = (item: Album | Playlist | Track): item is Track =>
+  "album" in item;
+
+// 点击卡片：歌曲直接播放，其他查看详情
+const openItem = (item: Album | Playlist | Track) => {
+  if (isTrack(item)) playList(item);
+  else router.push({ name: props.type, query: { id: item.id } });
+};
+
+// 歌曲所属的专辑
+const goAlbum = ({ album }: Track) => {
+  if (album) router.push({ name: "album", query: { id: album.id } });
 };
 
 // 播放歌单
 const playList = debounce(
-  async (item: Album | Playlist) => {
+  async (item: Album | Playlist | Track) => {
     try {
+      // 歌曲：播放这首，这几张卡片作为播放列表（同 SongList）
+      if (isTrack(item)) {
+        if (musicStore.playSong.id === item.id) return player.playOrPause();
+        return player.updatePlayList(props.data as Track[], item);
+      }
       // 是否为当前列表
       if (musicStore.playPlaylistId === listId(item.id))
         return player.playOrPause();
@@ -371,6 +395,13 @@ const getListData = (id: number): Promise<Track[]> =>
           }
         }
       }
+      .album-name {
+        font-size: 13px;
+        transition: opacity 0.3s;
+        &:hover {
+          opacity: 0.8;
+        }
+      }
       .artists {
         margin-top: 2px;
         font-size: 13px;
@@ -467,8 +498,9 @@ const getListData = (id: number): Promise<Track[]> =>
 .n-empty {
   margin-top: 60px;
 }
-// Sonora：专辑卡片的艺术家只占一行，过长时省略
-.cover-list.album .cover-data .artists {
+// Sonora：专辑与歌曲卡片的艺术家只占一行，过长时省略
+.cover-list.album .cover-data .artists,
+.cover-list.song .cover-data .artists {
   display: block;
   white-space: nowrap;
   text-overflow: ellipsis;
