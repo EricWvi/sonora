@@ -58,6 +58,7 @@
         :loadingNum="6"
         :type="item.key"
         :hiddenCover="settingStore.hiddenCovers.home"
+        fill-rows
       />
       <SongList
         v-else
@@ -124,13 +125,13 @@ const getHomeData = async () => {
   try {
     const [likes, songs, albums, history] = await Promise.all([
       source.likes({ limit: 50 }),
-      // 默认新入库在前，“最近添加的歌曲”取前 6 首
+      // 默认新入库在前，“最近添加的歌曲”取前 12 首
       source.tracks({ limit: 50 }),
       // 与 SPlayer 不同：最近添加的专辑不含标记为单曲的专辑
       source.albums({
         sort: "createTime",
         order: "desc",
-        limit: 6,
+        limit: 12,
         hideSingles: true,
       }),
       source.history({ limit: 10 }),
@@ -138,7 +139,7 @@ const getHomeData = async () => {
     likedSongs.value = likes.items;
     librarySongs.value = songs.items;
     libraryTotal.value = songs.total;
-    newSongs.value = songs.items.slice(0, 6);
+    newSongs.value = songs.items.slice(0, 12);
     recentAlbums.value = albums.items;
     recentSongs.value = history.items.map((entry) => entry.track);
   } catch (e) {

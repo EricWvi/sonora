@@ -168,6 +168,8 @@ const props = defineProps<{
   loadingText?: string;
   emptyDescription?: string;
   hiddenCover?: boolean;
+  // 只显示补满的整行（首页栏目）：5 列及以下两行，6 列及以上一行
+  fillRows?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -183,8 +185,10 @@ const {
   padTop,
   padBottom,
   reset: resetGrid,
+  items: shownItems,
 } = useVirtualGrid({
   items: () => props.data,
+  maxItems: props.fillRows ? (c) => c * (c <= 5 ? 2 : 1) : undefined,
   minWidth: 160,
   gap: 20,
   onReachEnd: () => {
@@ -233,7 +237,7 @@ const coverMenuRef = ref<InstanceType<typeof CoverMenu> | null>(null);
 const songMenuRef = ref<InstanceType<typeof SongListMenu> | null>(null);
 const openMenu = (e: MouseEvent, item: Album | Playlist | Track) => {
   if (isTrack(item)) {
-    const list = props.data as Track[];
+    const list = shownItems.value as Track[];
     songMenuRef.value?.openDropdown(e, list, item, list.indexOf(item));
   } else if (props.type !== "song") {
     coverMenuRef.value?.openDropdown(e, item, props.type);
@@ -252,7 +256,7 @@ const playList = debounce(
       // 歌曲：播放这首，这几张卡片作为播放列表（同 SongList）
       if (isTrack(item)) {
         if (musicStore.playSong.id === item.id) return player.playOrPause();
-        return player.updatePlayList(props.data as Track[], item);
+        return player.updatePlayList(shownItems.value as Track[], item);
       }
       // 是否为当前列表
       if (musicStore.playPlaylistId === listId(item.id))

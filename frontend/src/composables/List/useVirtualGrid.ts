@@ -59,6 +59,8 @@ export interface VirtualGridOptions<T> {
   buffer?: number;
   /** 渲染到最后几行时调用，用于载入下一页 */
   onReachEnd?: () => void;
+  /** 按列数限制显示的条数，例如首页栏目只显示补满的整行 */
+  maxItems?: (columns: number) => number;
 }
 
 /**
@@ -76,8 +78,15 @@ export const useVirtualGrid = <T>(options: VirtualGridOptions<T>) => {
   const columns = computed(() =>
     Math.max(1, Math.floor((width.value + gap) / (minWidth + gap))),
   );
+  // 实际显示的条目
+  const visible = computed(() => {
+    const all = options.items();
+    return options.maxItems
+      ? all.slice(0, options.maxItems(columns.value))
+      : all;
+  });
   const rowCount = computed(() =>
-    Math.ceil(options.items().length / columns.value),
+    Math.ceil(visible.value.length / columns.value),
   );
 
   // 已实测的行高
@@ -105,7 +114,7 @@ export const useVirtualGrid = <T>(options: VirtualGridOptions<T>) => {
 
   /** 应渲染的行 */
   const rows = computed(() => {
-    const items = options.items();
+    const items = visible.value;
     const c = columns.value;
     const out: { index: number; items: T[] }[] = [];
     for (let r = range.value.start; r <= range.value.end; r++) {
@@ -193,5 +202,13 @@ export const useVirtualGrid = <T>(options: VirtualGridOptions<T>) => {
     cancelAnimationFrame(frame);
   });
 
-  return { container, columns, rows, padTop, padBottom, reset };
+  return {
+    container,
+    columns,
+    rows,
+    padTop,
+    padBottom,
+    reset,
+    items: visible,
+  };
 };
