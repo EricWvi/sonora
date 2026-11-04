@@ -50,6 +50,8 @@ export type Album = {
   artists: ArtistRef[];
   year: number;
   cover: Cover | null;
+  /** 管理后台填写的简介，没有时为空字符串。 */
+  description: string;
   trackCount: number;
   durationMs: number;
 };

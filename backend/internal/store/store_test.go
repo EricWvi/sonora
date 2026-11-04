@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -521,6 +522,38 @@ func TestSingleAlbums(t *testing.T) {
 	no := false
 	if a, err = s.UpdateAlbum(ctx, single.Album.ID, AlbumInput{Title: "原声带", Artists: []string{"甲"}, Single: &no}); err != nil || a.Single {
 		t.Fatalf("unmark single = %+v, %v", a, err)
+	}
+}
+
+func TestAlbumDescription(t *testing.T) {
+	s := openTest(t)
+	ctx := context.Background()
+	a := newAlbumTrack(t, s, "tagged.mp3", "甲").Album
+	b := newAlbumTrack(t, s, "tagged.flac", "乙").Album
+	if a == nil || b == nil {
+		t.Fatal("tracks have no album")
+	}
+	desc := "  第一行\n第二行  "
+	got, err := s.UpdateAlbum(ctx, b.ID, AlbumInput{Title: b.Title, Artists: []string{"乙"}, Description: &desc})
+	if err != nil || got.Description != "第一行\n第二行" {
+		t.Fatalf("set = %q, %v", got.Description, err)
+	}
+	// omitting the description keeps it; an empty one clears it
+	if got, _ = s.UpdateAlbum(ctx, b.ID, AlbumInput{Title: b.Title, Artists: []string{"乙"}}); got.Description != "第一行\n第二行" {
+		t.Fatalf("keep = %q", got.Description)
+	}
+	long := strings.Repeat("长", maxAlbumDescription+1)
+	if _, err := s.UpdateAlbum(ctx, b.ID, AlbumInput{Title: b.Title, Artists: []string{"乙"}, Description: &long}); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("too long: %v", err)
+	}
+	// a merge target without a description takes the source's
+	merged, err := s.MergeAlbums(ctx, a.ID, []int64{b.ID}, false)
+	if err != nil || merged.Description != "第一行\n第二行" {
+		t.Fatalf("merge = %q, %v", merged.Description, err)
+	}
+	empty := " "
+	if got, _ = s.UpdateAlbum(ctx, a.ID, AlbumInput{Title: merged.Title, Artists: []string{"甲"}, Description: &empty}); got.Description != "" {
+		t.Fatalf("clear = %q", got.Description)
 	}
 }
 

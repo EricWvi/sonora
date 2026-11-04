@@ -146,6 +146,8 @@ export interface Album {
   cover: Cover | null;
   // An album that only holds singles; the player's album page hides it.
   single: boolean;
+  // Written by the admin; the player's album page shows it.
+  description: string;
   trackCount: number;
   durationMs: number;
   createdAt: string;

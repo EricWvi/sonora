@@ -112,6 +112,10 @@ function fictionalLibrary(): Library {
       artists: artistIds.map(ref),
       year,
       cover: null,
+      // 第一张专辑带简介，用来查看专辑页的简介行与弹窗
+      description: albums.length
+        ? ""
+        : "开发数据的专辑简介。\n第二行用来确认弹窗保留换行。",
       trackCount: 0,
       durationMs: 0,
     };

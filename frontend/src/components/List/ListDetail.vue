@@ -274,7 +274,11 @@ const handleSearch = (val: string) => {
 // 处理描述点击
 const handleDescriptionClick = () => {
   if (props.detailData?.description) {
-    openDescModal(props.detailData.description, props.titleText || "歌单简介");
+    // 照搬 SPlayer：专辑页（标题为 ellipsis）用“专辑简介”
+    const title =
+      props.titleText ||
+      (props.config.titleType === "ellipsis" ? "专辑简介" : "歌单简介");
+    openDescModal(props.detailData.description, title);
   }
 };
 </script>

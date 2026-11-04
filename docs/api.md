@@ -52,7 +52,7 @@
 | `PUT/DELETE tracks/{id}/cover` | 请求体为图片原始字节；单曲封面优先于专辑封面 |
 | `PUT/DELETE tracks/{id}/lyrics` | 请求体为 LRC 或 TTML 歌词的原始字节，服务识别 UTF-8、UTF-16 与 GB18030 |
 | `GET tracks/{id}/audio` | 音频流，支持 Range，用于试听 |
-| `GET albums`、`GET/PUT/DELETE albums/{id}` | 列表（`q`、`artistId`、`sort`、`order`）/ 详情 / 修改 `{title, artists, year, single}` / 删除专辑及其全部歌曲。`single` 标记只含单曲的专辑（单曲自动建的专辑，或只是同名的几首单曲），省略时保持原值；新入库的专辑为 `false` |
+| `GET albums`、`GET/PUT/DELETE albums/{id}` | 列表（`q`、`artistId`、`sort`、`order`）/ 详情 / 修改 `{title, artists, year, single, description}` / 删除专辑及其全部歌曲。`single` 标记只含单曲的专辑（单曲自动建的专辑，或只是同名的几首单曲），省略时保持原值；新入库的专辑为 `false`。`description` 为专辑简介（2026-11-04 起），去掉首尾空白后最多 10000 个字符，省略时保持原值，空字符串清除 |
 | `POST albums/{id}/merge` | `{sourceIds, keepCovers}` 合并到路径中的专辑。目标没有封面或年份时，沿用第一个有封面或年份的来源专辑。`keepCovers` 默认 `false`，合并后只留目标的封面；为 `true` 时，来源专辑中没有单曲封面的歌曲以原专辑的封面作为单曲封面（与目标封面相同或原专辑没有封面时不设） |
 | `PUT/DELETE albums/{id}/cover` | 同单曲封面 |
 | `GET artists`、`GET/PUT artists/{id}` | 列表（`q`）/ 详情 / 重命名 `{name}` |
@@ -100,7 +100,7 @@
 数据形态：
 
 - 歌曲 `{id, title, artists, album, trackNo, discNo, year, durationMs, format, cover, hasLyrics}`。`album` 为 `{id, title, artists}` 或 `null`；`cover` 是歌曲实际显示的封面，单曲封面优先，否则为专辑封面，都没有时为 `null`。
-- 专辑 `{id, title, artists, year, cover, trackCount, durationMs}`。
+- 专辑 `{id, title, artists, year, cover, description, trackCount, durationMs}`。`description` 为管理后台填写的简介，没有时为空字符串。
 - 艺术家 `{id, name, image, trackCount, albumCount}`，`image` 是管理后台上传的图片，没有时为 `null`。
 - `artists` 与 `cover` 的形态和管理 API 一致：`[{id, name}]` 与 `{name, thumbhash}`。
 

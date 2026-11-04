@@ -163,6 +163,7 @@ const getAlbumDetail = async (id: number) => {
       id: album.id,
       name: album.title,
       cover: album.cover,
+      description: album.description,
       artists: album.artists,
       count: album.trackCount,
       year: album.year,

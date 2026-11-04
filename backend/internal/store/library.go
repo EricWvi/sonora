@@ -79,10 +79,12 @@ type Album struct {
 	Year    int    `json:"year"`
 	Cover   *Cover `json:"cover"`
 	// Single marks an album that only holds singles, see AlbumInput.
-	Single     bool   `json:"single"`
-	TrackCount int    `json:"trackCount"`
-	DurationMs int64  `json:"durationMs"`
-	CreatedAt  string `json:"createdAt"`
+	Single bool `json:"single"`
+	// Description is written by the admin; empty when there is none.
+	Description string `json:"description"`
+	TrackCount  int    `json:"trackCount"`
+	DurationMs  int64  `json:"durationMs"`
+	CreatedAt   string `json:"createdAt"`
 }
 
 // Artist is a performer, of tracks or as an album artist. Image is
@@ -113,6 +115,9 @@ const (
 	maxLimit     = 500
 	maxNameLen   = 300
 	maxArtists   = 50
+	// Album blurbs copied from a store page can run to a few thousand
+	// characters, far more than a playlist's.
+	maxAlbumDescription = 10000
 )
 
 func (w Window) clamp() Window {
@@ -512,7 +517,7 @@ type AlbumQuery struct {
 }
 
 var albumSelect = `
-	SELECT al.id, al.title, al.year, al.cover, ` + placeholderOf("al.cover") + `, al.single, al.created_at, ` +
+	SELECT al.id, al.title, al.year, al.cover, ` + placeholderOf("al.cover") + `, al.single, al.description, al.created_at, ` +
 	artistsJSON("album_artists", "album_id", "al.id") + `,
 		(SELECT COUNT(*) FROM tracks WHERE album_id = al.id),
 		(SELECT IFNULL(SUM(duration_ms), 0) FROM tracks WHERE album_id = al.id)
@@ -521,7 +526,7 @@ var albumSelect = `
 func scanAlbum(row scanner) (Album, error) {
 	var a Album
 	var cover, coverHash sql.NullString
-	err := row.Scan(&a.ID, &a.Title, &a.Year, &cover, &coverHash, &a.Single, &a.CreatedAt, (*refs)(&a.Artists), &a.TrackCount, &a.DurationMs)
+	err := row.Scan(&a.ID, &a.Title, &a.Year, &cover, &coverHash, &a.Single, &a.Description, &a.CreatedAt, (*refs)(&a.Artists), &a.TrackCount, &a.DurationMs)
 	a.Cover = coverOf(cover, coverHash)
 	return a, err
 }
@@ -594,12 +599,14 @@ func (s *Store) album(ctx context.Context, q querier, id int64) (Album, error) {
 
 // AlbumInput is the editable metadata of an album. Artists are the album
 // artists' names; empty leaves the album without any. Single marks an
-// album that only holds singles; nil keeps the current mark.
+// album that only holds singles; nil keeps the current mark. Description
+// is trimmed; nil keeps the current one.
 type AlbumInput struct {
-	Title   string   `json:"title"`
-	Artists []string `json:"artists"`
-	Year    int      `json:"year"`
-	Single  *bool    `json:"single"`
+	Title       string   `json:"title"`
+	Artists     []string `json:"artists"`
+	Year        int      `json:"year"`
+	Single      *bool    `json:"single"`
+	Description *string  `json:"description"`
 }
 
 // UpdateAlbum replaces an album's metadata. Renaming onto another album of
@@ -613,6 +620,13 @@ func (s *Store) UpdateAlbum(ctx context.Context, id int64, in AlbumInput) (Album
 		return Album{}, invalid(fmt.Sprintf("名称不能超过 %d 个字符", maxNameLen))
 	case in.Year < 0 || in.Year > 9999:
 		return Album{}, invalid("年份超出范围")
+	}
+	if in.Description != nil {
+		d := strings.TrimSpace(*in.Description)
+		if utf8.RuneCountInString(d) > maxAlbumDescription {
+			return Album{}, invalid(fmt.Sprintf("简介不能超过 %d 个字符", maxAlbumDescription))
+		}
+		in.Description = &d
 	}
 	var err error
 	if in.Artists, err = normalizeNames(in.Artists); err != nil {
@@ -637,8 +651,9 @@ func (s *Store) UpdateAlbum(ctx context.Context, id int64, in AlbumInput) (Album
 			return err
 		}
 		res, err := tx.ExecContext(ctx, `
-			UPDATE albums SET title = ?, artist_key = ?, year = ?, single = IFNULL(?, single) WHERE id = ?`,
-			in.Title, albumKey(artists), in.Year, in.Single, id)
+			UPDATE albums SET title = ?, artist_key = ?, year = ?, single = IFNULL(?, single),
+				description = IFNULL(?, description) WHERE id = ?`,
+			in.Title, albumKey(artists), in.Year, in.Single, in.Description, id)
 		if err != nil {
 			return err
 		}
@@ -661,11 +676,12 @@ func (s *Store) UpdateAlbum(ctx context.Context, id int64, in AlbumInput) (Album
 }
 
 // MergeAlbums moves the tracks of the source albums into target and
-// deletes the sources. The target keeps its own cover and year when set,
-// taking them from the first source that has them otherwise. With
-// keepCovers, a moved track without a cover of its own takes the cover of
-// its old album when that differs from the target's, so albums of a
-// compilation keep their artwork; otherwise the other covers are dropped.
+// deletes the sources. The target keeps its own cover, year and
+// description when set, taking them from the first source that has them
+// otherwise. With keepCovers, a moved track without a cover of its own
+// takes the cover of its old album when that differs from the target's,
+// so albums of a compilation keep their artwork; otherwise the other
+// covers are dropped.
 func (s *Store) MergeAlbums(ctx context.Context, target int64, sources []int64, keepCovers bool) (Album, error) {
 	if err := checkMerge(target, sources); err != nil {
 		return Album{}, err
@@ -699,8 +715,9 @@ func mergeAlbumInto(ctx context.Context, tx *sql.Tx, target, src int64, keepCove
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE albums SET
 			cover = IFNULL(cover, (SELECT cover FROM albums WHERE id = ?)),
-			year = CASE WHEN year = 0 THEN (SELECT year FROM albums WHERE id = ?) ELSE year END
-		WHERE id = ?`, src, src, target); err != nil {
+			year = CASE WHEN year = 0 THEN (SELECT year FROM albums WHERE id = ?) ELSE year END,
+			description = CASE WHEN description = '' THEN (SELECT description FROM albums WHERE id = ?) ELSE description END
+		WHERE id = ?`, src, src, src, target); err != nil {
 		return err
 	}
 	if keepCovers {

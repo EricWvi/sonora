@@ -254,6 +254,12 @@ var migrations = []migration{
 	ALTER TABLE albums ADD COLUMN single INTEGER NOT NULL DEFAULT 0;
 	UPDATE albums SET single = 1 WHERE (SELECT COUNT(*) FROM tracks WHERE album_id = albums.id) = 1;
 	`),
+
+	// albums.description is the album's blurb, written by the admin; tags
+	// carry none. The player's album page shows it as SPlayer does.
+	execSQL(`
+	ALTER TABLE albums ADD COLUMN description TEXT NOT NULL DEFAULT '';
+	`),
 }
 
 func migrate(db *sql.DB) error {

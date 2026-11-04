@@ -117,6 +117,7 @@ const form = reactive({
   artists: [] as string[],
   year: 0,
   single: false,
+  description: "",
 });
 const saving = ref(false);
 
@@ -128,6 +129,7 @@ function edit(a: Album) {
     artists: a.artists.map((r) => r.name),
     year: a.year,
     single: a.single,
+    description: a.description,
   });
 }
 
@@ -356,6 +358,15 @@ const pagination = computed(() => ({
           feedback="单曲自动建的专辑，或只是同名的几首单曲；播放端的专辑页与首页不显示"
         >
           <n-switch v-model:value="form.single" />
+        </n-form-item>
+        <n-form-item label="简介">
+          <n-input
+            v-model:value="form.description"
+            type="textarea"
+            :autosize="{ minRows: 3, maxRows: 10 }"
+            :maxlength="10000"
+            show-count
+          />
         </n-form-item>
         <n-button type="primary" attr-type="submit" :loading="saving"
           >保存</n-button

@@ -129,5 +129,9 @@ func TestMigrationMarksOneTrackAlbumsSingle(t *testing.T) {
 		if err != nil || a.Single != want {
 			t.Errorf("album %d single = %v, %v; want %v", id, a.Single, err, want)
 		}
+		// migration 8 leaves existing albums without a description
+		if a.Description != "" {
+			t.Errorf("album %d description = %q", id, a.Description)
+		}
 	}
 }
