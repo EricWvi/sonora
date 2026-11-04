@@ -129,7 +129,10 @@ const allSettingGroups = computed(() => {
 
 // 版本号由构建时的 VITE_APP_VERSION 注入：镜像用 git tag（1.4.0），task build 用 git describe（v1.4.0-3-gabc）。
 // 本地开发没有注入时显示 dev。SPlayer 读 package.json，Sonora 的 package.json 不随发布更新。
-const displayVersion = (import.meta.env.VITE_APP_VERSION || "dev").replace(/^v?(?=\d)/, "v");
+const displayVersion = (import.meta.env.VITE_APP_VERSION || "dev").replace(
+  /^v?(?=\d)/,
+  "v",
+);
 
 // 设置内容
 const setScrollbar = ref<InstanceType<typeof NScrollbar> | null>(null);
