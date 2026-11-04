@@ -13,7 +13,7 @@
 - [x] 卡片右键菜单：专辑、歌单卡片按 SPlayer 的 `CoverMenu.vue`（查看详情、播放或暂停、复制名称与 ID；分享不做），范围包括首页“最近添加的专辑”、专辑页、艺术家的专辑和搜索结果。歌单卡片目前只出现在搜索结果的“歌单”标签。实现：[CoverMenu.vue](../../frontend/src/components/Menu/CoverMenu.vue)，在 [CoverList.vue](../../frontend/src/components/List/CoverList.vue) 中接入，所有用 CoverList 的页面一并生效。`Eye` 图标从 SPlayer 复制（Google Material Icons，已在[视觉资源清单](../visual-assets.md#4-图标)中）。
 - [x] 侧边栏歌单项的右键菜单（Eric 确认，2026-11-04）：SPlayer 的侧边栏没有右键菜单，是 Sonora 新增。条目与卡片一致再加管理：查看详情、播放或暂停、编辑歌单、删除歌单、复制歌单名称与 ID；编辑与删除复用歌单详情页的弹窗与确认，删除正在查看的歌单时回到首页。实现见 [SidebarMenu.vue](../../frontend/src/components/Layout/SidebarMenu.vue)：Naive UI 菜单项的 `props` 只作用于分隔线，右键事件经 `n-menu` 的 `node-props` 绑定。
 - [x] 首页“最近添加的歌曲”卡片的右键菜单：用歌曲列表现有的 `SongListMenu`（立即播放、下一首播放、添加到歌单、更多操作、查看专辑、查看艺术家、同名搜索），菜单设置 `contextMenuOptions` 同样生效。
-- [x] 详情页批量操作（Eric 确认，2026-11-04）：专辑、歌单、我喜欢的音乐三个详情页的“更多 → 批量操作”，弹窗照搬 SPlayer 的 `BatchList.vue`（表格勾选、“高级筛选”按序号范围选择）。与 SPlayer 不同：没有批量下载与删除本地歌曲；所有页面有“添加到歌单”与“下一首播放”（Sonora 新增，按勾选顺序插到当前歌曲之后，[PlayerController.addNextSongs](../../frontend/src/core/player/PlayerController.ts)）；歌单页另有“删除选中的歌曲”；我喜欢的音乐另有“取消喜欢”（Sonora 新增，逐首请求，中途失败时只移除已成功的）。移除后弹窗表格与页面列表、头部数量同步更新。艺术家页不做（歌曲是分页载入）。实现：[BatchList.vue](../../frontend/src/components/Modal/BatchList.vue)、[modal.ts](../../frontend/src/utils/modal.ts) 的 `openBatchList`。
+- [x] 详情页批量操作（Eric 确认，2026-11-04）：专辑、歌单、我喜欢的音乐三个详情页的“更多 → 批量操作”，弹窗照搬 SPlayer 的 `BatchList.vue`（表格勾选、“高级筛选”按序号范围选择）。与 SPlayer 不同：没有批量下载与删除本地歌曲；所有页面有“添加到歌单”与“下一首播放”（Sonora 新增，按勾选顺序插到当前歌曲之后，[PlayerController.addNextSongs](../../frontend/src/core/player/PlayerController.ts)）；歌单页另有“删除选中的歌曲”；我喜欢的音乐另有“取消喜欢”（Sonora 新增，逐首请求，中途失败时只移除已成功的）。移除后弹窗表格与页面列表、头部数量同步更新。实现：[BatchList.vue](../../frontend/src/components/Modal/BatchList.vue)、[modal.ts](../../frontend/src/utils/modal.ts) 的 `openBatchList`。
 
 运行确认（2026-11-04，开发模式临时实例，本机 337 首的曲库副本，Playwright Chromium 无头，1440×1000；脚本在 `/tmp`，未入库）：
 
@@ -24,6 +24,15 @@
 - 专辑页批量：按钮为下一首播放、添加到歌单；高级筛选 1–2 选中 2 首。
 - 我喜欢的音乐批量：按钮为取消喜欢、下一首播放、添加到歌单；取消 1 首后服务端由 3 首变为 2 首，弹窗与页面头部同步。
 - 全程没有页面错误。`task lint:frontend`、`task test:frontend`（57 个测试，新增批量下一首播放 1 个）、`pnpm build` 通过，产物不含 fixture。
+- [x] 歌曲页与艺术家页的批量操作（Eric 确认，2026-11-04；最常用的场景是把最近添加的歌曲批量加入歌单）：这两页的歌曲是分页载入的，点“更多 → 批量操作”时按当前搜索与排序取全部歌曲（每页 500 首），再打开同一个批量弹窗，操作为“下一首播放”“添加到歌单”；取歌期间“更多”按钮显示加载中。歌曲页默认最新入库的在前，用“高级筛选 1–N”即可选中最近添加的一批。不加入库时间列（Eric 决定）。艺术家页新增“更多”按钮，照搬 SPlayer 只在“歌曲”标签下显示；与 SPlayer 不同，SPlayer 只处理已载入的歌曲。实现：[songs.vue](../../frontend/src/views/Library/songs.vue)、[Artist/layout.vue](../../frontend/src/views/Artist/layout.vue)。
+- [x] 歌单页头部随别处的编辑同步：从侧边栏右键菜单编辑正在查看的歌单后，详情页头部的名称、简介与更新时间按刷新后的歌单列表更新，不重新读取歌曲（[playlist.vue](../../frontend/src/views/List/playlist.vue)）。
+
+运行确认（2026-11-04，同上的临时实例与浏览器）：
+
+- 歌曲页：“更多”只有批量操作，弹窗共 337 行（与服务端总数一致），第一行是最新入库的歌；高级筛选 1–5 后添加到歌单，服务端歌单为这 5 首，顺序与列表一致。搜索“陈奕迅”后打开批量，弹窗为 12 行，与搜索结果总数一致。
+- 艺术家页（18 首的艺术家）：歌曲标签下有“更多”，弹窗 18 行，勾选 1 首下一首播放提示“已添加 1 首至下一首播放”；切到专辑标签后“更多”隐藏。
+- 歌单页：从侧边栏编辑名称与简介后，头部立即显示新的名称与简介。
+- 全程没有页面错误；`task lint:frontend`、`task test:frontend`（57 个）通过。
 
 ### 网易云音乐
 

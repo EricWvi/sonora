@@ -1,6 +1,8 @@
 <!-- 艺术家详情。照搬 SPlayer views/Artist/layout.vue：圆形图片、名称、歌曲数与专辑数，
 “歌曲 / 专辑”标签页。图片是管理后台上传的艺术家图片，没有时为 SPlayer 的默认图片。
-不迁入别名、身份、视频、关注与“更多”（批量操作、分享、源页面）。
+不迁入别名、身份、视频、关注、分享与源页面。“更多 → 批量操作”（阶段 7，Eric 确认 2026-11-04）
+照搬 SPlayer 只在“歌曲”标签下显示；与 SPlayer 不同，点开时按当前排序取这位艺术家的全部歌曲，
+而不是只用已载入的部分。
 简介（2026-11-04 起）照搬 SPlayer，内容由管理后台填写。 -->
 <template>
   <div :key="artistId" :class="['artist', { small: listScrolling }]">
@@ -87,6 +89,26 @@
                 </template>
                 播放
               </n-button>
+              <!-- 更多操作 -->
+              <n-dropdown
+                v-if="artistType === 'artist-songs'"
+                :options="moreOptions"
+                trigger="click"
+                placement="bottom-start"
+              >
+                <n-button
+                  :focusable="false"
+                  :loading="batchLoading"
+                  class="more"
+                  circle
+                  strong
+                  secondary
+                >
+                  <template #icon>
+                    <SvgIcon name="List" />
+                  </template>
+                </n-button>
+              </n-dropdown>
             </n-flex>
           </n-flex>
         </div>
@@ -144,21 +166,25 @@
 </template>
 
 <script setup lang="ts">
+import type { DropdownOption } from "naive-ui";
 import type { Artist } from "@/api/types";
+import { fetchAll } from "@/api/pages";
+import { listSortQuery } from "@/utils/meta";
 import { source } from "@/api/source";
 import { useLoadError } from "@/composables/List/useLoadError";
-import { coverLoaded } from "@/utils/helper";
+import { coverLoaded, renderIcon } from "@/utils/helper";
 import { renderToolbar } from "@/utils/meta";
 import { removeBrackets } from "@/utils/format";
 import { coverUrl, defaultCovers } from "@/utils/cover";
-import { useSettingStore } from "@/stores";
-import { openDescModal } from "@/utils/modal";
+import { useSettingStore, useStatusStore } from "@/stores";
+import { openBatchList, openDescModal } from "@/utils/modal";
 import ListError from "@/components/List/ListError.vue";
 import ArtistSongs from "./songs.vue";
 
 const route = useRoute();
 const router = useRouter();
 const settingStore = useSettingStore();
+const statusStore = useStatusStore();
 
 // 路由元素
 const componentRef = ref<InstanceType<typeof ArtistSongs> | null>(null);
@@ -214,6 +240,40 @@ const playAllSongs = async () => {
   await router.push({ name: "artist-songs", query: { id: artistId.value } });
   if (componentRef.value) componentRef.value.playAllSongs();
 };
+
+// 批量操作：按当前排序取这位艺术家的全部歌曲后打开弹窗
+const batchLoading = ref<boolean>(false);
+const openBatch = async () => {
+  const id = artistId.value;
+  if (!id || batchLoading.value) return;
+  batchLoading.value = true;
+  try {
+    const songs = await fetchAll((offset, limit) =>
+      source.tracks({
+        artistId: id,
+        offset,
+        limit,
+        ...listSortQuery(statusStore.listSortField, statusStore.listSortOrder),
+      }),
+    );
+    if (artistId.value === id) await openBatchList(songs);
+  } catch (e) {
+    console.error("获取艺术家歌曲失败：", e);
+    window.$message.error("获取歌曲失败，请重试");
+  } finally {
+    batchLoading.value = false;
+  }
+};
+
+// 更多操作
+const moreOptions = computed<DropdownOption[]>(() => [
+  {
+    label: "批量操作",
+    key: "batch",
+    props: { onClick: openBatch },
+    icon: renderIcon("Batch"),
+  },
+]);
 
 // 列表滚动
 const listScroll = (e: Event) => {
