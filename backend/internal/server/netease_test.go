@@ -886,6 +886,17 @@ func TestNeteaseImport(t *testing.T) {
 	if !album.Single || album.Cover == nil || album.Cover.Name != got.Track.Cover.Name || album.Year != 2017 {
 		t.Fatalf("album: %+v", album)
 	}
+	// The album and the artists keep their NetEase IDs, the track its song's.
+	if album.NeteaseID == nil || *album.NeteaseID != 6 || detail.NeteaseID == nil || *detail.NeteaseID != 701 {
+		t.Fatalf("netease ids: album %v, track %v", album.NeteaseID, detail.NeteaseID)
+	}
+	for _, ref := range detail.Artists {
+		artist, err := ts.store.Artist(ctx, ref.ID)
+		want := map[string]int64{"A": 5, "B/C": 6}[ref.Name]
+		if err != nil || artist.NeteaseID == nil || *artist.NeteaseID != want {
+			t.Fatalf("artist %s: %v %v", ref.Name, err, artist.NeteaseID)
+		}
+	}
 
 	// Importing again finds the track and downloads nothing.
 	f.downloads = nil

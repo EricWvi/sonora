@@ -61,7 +61,7 @@ func TestSearchOrdersByRelevance(t *testing.T) {
 	}
 
 	// Artists: by name alone 阿爱 (a ai) sorts first.
-	artists, err := s.Artists(ctx, "爱", Window{})
+	artists, err := s.Artists(ctx, ArtistQuery{Q: "爱"})
 	var names []string
 	for _, a := range artists.Items {
 		names = append(names, a.Name)

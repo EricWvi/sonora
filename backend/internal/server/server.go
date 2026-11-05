@@ -400,7 +400,11 @@ func (s *server) clearAlbumCover(w http.ResponseWriter, r *http.Request) {
 // --- artists ---------------------------------------------------------------
 
 func (s *server) listArtists(w http.ResponseWriter, r *http.Request) {
-	page, err := s.store.Artists(r.Context(), r.URL.Query().Get("q"), window(r))
+	page, err := s.store.Artists(r.Context(), store.ArtistQuery{
+		Q:      r.URL.Query().Get("q"),
+		Sort:   listSort(r),
+		Window: window(r),
+	})
 	respond(w, r, page, err)
 }
 

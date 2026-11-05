@@ -51,6 +51,11 @@ var albumSortKeys = map[string]string{
 	SortCreateTime: `al.id`,
 }
 
+// artistSortKeys are the fields the artist list sorts by.
+var artistSortKeys = map[string]string{
+	SortCreateTime: `a.id`,
+}
+
 // Sort orders a list by Field, ascending unless Order is "desc". An empty
 // Field or SortDefault keeps the list's own order: newest first, an
 // album's by disc and track, a playlist's as arranged.

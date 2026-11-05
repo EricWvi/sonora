@@ -302,6 +302,16 @@ var migrations = []migration{
 	execSQL(`
 	ALTER TABLE users ADD COLUMN idp_groups TEXT NOT NULL DEFAULT '[]';
 	`),
+
+	// albums.netease_id and artists.netease_id are the NetEase album and
+	// artist an import came from. Unlike tracks.netease_id they are not
+	// unique: every import gets its own album, and an artist matched by name
+	// keeps the first ID it was given. Albums and artists imported before
+	// stay NULL; their NetEase IDs were never stored.
+	execSQL(`
+	ALTER TABLE albums ADD COLUMN netease_id INTEGER;
+	ALTER TABLE artists ADD COLUMN netease_id INTEGER;
+	`),
 }
 
 func migrate(db *sql.DB) error {

@@ -28,9 +28,11 @@ import {
   type ApiError,
   type Page,
 } from "../api";
+import { idColumn, neteaseIdColumn, newestFirst } from "../columns";
 import ArtistLinks from "../components/ArtistLinks.vue";
 import CoverImage from "../components/CoverImage.vue";
 import ArtistsInput from "../components/ArtistsInput.vue";
+import NeteaseIdInput from "../components/NeteaseIdInput.vue";
 import CoverEditor from "../components/CoverEditor.vue";
 import MergeModal from "../components/MergeModal.vue";
 
@@ -68,6 +70,7 @@ async function load() {
         query({
           q: f.q,
           artistId: f.artistId,
+          ...newestFirst(f.q),
           offset: (f.page - 1) * PAGE_SIZE,
           limit: PAGE_SIZE,
         }),
@@ -118,6 +121,7 @@ const form = reactive({
   year: 0,
   single: false,
   description: "",
+  neteaseId: null as number | null,
 });
 const saving = ref(false);
 
@@ -130,6 +134,7 @@ function edit(a: Album) {
     year: a.year,
     single: a.single,
     description: a.description,
+    neteaseId: a.neteaseId,
   });
 }
 
@@ -213,6 +218,7 @@ async function merge(target: number, sources: number[], unifyCovers: boolean) {
 
 const columns: DataTableColumns<Album> = [
   { type: "selection" },
+  idColumn(),
   {
     title: "",
     key: "cover",
@@ -265,6 +271,7 @@ const columns: DataTableColumns<Album> = [
     width: 90,
     render: (a) => formatDuration(a.durationMs),
   },
+  neteaseIdColumn(),
 ];
 
 const pagination = computed(() => ({
@@ -353,8 +360,12 @@ const pagination = computed(() => ({
             :show-button="false"
           />
         </n-form-item>
+        <n-form-item label="网易云 ID">
+          <netease-id-input v-model="form.neteaseId" />
+        </n-form-item>
         <n-form-item
           label="单曲"
+          class="long-feedback"
           feedback="单曲自动建的专辑，或只是同名的几首单曲；播放端的专辑页与首页不显示"
         >
           <n-switch v-model:value="form.single" />
@@ -397,6 +408,11 @@ const pagination = computed(() => ({
 </template>
 
 <style scoped>
+/* Naive UI keeps one line of feedback as the gap before the next item; a
+   hint that wraps fills that gap, so it gets its own. */
+.long-feedback :deep(.n-form-item-feedback-wrapper) {
+  padding-bottom: 12px;
+}
 :deep(.thumb) {
   width: 36px;
   height: 36px;

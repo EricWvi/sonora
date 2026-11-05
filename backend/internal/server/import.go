@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"slices"
+	"strings"
 	"time"
 
 	"sonora/internal/admin"
@@ -118,14 +119,18 @@ func (s *server) downloadSong(ctx context.Context, cookie string, id int64) (sto
 		return store.IngestResult{}, err
 	}
 	meta := media.Meta{Title: song.Title, Year: song.Year}
+	ids := store.NeteaseIDs{Song: id, Artists: map[string]int64{}}
 	for _, a := range song.Artists {
 		meta.Artists = append(meta.Artists, a.Name)
+		// The library trims the names it reads back from the tags.
+		ids.Artists[strings.TrimSpace(a.Name)] = a.ID
 	}
 	// The album artists are the song's artists rather than NetEase's album
 	// artists (Eric, 2026-11-05).
 	meta.AlbumArtists = meta.Artists
 	if song.Album != nil {
 		meta.Album = song.Album.Title
+		ids.Album = song.Album.ID
 	}
 	if song.Cover != nil {
 		var cover bytes.Buffer
@@ -160,5 +165,5 @@ func (s *server) downloadSong(ctx context.Context, cookie string, id int64) (sto
 		return store.IngestResult{}, err
 	}
 	text, _ := lyrics.Compose()
-	return s.store.IngestImported(ctx, upload, []byte(text), id)
+	return s.store.IngestImported(ctx, upload, []byte(text), ids)
 }

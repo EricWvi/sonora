@@ -203,7 +203,7 @@ func (s *server) getPlayerAlbum(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) listPlayerArtists(w http.ResponseWriter, r *http.Request) {
-	page, err := s.store.Artists(r.Context(), r.URL.Query().Get("q"), window(r))
+	page, err := s.store.Artists(r.Context(), store.ArtistQuery{Q: r.URL.Query().Get("q"), Window: window(r)})
 	respond(w, r, mapPage(page, toPlayerArtist), err)
 }
 

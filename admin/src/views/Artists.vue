@@ -17,8 +17,10 @@ import {
 } from "naive-ui";
 import { query, request, type ApiError, type Artist, type Page } from "../api";
 import CoverEditor from "../components/CoverEditor.vue";
+import { idColumn, neteaseIdColumn, newestFirst } from "../columns";
 import CoverImage from "../components/CoverImage.vue";
 import MergeModal from "../components/MergeModal.vue";
+import NeteaseIdInput from "../components/NeteaseIdInput.vue";
 
 const PAGE_SIZE = 50;
 const route = useRoute();
@@ -48,7 +50,12 @@ async function load() {
     data.value = await request<Page<Artist>>(
       "GET",
       "/artists" +
-        query({ q: f.q, offset: (f.page - 1) * PAGE_SIZE, limit: PAGE_SIZE }),
+        query({
+          q: f.q,
+          ...newestFirst(f.q),
+          offset: (f.page - 1) * PAGE_SIZE,
+          limit: PAGE_SIZE,
+        }),
     );
   } catch (err) {
     error.value = (err as ApiError).message;
@@ -86,12 +93,14 @@ const showEdit = ref(false);
 const editing = ref<Artist | null>(null);
 const name = ref("");
 const description = ref("");
+const neteaseId = ref<number | null>(null);
 const saving = ref(false);
 
 function edit(a: Artist) {
   editing.value = a;
   name.value = a.name;
   description.value = a.description;
+  neteaseId.value = a.neteaseId;
   showEdit.value = true;
 }
 
@@ -102,7 +111,11 @@ async function save() {
     editing.value = await request<Artist>(
       "PUT",
       `/artists/${editing.value.id}`,
-      { name: name.value, description: description.value },
+      {
+        name: name.value,
+        description: description.value,
+        neteaseId: neteaseId.value,
+      },
     );
     message.success("已保存");
     load();
@@ -146,6 +159,7 @@ async function merge(target: number, sources: number[]) {
 
 const columns: DataTableColumns<Artist> = [
   { type: "selection" },
+  idColumn(),
   {
     title: "",
     key: "image",
@@ -177,6 +191,7 @@ const columns: DataTableColumns<Artist> = [
     render: (a) =>
       h(RouterLink, { to: `/albums?artistId=${a.id}` }, () => a.albumCount),
   },
+  neteaseIdColumn(),
 ];
 
 const pagination = computed(() => ({
@@ -244,6 +259,9 @@ const pagination = computed(() => ({
       <n-form @submit.prevent="save">
         <n-form-item label="名称">
           <n-input v-model:value="name" autofocus />
+        </n-form-item>
+        <n-form-item label="网易云 ID">
+          <netease-id-input v-model="neteaseId" />
         </n-form-item>
         <n-form-item label="简介">
           <n-input

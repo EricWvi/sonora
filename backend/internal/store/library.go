@@ -63,6 +63,9 @@ type Track struct {
 	LyricsFormat string `json:"lyricsFormat"`
 	OriginalName string `json:"originalName"`
 	CreatedAt    string `json:"createdAt"`
+	// NeteaseID is the NetEase song the track was imported from; nil for
+	// an upload.
+	NeteaseID *int64 `json:"neteaseId"`
 }
 
 // TrackDetail is a track with its lyrics.
@@ -85,6 +88,9 @@ type Album struct {
 	TrackCount  int    `json:"trackCount"`
 	DurationMs  int64  `json:"durationMs"`
 	CreatedAt   string `json:"createdAt"`
+	// NeteaseID is the NetEase album the album was imported from; nil for
+	// uploads and for imports from before 2026-11-06.
+	NeteaseID *int64 `json:"neteaseId"`
 }
 
 // Artist is a performer, of tracks or as an album artist. Image is
@@ -98,6 +104,9 @@ type Artist struct {
 	TrackCount  int    `json:"trackCount"`
 	AlbumCount  int    `json:"albumCount"`
 	CreatedAt   string `json:"createdAt"`
+	// NeteaseID is the NetEase artist of the first import that named this
+	// artist; nil when none did, or only before 2026-11-06.
+	NeteaseID *int64 `json:"neteaseId"`
 }
 
 // Page is one slice of a list and the size of the whole list.
@@ -251,7 +260,7 @@ type TrackQuery struct {
 var trackColumns = `
 	t.id, t.title, t.track_no, t.disc_no, t.year, t.duration_ms, t.format, t.size,
 	t.cover, ` + placeholderOf("t.cover") + `, t.lyrics <> '',
-	CASE WHEN t.lyrics = '' THEN '' ELSE t.lyrics_format END, t.original_name, t.created_at, ` +
+	CASE WHEN t.lyrics = '' THEN '' ELSE t.lyrics_format END, t.original_name, t.created_at, t.netease_id, ` +
 	artistsJSON("track_artists", "track_id", "t.id") + `,
 	al.id, al.title, al.cover, ` + placeholderOf("al.cover") + `, ` + artistsJSON("album_artists", "album_id", "al.id")
 
@@ -261,18 +270,52 @@ const trackFrom = `
 
 type scanner interface{ Scan(...any) error }
 
+// OptionalID is an ID an edit may set, clear or keep: a JSON number sets
+// it, null clears it, and leaving the field out keeps the current one.
+type OptionalID struct {
+	Set   bool
+	Value *int64
+}
+
+// UnmarshalJSON runs only for a field that is present, null included.
+func (o *OptionalID) UnmarshalJSON(b []byte) error {
+	o.Set = true
+	return json.Unmarshal(b, &o.Value)
+}
+
+func (o OptionalID) check() error {
+	if o.Value != nil && *o.Value <= 0 {
+		return invalid("网易云 ID 必须是正整数")
+	}
+	return nil
+}
+
+// setNeteaseID is the SET clause for an OptionalID, taking o.args().
+const setNeteaseID = `netease_id = CASE WHEN ? THEN ? ELSE netease_id END`
+
+func (o OptionalID) args() []any { return []any{o.Set, o.Value} }
+
+// nullID is a nullable ID column as a JSON number or null.
+func nullID(id sql.NullInt64) *int64 {
+	if !id.Valid {
+		return nil
+	}
+	return &id.Int64
+}
+
 func scanTrack(row scanner, extra ...any) (Track, error) {
 	var t Track
-	var alID sql.NullInt64
+	var alID, neteaseID sql.NullInt64
 	var cover, coverHash, alTitle, alCover, alCoverHash sql.NullString
 	var alArtists []Ref
 	dest := []any{&t.ID, &t.Title, &t.TrackNo, &t.DiscNo, &t.Year, &t.DurationMs, &t.Format, &t.Size,
-		&cover, &coverHash, &t.HasLyrics, &t.LyricsFormat, &t.OriginalName, &t.CreatedAt, (*refs)(&t.Artists),
+		&cover, &coverHash, &t.HasLyrics, &t.LyricsFormat, &t.OriginalName, &t.CreatedAt, &neteaseID, (*refs)(&t.Artists),
 		&alID, &alTitle, &alCover, &alCoverHash, (*refs)(&alArtists)}
 	if err := row.Scan(append(dest, extra...)...); err != nil {
 		return t, err
 	}
 	t.Cover = coverOf(cover, coverHash)
+	t.NeteaseID = nullID(neteaseID)
 	if alID.Valid {
 		t.Album = &AlbumRef{ID: alID.Int64, Title: alTitle.String, Artists: alArtists, Cover: coverOf(alCover, alCoverHash)}
 	}
@@ -369,6 +412,9 @@ type TrackInput struct {
 	TrackNo      int      `json:"trackNo"`
 	DiscNo       int      `json:"discNo"`
 	Year         int      `json:"year"`
+	// NeteaseID is the NetEase song; unlike the other fields, leaving it
+	// out keeps the current one.
+	NeteaseID OptionalID `json:"neteaseId"`
 }
 
 func (in *TrackInput) normalize() error {
@@ -402,18 +448,33 @@ func (s *Store) UpdateTrack(ctx context.Context, id int64, in TrackInput) (Track
 	if err := in.normalize(); err != nil {
 		return TrackDetail{}, err
 	}
+	if err := in.NeteaseID.check(); err != nil {
+		return TrackDetail{}, err
+	}
 	s.files.Lock()
 	defer s.files.Unlock()
 	var d TrackDetail
 	err := s.inTx(ctx, func(tx *sql.Tx) error {
+		// The ID tells an imported song apart, so no two tracks share one.
+		if v := in.NeteaseID.Value; v != nil {
+			var other int64
+			err := tx.QueryRowContext(ctx, `SELECT id FROM tracks WHERE netease_id = ? AND id <> ?`, *v, id).Scan(&other)
+			if err == nil {
+				return conflict(fmt.Sprintf("网易云 ID 已被另一首歌曲（ID %d）使用", other))
+			}
+			if !errors.Is(err, sql.ErrNoRows) {
+				return err
+			}
+		}
 		artists, album, err := resolveTrackRefs(ctx, tx, in)
 		if err != nil {
 			return err
 		}
+		args := append([]any{in.Title, album, in.TrackNo, in.DiscNo, in.Year}, in.NeteaseID.args()...)
 		res, err := tx.ExecContext(ctx, `
-			UPDATE tracks SET title = ?, album_id = ?, track_no = ?, disc_no = ?, year = ?,
+			UPDATE tracks SET title = ?, album_id = ?, track_no = ?, disc_no = ?, year = ?, `+setNeteaseID+`,
 				updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
-			WHERE id = ?`, in.Title, album, in.TrackNo, in.DiscNo, in.Year, id)
+			WHERE id = ?`, append(args, id)...)
 		if err != nil {
 			return err
 		}
@@ -543,7 +604,7 @@ type AlbumQuery struct {
 }
 
 var albumSelect = `
-	SELECT al.id, al.title, al.year, al.cover, ` + placeholderOf("al.cover") + `, al.single, al.description, al.created_at, ` +
+	SELECT al.id, al.title, al.year, al.cover, ` + placeholderOf("al.cover") + `, al.single, al.description, al.created_at, al.netease_id, ` +
 	artistsJSON("album_artists", "album_id", "al.id") + `,
 		(SELECT COUNT(*) FROM tracks WHERE album_id = al.id),
 		(SELECT IFNULL(SUM(duration_ms), 0) FROM tracks WHERE album_id = al.id)
@@ -552,8 +613,11 @@ var albumSelect = `
 func scanAlbum(row scanner) (Album, error) {
 	var a Album
 	var cover, coverHash sql.NullString
-	err := row.Scan(&a.ID, &a.Title, &a.Year, &cover, &coverHash, &a.Single, &a.Description, &a.CreatedAt, (*refs)(&a.Artists), &a.TrackCount, &a.DurationMs)
+	var neteaseID sql.NullInt64
+	err := row.Scan(&a.ID, &a.Title, &a.Year, &cover, &coverHash, &a.Single, &a.Description, &a.CreatedAt, &neteaseID,
+		(*refs)(&a.Artists), &a.TrackCount, &a.DurationMs)
 	a.Cover = coverOf(cover, coverHash)
+	a.NeteaseID = nullID(neteaseID)
 	return a, err
 }
 
@@ -633,6 +697,8 @@ type AlbumInput struct {
 	Year        int      `json:"year"`
 	Single      *bool    `json:"single"`
 	Description *string  `json:"description"`
+	// NeteaseID is the NetEase album; leaving it out keeps the current one.
+	NeteaseID OptionalID `json:"neteaseId"`
 }
 
 // UpdateAlbum replaces an album's metadata. Renaming onto another album of
@@ -646,6 +712,9 @@ func (s *Store) UpdateAlbum(ctx context.Context, id int64, in AlbumInput) (Album
 		return Album{}, invalid(fmt.Sprintf("名称不能超过 %d 个字符", maxNameLen))
 	case in.Year < 0 || in.Year > 9999:
 		return Album{}, invalid("年份超出范围")
+	}
+	if err := in.NeteaseID.check(); err != nil {
+		return Album{}, err
 	}
 	var err error
 	if in.Description, err = normalizeDescription(in.Description); err != nil {
@@ -683,8 +752,8 @@ func (s *Store) UpdateAlbum(ctx context.Context, id int64, in AlbumInput) (Album
 		}
 		res, err := tx.ExecContext(ctx, `
 			UPDATE albums SET title = ?, artist_key = ?, year = ?, single = IFNULL(?, single),
-				description = IFNULL(?, description) WHERE id = ?`,
-			in.Title, key, in.Year, in.Single, in.Description, id)
+				description = IFNULL(?, description), `+setNeteaseID+` WHERE id = ?`,
+			append(append([]any{in.Title, key, in.Year, in.Single, in.Description}, in.NeteaseID.args()...), id)...)
 		if err != nil {
 			return err
 		}
@@ -707,8 +776,8 @@ func (s *Store) UpdateAlbum(ctx context.Context, id int64, in AlbumInput) (Album
 }
 
 // MergeAlbums moves the tracks of the source albums into target and
-// deletes the sources. The target keeps its own cover, year and
-// description when set, taking them from the first source that has them
+// deletes the sources. The target keeps its own cover, year, description
+// and NetEase ID when set, taking them from the first source that has them
 // otherwise. With keepCovers, a moved track without a cover of its own
 // takes the cover of its old album when that differs from the target's,
 // so albums of a compilation keep their artwork; otherwise the other
@@ -747,8 +816,9 @@ func mergeAlbumInto(ctx context.Context, tx *sql.Tx, target, src int64, keepCove
 		UPDATE albums SET
 			cover = IFNULL(cover, (SELECT cover FROM albums WHERE id = ?)),
 			year = CASE WHEN year = 0 THEN (SELECT year FROM albums WHERE id = ?) ELSE year END,
-			description = CASE WHEN description = '' THEN (SELECT description FROM albums WHERE id = ?) ELSE description END
-		WHERE id = ?`, src, src, src, target); err != nil {
+			description = CASE WHEN description = '' THEN (SELECT description FROM albums WHERE id = ?) ELSE description END,
+			netease_id = IFNULL(netease_id, (SELECT netease_id FROM albums WHERE id = ?))
+		WHERE id = ?`, src, src, src, src, target); err != nil {
 		return err
 	}
 	if keepCovers {
@@ -770,7 +840,7 @@ func mergeAlbumInto(ctx context.Context, tx *sql.Tx, target, src int64, keepCove
 // --- artists ---------------------------------------------------------------
 
 var artistSelect = `
-	SELECT a.id, a.name, a.image, ` + placeholderOf("a.image") + `, a.description, a.created_at,
+	SELECT a.id, a.name, a.image, ` + placeholderOf("a.image") + `, a.description, a.created_at, a.netease_id,
 		(SELECT COUNT(*) FROM track_artists WHERE artist_id = a.id),
 		(SELECT COUNT(*) FROM album_artists WHERE artist_id = a.id)
 	FROM artists a`
@@ -778,28 +848,43 @@ var artistSelect = `
 func scanArtist(row scanner) (Artist, error) {
 	var a Artist
 	var image, imageHash sql.NullString
-	err := row.Scan(&a.ID, &a.Name, &image, &imageHash, &a.Description, &a.CreatedAt, &a.TrackCount, &a.AlbumCount)
+	var neteaseID sql.NullInt64
+	err := row.Scan(&a.ID, &a.Name, &image, &imageHash, &a.Description, &a.CreatedAt, &neteaseID, &a.TrackCount, &a.AlbumCount)
 	a.Image = coverOf(image, imageHash)
+	a.NeteaseID = nullID(neteaseID)
 	return a, err
 }
 
 const artistOrder = `a.name COLLATE ` + sortCollation + `, a.id`
 
-// Artists lists artists by name, or by relevance when searching.
-func (s *Store) Artists(ctx context.Context, q string, w Window) (Page[Artist], error) {
+// ArtistQuery selects artists: all of them, or those whose name matches Q.
+type ArtistQuery struct {
+	Q    string
+	Sort Sort
+	Window
+}
+
+// Artists lists artists by name unless q.Sort says otherwise; a search
+// without a sort orders by relevance.
+func (s *Store) Artists(ctx context.Context, q ArtistQuery) (Page[Artist], error) {
 	page := Page[Artist]{Items: []Artist{}}
-	cond, args := "", []any{}
-	order, orderArgs := ` ORDER BY `+artistOrder, []any{}
-	if q = strings.TrimSpace(q); q != "" {
+	order, err := q.Sort.orderBy(artistSortKeys, artistOrder)
+	if err != nil {
+		return page, err
+	}
+	cond, args, orderArgs := "", []any{}, []any{}
+	if q.Q = strings.TrimSpace(q.Q); q.Q != "" {
 		name := []searchField{{col: `a.name`}}
-		cond, args = searchCond(q, name)
+		cond, args = searchCond(q.Q, name)
 		cond = ` WHERE ` + cond
-		order, orderArgs = searchOrder(q, artistOrder, name)
+		if q.Sort.isDefault() {
+			order, orderArgs = searchOrder(q.Q, artistOrder, name)
+		}
 	}
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM artists a`+cond, args...).Scan(&page.Total); err != nil {
 		return page, err
 	}
-	w = w.clamp()
+	w := q.Window.clamp()
 	rows, err := s.db.QueryContext(ctx, artistSelect+cond+order+` LIMIT ? OFFSET ?`,
 		append(append(args, orderArgs...), w.Limit, w.Offset)...)
 	if err != nil {
@@ -847,6 +932,8 @@ func normalizeDescription(d *string) (*string, error) {
 type ArtistInput struct {
 	Name        string  `json:"name"`
 	Description *string `json:"description"`
+	// NeteaseID is the NetEase artist; leaving it out keeps the current one.
+	NeteaseID OptionalID `json:"neteaseId"`
 }
 
 // UpdateArtist renames an artist and sets their description. Taking
@@ -863,6 +950,9 @@ func (s *Store) UpdateArtist(ctx context.Context, id int64, in ArtistInput) (Art
 	if err != nil {
 		return Artist{}, err
 	}
+	if err := in.NeteaseID.check(); err != nil {
+		return Artist{}, err
+	}
 	var a Artist
 	err = s.inTx(ctx, func(tx *sql.Tx) error {
 		var other int64
@@ -874,7 +964,8 @@ func (s *Store) UpdateArtist(ctx context.Context, id int64, in ArtistInput) (Art
 			return err
 		}
 		res, err := tx.ExecContext(ctx,
-			`UPDATE artists SET name = ?, description = IFNULL(?, description) WHERE id = ?`, name, desc, id)
+			`UPDATE artists SET name = ?, description = IFNULL(?, description), `+setNeteaseID+` WHERE id = ?`,
+			append(append([]any{name, desc}, in.NeteaseID.args()...), id)...)
 		if err != nil {
 			return err
 		}
@@ -888,8 +979,8 @@ func (s *Store) UpdateArtist(ctx context.Context, id int64, in ArtistInput) (Art
 }
 
 // MergeArtists moves the tracks and albums of the source artists to target
-// and deletes the sources. The target keeps its own image and
-// description when set, taking them from the first source that has them
+// and deletes the sources. The target keeps its own image, description and
+// NetEase ID when set, taking them from the first source that has them
 // otherwise. An album whose artists then match another album of the same
 // title is merged into it.
 func (s *Store) MergeArtists(ctx context.Context, target int64, sources []int64) (Artist, error) {
@@ -915,7 +1006,8 @@ func (s *Store) MergeArtists(ctx context.Context, target int64, sources []int64)
 				}
 			}
 			if _, err := tx.ExecContext(ctx, `UPDATE artists SET image = IFNULL(image, (SELECT image FROM artists WHERE id = ?1)),
-				description = CASE WHEN description = '' THEN (SELECT description FROM artists WHERE id = ?1) ELSE description END
+				description = CASE WHEN description = '' THEN (SELECT description FROM artists WHERE id = ?1) ELSE description END,
+				netease_id = IFNULL(netease_id, (SELECT netease_id FROM artists WHERE id = ?1))
 				WHERE id = ?2`, src, target); err != nil {
 				return err
 			}

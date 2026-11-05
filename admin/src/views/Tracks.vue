@@ -21,6 +21,7 @@ import {
   type Page,
   type Track,
 } from "../api";
+import { idColumn, neteaseIdColumn } from "../columns";
 import ArtistLinks from "../components/ArtistLinks.vue";
 import CoverImage from "../components/CoverImage.vue";
 import TrackDrawer from "../components/TrackDrawer.vue";
@@ -101,6 +102,7 @@ function onSearch(v: string) {
 }
 
 const columns: DataTableColumns<Track> = [
+  idColumn(),
   {
     title: "",
     key: "cover",
@@ -186,6 +188,7 @@ const columns: DataTableColumns<Track> = [
         ? t.lyricsFormat.toUpperCase()
         : h(NText, { depth: 3 }, () => "—"),
   },
+  neteaseIdColumn(),
 ];
 
 const pagination = computed(() => ({

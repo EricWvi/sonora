@@ -84,7 +84,7 @@ func TestPlayerCatalog(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("tracks: %d %s", rec.Code, rec.Body)
 	}
-	for _, field := range []string{"originalName", "size", "createdAt", "lyrics\""} {
+	for _, field := range []string{"originalName", "size", "createdAt", "lyrics\"", "neteaseId"} {
 		if strings.Contains(rec.Body.String(), `"`+field) {
 			t.Fatalf("player track exposes %s: %s", field, rec.Body)
 		}

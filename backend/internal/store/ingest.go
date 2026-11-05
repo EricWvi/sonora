@@ -79,14 +79,27 @@ type IngestResult struct {
 // lyrics is an optional sidecar LRC or TTML file that takes precedence
 // over lyrics embedded in the tags.
 func (s *Store) Ingest(ctx context.Context, u *Upload, lyrics []byte) (IngestResult, error) {
-	return s.ingest(ctx, u, lyrics, 0)
+	return s.ingest(ctx, u, lyrics, NeteaseIDs{})
 }
 
 // IngestImported adds a song imported from NetEase. Unlike an upload it always
 // gets a new album marked single, and keeps its cover as well as giving it to
 // the album, so that the song keeps it when albums are merged later.
-func (s *Store) IngestImported(ctx context.Context, u *Upload, lyrics []byte, neteaseID int64) (IngestResult, error) {
-	return s.ingest(ctx, u, lyrics, neteaseID)
+// ids.Song must be set.
+func (s *Store) IngestImported(ctx context.Context, u *Upload, lyrics []byte, ids NeteaseIDs) (IngestResult, error) {
+	if ids.Song == 0 {
+		return IngestResult{}, invalid("导入的歌曲缺少网易云 ID")
+	}
+	return s.ingest(ctx, u, lyrics, ids)
+}
+
+// NeteaseIDs are the NetEase IDs of an imported song, its album and its
+// artists. Artists maps an artist's name, as written to the tags, to their
+// ID; a missing name or a zero ID leaves that one unset.
+type NeteaseIDs struct {
+	Song    int64
+	Album   int64
+	Artists map[string]int64
 }
 
 // IncomingFile creates a temporary file in the incoming area, on the same
@@ -108,7 +121,7 @@ func (s *Store) ImportedTrack(ctx context.Context, neteaseID int64) (TrackDetail
 	return s.Track(ctx, id)
 }
 
-func (s *Store) ingest(ctx context.Context, u *Upload, lyrics []byte, neteaseID int64) (IngestResult, error) {
+func (s *Store) ingest(ctx context.Context, u *Upload, lyrics []byte, ids NeteaseIDs) (IngestResult, error) {
 	defer u.Discard()
 	// Embedded lyrics are taken as LRC.
 	text, format := u.info.Tags.Lyrics, LRC
@@ -178,8 +191,8 @@ func (s *Store) ingest(ctx context.Context, u *Upload, lyrics []byte, neteaseID 
 		var artists []int64
 		var album sql.NullInt64
 		var err error
-		if neteaseID != 0 {
-			artists, album, err = newImportedAlbum(ctx, tx, in, neteaseID, cover)
+		if ids.Song != 0 {
+			artists, album, err = newImportedAlbum(ctx, tx, in, ids, cover)
 		} else {
 			artists, album, err = resolveTrackRefs(ctx, tx, in)
 		}
@@ -187,7 +200,7 @@ func (s *Store) ingest(ctx context.Context, u *Upload, lyrics []byte, neteaseID 
 			return err
 		}
 		trackCover := cover
-		if neteaseID == 0 && album.Valid && cover.Valid {
+		if ids.Song == 0 && album.Valid && cover.Valid {
 			// The first embedded picture of an album becomes its cover; a
 			// track keeps its own only when the picture differs.
 			var albumCover sql.NullString
@@ -210,7 +223,7 @@ func (s *Store) ingest(ctx context.Context, u *Upload, lyrics []byte, neteaseID 
 				sha256, file, original_name, cover, lyrics, lyrics_format, netease_id)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, 0)) RETURNING id`,
 			in.Title, album, in.TrackNo, in.DiscNo, in.Year, u.info.Duration.Milliseconds(),
-			string(u.info.Format), u.size, u.sha256, rel, u.name, trackCover, text, format, neteaseID).Scan(&id)
+			string(u.info.Format), u.size, u.sha256, rel, u.name, trackCover, text, format, ids.Song).Scan(&id)
 		if err != nil {
 			return err
 		}
@@ -229,18 +242,28 @@ func (s *Store) ingest(ctx context.Context, u *Upload, lyrics []byte, neteaseID 
 }
 
 // newImportedAlbum creates the album of an imported song, see importedSuffix.
-func newImportedAlbum(ctx context.Context, tx *sql.Tx, in TrackInput, neteaseID int64, cover sql.NullString) ([]int64, sql.NullInt64, error) {
+func newImportedAlbum(ctx context.Context, tx *sql.Tx, in TrackInput, ids NeteaseIDs, cover sql.NullString) ([]int64, sql.NullInt64, error) {
 	artists, err := artistIDs(ctx, tx, in.Artists)
 	if err != nil {
 		return nil, sql.NullInt64{}, err
+	}
+	// An artist found by name keeps the NetEase ID they already have: two
+	// NetEase artists can share a name, and the first import decides.
+	for _, name := range in.Artists {
+		if id := ids.Artists[name]; id != 0 {
+			if _, err := tx.ExecContext(ctx, `UPDATE artists SET netease_id = ? WHERE name = ? AND netease_id IS NULL`,
+				id, name); err != nil {
+				return nil, sql.NullInt64{}, err
+			}
+		}
 	}
 	var album sql.NullInt64
 	if in.Album == "" {
 		return artists, album, nil
 	}
 	err = tx.QueryRowContext(ctx,
-		`INSERT INTO albums (title, artist_key, year, cover, single) VALUES (?, ?, ?, ?, 1) RETURNING id`,
-		in.Album, importedKey(artists, neteaseID), in.Year, cover).Scan(&album)
+		`INSERT INTO albums (title, artist_key, year, cover, single, netease_id) VALUES (?, ?, ?, ?, 1, NULLIF(?, 0)) RETURNING id`,
+		in.Album, importedKey(artists, ids.Song), in.Year, cover, ids.Album).Scan(&album)
 	if err != nil {
 		return nil, album, err
 	}

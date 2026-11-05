@@ -136,7 +136,7 @@ func TestMigrationMarksOneTrackAlbumsSingle(t *testing.T) {
 		}
 	}
 	// migration 9 leaves existing artists without one too
-	artists, err := s.Artists(t.Context(), "", Window{})
+	artists, err := s.Artists(t.Context(), ArtistQuery{})
 	if err != nil {
 		t.Fatal(err)
 	}

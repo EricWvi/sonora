@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"image"
 	"image/color"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -305,7 +307,7 @@ func TestUpdateTrackMovesItAndPrunesEmptyAlbum(t *testing.T) {
 		t.Fatalf("updated = %+v", d)
 	}
 	albums, _ := s.Albums(ctx, AlbumQuery{})
-	artists, _ := s.Artists(ctx, "", Window{})
+	artists, _ := s.Artists(ctx, ArtistQuery{})
 	if albums.Total != 1 || artists.Total != 1 {
 		t.Fatalf("albums = %d, artists = %d; old ones not pruned", albums.Total, artists.Total)
 	}
@@ -860,7 +862,7 @@ func TestIngestMultiValueArtists(t *testing.T) {
 	if want := []string{"周杰伦", "费玉清"}; !slices.Equal(names(tr.Artists), want) || !slices.Equal(names(tr.Album.Artists), want) {
 		t.Fatalf("artists = %v, album artists = %v", names(tr.Artists), names(tr.Album.Artists))
 	}
-	if artists, _ := s.Artists(context.Background(), "", Window{}); artists.Total != 2 {
+	if artists, _ := s.Artists(context.Background(), ArtistQuery{}); artists.Total != 2 {
 		t.Fatalf("artists = %+v", artists)
 	}
 }
@@ -956,6 +958,12 @@ func TestPlaceholdersBackfilledOnOpen(t *testing.T) {
 
 func taggedMP3(t *testing.T, st *Store, title string) *Upload {
 	t.Helper()
+	return artistMP3(t, st, title, "A")
+}
+
+// artistMP3 is an MP3 of the artist's album "Same".
+func artistMP3(t *testing.T, st *Store, title, artist string) *Upload {
+	t.Helper()
 	data, err := os.ReadFile(filepath.Join("..", "media", "testdata", "untagged.mp3"))
 	if err != nil {
 		t.Fatal(err)
@@ -964,7 +972,7 @@ func taggedMP3(t *testing.T, st *Store, title string) *Upload {
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := media.WriteTags(path, media.Meta{Title: title, Artists: []string{"A"}, AlbumArtists: []string{"A"}, Album: "Same"}); err != nil {
+	if err := media.WriteTags(path, media.Meta{Title: title, Artists: []string{artist}, AlbumArtists: []string{artist}, Album: "Same"}); err != nil {
 		t.Fatal(err)
 	}
 	f, err := os.Open(path)
@@ -987,7 +995,7 @@ func TestImportedAlbumsStayApart(t *testing.T) {
 		var res IngestResult
 		var err error
 		if neteaseID != 0 {
-			res, err = st.IngestImported(ctx, taggedMP3(t, st, title), nil, neteaseID)
+			res, err = st.IngestImported(ctx, taggedMP3(t, st, title), nil, NeteaseIDs{Song: neteaseID})
 		} else {
 			res, err = st.Ingest(ctx, taggedMP3(t, st, title), nil)
 		}
@@ -1016,5 +1024,182 @@ func TestImportedAlbumsStayApart(t *testing.T) {
 	}
 	if res, err := st.Tracks(ctx, TrackQuery{AlbumID: upload}); err != nil || res.Total != 3 {
 		t.Fatalf("merged: %v %+v", err, res.Total)
+	}
+}
+
+func TestImportedNeteaseIDs(t *testing.T) {
+	st := openTest(t).Store
+	ctx := context.Background()
+	upload, err := st.Ingest(ctx, taggedMP3(t, st, "upload"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if upload.Track.NeteaseID != nil {
+		t.Fatalf("upload track: %v", *upload.Track.NeteaseID)
+	}
+	first, err := st.IngestImported(ctx, taggedMP3(t, st, "first"), nil,
+		NeteaseIDs{Song: 11, Album: 21, Artists: map[string]int64{"A": 31}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The second import names another NetEase artist "A": the first ID stays.
+	second, err := st.IngestImported(ctx, taggedMP3(t, st, "second"), nil,
+		NeteaseIDs{Song: 12, Album: 22, Artists: map[string]int64{"A": 32}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	artistID := first.Track.Artists[0].ID
+	artist, err := st.Artist(ctx, artistID)
+	if err != nil || artist.NeteaseID == nil || *artist.NeteaseID != 31 {
+		t.Fatalf("artist: %v %v", err, artist.NeteaseID)
+	}
+	for res, want := range map[*IngestResult][2]int64{&first: {11, 21}, &second: {12, 22}} {
+		album, err := st.Album(ctx, res.Track.Album.ID)
+		if err != nil || res.Track.NeteaseID == nil || *res.Track.NeteaseID != want[0] ||
+			album.NeteaseID == nil || *album.NeteaseID != want[1] {
+			t.Fatalf("import %d: %v track %v album %v", want[0], err, res.Track.NeteaseID, album.NeteaseID)
+		}
+	}
+	if _, err := st.IngestImported(ctx, taggedMP3(t, st, "none"), nil, NeteaseIDs{}); err == nil {
+		t.Fatal("import without a song ID")
+	}
+
+	// Merging into the uploaded album takes the first source's ID; a target
+	// with an ID keeps it.
+	merged, err := st.MergeAlbums(ctx, upload.Track.Album.ID, []int64{first.Track.Album.ID, second.Track.Album.ID}, false)
+	if err != nil || merged.NeteaseID == nil || *merged.NeteaseID != 21 {
+		t.Fatalf("merged album: %v %v", err, merged.NeteaseID)
+	}
+	other, err := st.UpdateTrack(ctx, upload.Track.ID, TrackInput{Title: "upload", Artists: []string{"B"}, Album: "Other"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mergedArtist, err := st.MergeArtists(ctx, other.Artists[0].ID, []int64{artistID})
+	if err != nil || mergedArtist.NeteaseID == nil || *mergedArtist.NeteaseID != 31 {
+		t.Fatalf("merged artist: %v %v", err, mergedArtist.NeteaseID)
+	}
+}
+
+func TestArtistsSortByCreateTime(t *testing.T) {
+	st := openTest(t).Store
+	ctx := context.Background()
+	for _, name := range []string{"b", "a", "c"} {
+		if _, err := st.Ingest(ctx, artistMP3(t, st, name, name), nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	page, err := st.Artists(ctx, ArtistQuery{Sort: Sort{Field: SortCreateTime, Order: "desc"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, a := range page.Items {
+		names = append(names, a.Name)
+	}
+	if !slices.Equal(names, []string{"c", "a", "b"}) {
+		t.Fatalf("newest first = %v", names)
+	}
+	if _, err := st.Artists(ctx, ArtistQuery{Sort: Sort{Field: SortTitle}}); err == nil {
+		t.Fatal("sorted artists by title")
+	}
+}
+
+func TestOptionalIDJSON(t *testing.T) {
+	for body, want := range map[string]string{
+		`{}`:                 "keep",
+		`{"neteaseId":null}`: "clear",
+		`{"neteaseId":42}`:   "42",
+	} {
+		var in struct {
+			NeteaseID OptionalID `json:"neteaseId"`
+		}
+		if err := json.Unmarshal([]byte(body), &in); err != nil {
+			t.Fatal(err)
+		}
+		got := "keep"
+		switch {
+		case in.NeteaseID.Set && in.NeteaseID.Value == nil:
+			got = "clear"
+		case in.NeteaseID.Set:
+			got = strconv.FormatInt(*in.NeteaseID.Value, 10)
+		}
+		if got != want {
+			t.Errorf("%s: %s, want %s", body, got, want)
+		}
+	}
+}
+
+func TestEditNeteaseIDs(t *testing.T) {
+	st := openTest(t).Store
+	ctx := context.Background()
+	id := func(v int64) OptionalID { return OptionalID{Set: true, Value: &v} }
+	clear := OptionalID{Set: true}
+	same := func(got *int64, want int64) bool {
+		if want == 0 {
+			return got == nil
+		}
+		return got != nil && *got == want
+	}
+	first, err := st.Ingest(ctx, artistMP3(t, st, "first", "A"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := st.Ingest(ctx, artistMP3(t, st, "second", "B"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	in := TrackInput{Title: "first", Artists: []string{"A"}, Album: "Same"}
+
+	// Tracks: set, keep when left out, refuse a taken or bad ID, clear.
+	in.NeteaseID = id(7)
+	if d, err := st.UpdateTrack(ctx, first.Track.ID, in); err != nil || !same(d.NeteaseID, 7) {
+		t.Fatalf("set track: %v %v", err, d.NeteaseID)
+	}
+	in.NeteaseID = OptionalID{}
+	if d, err := st.UpdateTrack(ctx, first.Track.ID, in); err != nil || !same(d.NeteaseID, 7) {
+		t.Fatalf("keep track: %v %v", err, d.NeteaseID)
+	}
+	taken := TrackInput{Title: "second", Artists: []string{"B"}, Album: "Same", NeteaseID: id(7)}
+	if _, err := st.UpdateTrack(ctx, second.Track.ID, taken); !errors.Is(err, ErrConflict) {
+		t.Fatalf("taken track ID: %v", err)
+	}
+	in.NeteaseID = id(0)
+	if _, err := st.UpdateTrack(ctx, first.Track.ID, in); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("zero track ID: %v", err)
+	}
+	in.NeteaseID = clear
+	if d, err := st.UpdateTrack(ctx, first.Track.ID, in); err != nil || !same(d.NeteaseID, 0) {
+		t.Fatalf("clear track: %v %v", err, d.NeteaseID)
+	}
+
+	// Albums and artists may share an ID: every import gets its own album.
+	for _, track := range []IngestResult{first, second} {
+		album := AlbumInput{Title: "Same", Artists: []string{track.Track.Artists[0].Name}, NeteaseID: id(8)}
+		if a, err := st.UpdateAlbum(ctx, track.Track.Album.ID, album); err != nil || !same(a.NeteaseID, 8) {
+			t.Fatalf("set album: %v %v", err, a.NeteaseID)
+		}
+	}
+	album := AlbumInput{Title: "Same", Artists: []string{"A"}, Year: 2000}
+	if a, err := st.UpdateAlbum(ctx, first.Track.Album.ID, album); err != nil || !same(a.NeteaseID, 8) {
+		t.Fatalf("keep album: %v %v", err, a.NeteaseID)
+	}
+	album.NeteaseID = id(-1)
+	if _, err := st.UpdateAlbum(ctx, first.Track.Album.ID, album); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("negative album ID: %v", err)
+	}
+	album.NeteaseID = clear
+	if a, err := st.UpdateAlbum(ctx, first.Track.Album.ID, album); err != nil || !same(a.NeteaseID, 0) {
+		t.Fatalf("clear album: %v %v", err, a.NeteaseID)
+	}
+
+	artistID := first.Track.Artists[0].ID
+	if a, err := st.UpdateArtist(ctx, artistID, ArtistInput{Name: "A", NeteaseID: id(9)}); err != nil || !same(a.NeteaseID, 9) {
+		t.Fatalf("set artist: %v %v", err, a.NeteaseID)
+	}
+	if a, err := st.UpdateArtist(ctx, artistID, ArtistInput{Name: "A"}); err != nil || !same(a.NeteaseID, 9) {
+		t.Fatalf("keep artist: %v %v", err, a.NeteaseID)
+	}
+	if a, err := st.UpdateArtist(ctx, artistID, ArtistInput{Name: "A", NeteaseID: clear}); err != nil || !same(a.NeteaseID, 0) {
+		t.Fatalf("clear artist: %v %v", err, a.NeteaseID)
 	}
 }

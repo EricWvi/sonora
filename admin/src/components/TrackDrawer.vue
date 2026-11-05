@@ -29,6 +29,7 @@ import {
   type TrackInput,
 } from "../api";
 import ArtistsInput from "./ArtistsInput.vue";
+import NeteaseIdInput from "./NeteaseIdInput.vue";
 import CoverEditor from "./CoverEditor.vue";
 
 const props = defineProps<{ id: number | null }>();
@@ -46,6 +47,7 @@ const form = reactive<TrackInput>({
   trackNo: 0,
   discNo: 0,
   year: 0,
+  neteaseId: null,
 });
 const lyrics = ref("");
 const saving = ref(false);
@@ -70,6 +72,7 @@ function fill(t: TrackDetail) {
     trackNo: t.trackNo,
     discNo: t.discNo,
     year: t.year,
+    neteaseId: t.neteaseId,
   });
   lyrics.value = t.lyrics;
 }
@@ -229,6 +232,12 @@ function confirmDelete() {
               </n-form-item>
             </n-gi>
           </n-grid>
+          <n-form-item
+            label="网易云 ID"
+            feedback="导入网易云歌曲时据此判断它是否已在曲库中"
+          >
+            <netease-id-input v-model="form.neteaseId" />
+          </n-form-item>
           <n-button type="primary" attr-type="submit" :loading="saving"
             >保存</n-button
           >

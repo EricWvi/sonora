@@ -121,6 +121,8 @@ export interface Track {
   lyricsFormat: "lrc" | "ttml" | "";
   originalName: string;
   createdAt: string;
+  /** The NetEase song an import came from; null otherwise. */
+  neteaseId: number | null;
 }
 
 export interface TrackDetail extends Track {
@@ -136,6 +138,8 @@ export interface TrackInput {
   trackNo: number;
   discNo: number;
   year: number;
+  /** Null clears it. */
+  neteaseId: number | null;
 }
 
 export interface Album {
@@ -151,6 +155,8 @@ export interface Album {
   trackCount: number;
   durationMs: number;
   createdAt: string;
+  /** The NetEase album an import came from; null otherwise. */
+  neteaseId: number | null;
 }
 
 export interface Artist {
@@ -162,6 +168,8 @@ export interface Artist {
   trackCount: number;
   albumCount: number;
   createdAt: string;
+  /** The NetEase artist an import came from; null otherwise. */
+  neteaseId: number | null;
 }
 
 export interface Page<T> {
