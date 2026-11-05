@@ -1,7 +1,7 @@
 <!-- 主菜单：按 SPlayer Menu.vue 改编，条目见阶段 2 的信息架构。
 与 SPlayer 不同（阶段 7，Eric 决定 2026-11-05）：歌单分组不能折叠，始终展开，标题是普通的小标题，
 文字样式不变。在线/本地歌单的切换按钮照搬 SPlayer（NPopselect），默认本地歌单；
-接入网易云之前“在线歌单”不可选。 -->
+没有登录网易云时“在线歌单”不可选。 -->
 <template>
   <n-menu
     ref="menuRef"
@@ -64,6 +64,10 @@ const router = useRouter();
 const settingStore = useSettingStore();
 const userStore = useUserStore();
 const statusStore = useStatusStore();
+// 选择了在线歌单、后来退出网易云时，显示本地歌单，选择保留到下次登录
+const onlineMode = computed(
+  () => statusStore.playlistMode === "online" && userStore.onlineSignedIn,
+);
 const menuRef = ref<MenuInst | null>(null);
 
 const renderIcon = (name: string, style?: Record<string, string>) => () =>
@@ -103,6 +107,14 @@ const options = computed<MenuOption[]>(() => [
     icon: renderIcon("Favorite"),
   },
   {
+    key: "collection",
+    link: "collection",
+    label: "我的收藏",
+    // 网易云独有，没有登录时隐藏
+    show: userStore.onlineSignedIn,
+    icon: renderIcon("Star"),
+  },
+  {
     key: "history",
     link: "history",
     label: "最近播放",
@@ -117,17 +129,21 @@ const options = computed<MenuOption[]>(() => [
     label: () =>
       h("div", { class: "user-list" }, [
         h(NText, { depth: 3 }, () =>
-          statusStore.playlistMode === "online" ? "创建的歌单" : "本地歌单",
+          onlineMode.value ? "创建的歌单" : "本地歌单",
         ),
         h(
           NPopselect,
           {
             options: [
-              // 在线歌单在接入网易云登录后可选
-              { label: "在线歌单", value: "online", disabled: true },
+              // 没有登录网易云时不可选
+              {
+                label: "在线歌单",
+                value: "online",
+                disabled: !userStore.onlineSignedIn,
+              },
               { label: "本地歌单", value: "local" },
             ],
-            value: statusStore.playlistMode,
+            value: onlineMode.value ? "online" : "local",
             trigger: "click",
             onUpdateValue: (value: "online" | "local") => {
               statusStore.playlistMode = value;
@@ -144,24 +160,26 @@ const options = computed<MenuOption[]>(() => [
               onClick: (event: Event) => event.stopPropagation(),
             }),
         ),
-        h(NButton, {
-          type: "tertiary",
-          round: true,
-          strong: true,
-          secondary: true,
-          renderIcon: renderIcon("Add"),
-          "aria-label": "新建歌单",
-          onClick: (event: Event) => {
-            event.stopPropagation();
-            openCreatePlaylist();
-          },
-        }),
+        // 在线模式的新建待接入网易云的写接口
+        !onlineMode.value &&
+          h(NButton, {
+            type: "tertiary",
+            round: true,
+            strong: true,
+            secondary: true,
+            renderIcon: renderIcon("Add"),
+            "aria-label": "新建歌单",
+            onClick: (event: Event) => {
+              event.stopPropagation();
+              openCreatePlaylist();
+            },
+          }),
       ]),
-    children: (statusStore.playlistMode === "local"
-      ? userStore.playlists
-      : []
+    children: (onlineMode.value
+      ? userStore.onlinePlaylists.created
+      : userStore.playlists
     ).map((playlist) => ({
-      key: playlist.id,
+      key: onlineMode.value ? `online-${playlist.id}` : playlist.id,
       label: () =>
         settingStore.menuShowCover
           ? h("div", { class: "pl-cover" }, [
@@ -303,12 +321,21 @@ function select(key: string | number): void {
   emit("menu-click", key);
   if (typeof key === "number")
     void router.push({ name: "playlist", query: { id: key } });
+  else if (key.startsWith("online-"))
+    void router.push({
+      name: "online-list",
+      query: { type: "playlist", id: key.slice("online-".length) },
+    });
 }
 
 // 当前路由对应的菜单项：详情页高亮所属的列表，自己的歌单高亮该歌单。
 const activeKey = computed<string | number | null>(() => {
   const name = String(route.matched[0]?.name ?? route.name ?? "");
   switch (name) {
+    case "online-list":
+      return route.query.type === "playlist"
+        ? `online-${route.query.id}`
+        : null;
     case "album":
       return "albums";
     case "artist":

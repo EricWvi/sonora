@@ -1,4 +1,5 @@
 import type { DropdownOption } from "naive-ui";
+import { albumRoute, isOnline, sameTrack } from "@/utils/track";
 import type { Track } from "@/api/types";
 import { useMusicStore, useSettingStore } from "@/stores";
 import { usePlayerController } from "@/core/player/PlayerController";
@@ -26,7 +27,7 @@ export const useSongMenu = () => {
     playlistId: number = 0,
     emit?: (event: "removeSong", args: number[]) => void,
   ): DropdownOption[] => {
-    const isCurrent = musicStore.playSong.id === song.id;
+    const isCurrent = sameTrack(musicStore.playSong, song);
     const options = settingStore.contextMenuOptions;
 
     return [
@@ -51,7 +52,8 @@ export const useSongMenu = () => {
       {
         key: "playlist-add",
         label: "添加到歌单",
-        show: options.addToPlaylist,
+        // 本地歌单只放曲库中的歌曲，在线歌曲要先导入
+        show: options.addToPlaylist && !isOnline(song),
         props: {
           onClick: () => openPlaylistAdd([song]),
         },
@@ -102,8 +104,7 @@ export const useSongMenu = () => {
         label: "查看专辑",
         show: options.album && !!song.album,
         props: {
-          onClick: () =>
-            router.push({ name: "album", query: { id: song.album?.id } }),
+          onClick: () => router.push(albumRoute(song)),
         },
         icon: renderIcon("Album"),
       },
@@ -116,7 +117,11 @@ export const useSongMenu = () => {
           onClick: () =>
             openJumpArtist(
               song.artists,
-              song.artists.length === 1 ? song.artists[0].id : undefined,
+              // 在线歌曲没有多位艺术家的选择弹窗，进入第一位的页面
+              song.artists.length === 1 || isOnline(song)
+                ? song.artists[0].id
+                : undefined,
+              isOnline(song),
             ),
         },
         icon: renderIcon("Artist"),

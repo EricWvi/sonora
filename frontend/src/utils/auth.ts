@@ -1,4 +1,5 @@
 import { ApiError, loginUrl, source } from "@/api/source";
+import { isOnline } from "@/utils/track";
 import type { Track } from "@/api/types";
 import { useDataStore, useUserStore } from "@/stores";
 import { debounce, isFunction, type DebouncedFunc } from "lodash-es";
@@ -16,8 +17,12 @@ export const toLikeSong: DebouncedFunc<
   async (song: Track, like: boolean): Promise<void> => {
     const dataStore = useDataStore();
     const { id } = song;
+    const online = isOnline(song);
+    const list = online ? "onlineSongs" : "songs";
     try {
-      if (like) await source.like(id);
+      if (online)
+        await (like ? source.onlineLike(id) : source.onlineUnlike(id));
+      else if (like) await source.like(id);
       else await source.unlike(id);
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
@@ -29,13 +34,13 @@ export const toLikeSong: DebouncedFunc<
       return;
     }
     // 请求期间可能有其他修改，按确认时的列表更新
-    const likeList = dataStore.userLikeData.songs;
+    const likeList = dataStore.userLikeData[list];
     const exists = likeList.includes(id);
     if (like && !exists) {
-      dataStore.userLikeData.songs = [id, ...likeList];
+      dataStore.userLikeData[list] = [id, ...likeList];
       window.$message.success("已添加到我喜欢的音乐");
     } else if (!like && exists) {
-      dataStore.userLikeData.songs = likeList.filter((s) => s !== id);
+      dataStore.userLikeData[list] = likeList.filter((s) => s !== id);
       window.$message.success("已取消喜欢");
     } else if (like && exists) {
       window.$message.info("我喜欢的音乐中已存在该歌曲");

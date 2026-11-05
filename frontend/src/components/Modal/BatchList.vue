@@ -108,6 +108,7 @@
 <script setup lang="ts">
 import type { DataTableColumns, DataTableRowKey } from "naive-ui";
 import type { Track } from "@/api/types";
+import { isOnline, trackKey } from "@/utils/track";
 import { ApiError, loginUrl, source } from "@/api/source";
 import { openPlaylistAdd } from "@/utils/modal";
 import { deleteSongs } from "@/utils/auth";
@@ -116,7 +117,7 @@ import { usePlayerController } from "@/core/player/PlayerController";
 
 interface DataType {
   key: number;
-  id: number;
+  id: string;
   name: string;
   artists: string;
   album: string;
@@ -134,7 +135,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   // 已从当前列表移除的歌曲
-  removed: [ids: number[]];
+  /** 移除的歌曲，见 trackKey */
+  removed: [keys: string[]];
 }>();
 
 const player = usePlayerController();
@@ -165,7 +167,7 @@ const columnsData = computed<DataTableColumns<DataType>>(() => [
 const tableData = computed<DataType[]>(() =>
   songs.value.map((song, index) => ({
     key: index + 1,
-    id: song.id,
+    id: trackKey(song),
     name: song.title || "未知曲目",
     artists: song.artists.length
       ? song.artists.map((ar) => ar.name).join(" / ")
@@ -203,10 +205,12 @@ const handleRangeSelect = () => {
 };
 
 // 移除歌曲后去掉对应行；序号随之变化，保留其余歌曲的勾选
-const afterRemoved = (ids: number[]) => {
+const afterRemoved = (ids: string[]) => {
   emit("removed", ids);
-  const kept = checkSongData.value.filter((song) => !ids.includes(song.id));
-  songs.value = songs.value.filter((song) => !ids.includes(song.id));
+  const kept = checkSongData.value.filter(
+    (song) => !ids.includes(trackKey(song)),
+  );
+  songs.value = songs.value.filter((song) => !ids.includes(trackKey(song)));
   applyCheck(
     tableData.value
       .filter((row) => kept.includes(row.origin))
@@ -220,7 +224,7 @@ const handleDeleteFromPlaylist = () => {
   const ids = checkSongData.value.map((song) => song.id);
   deleteSongs(props.playlistId, ids, {
     songName: ids.length === 1 ? checkSongData.value[0].title : undefined,
-    callback: () => afterRemoved(ids),
+    callback: () => afterRemoved(ids.map(String)),
   });
 };
 
@@ -238,11 +242,13 @@ const handleUnlike = () => {
     negativeText: "取消",
     onPositiveClick: async () => {
       unliking.value = true;
-      const done: number[] = [];
+      const done: Track[] = [];
       try {
         for (const song of selected) {
-          await source.unlike(song.id);
-          done.push(song.id);
+          await (isOnline(song)
+            ? source.onlineUnlike(song.id)
+            : source.unlike(song.id));
+          done.push(song);
         }
       } catch (error) {
         if (error instanceof ApiError && error.status === 401) {
@@ -257,10 +263,15 @@ const handleUnlike = () => {
         unliking.value = false;
       }
       if (!done.length) return;
-      dataStore.userLikeData.songs = dataStore.userLikeData.songs.filter(
-        (id) => !done.includes(id),
-      );
-      afterRemoved(done);
+      const doneKeys = done.map(trackKey);
+      const { songs, onlineSongs } = dataStore.userLikeData;
+      dataStore.userLikeData = {
+        songs: songs.filter((id) => !doneKeys.includes(String(id))),
+        onlineSongs: onlineSongs.filter(
+          (id) => !doneKeys.includes(`online:${id}`),
+        ),
+      };
+      afterRemoved(doneKeys);
       if (done.length === selected.length)
         window.$message.success("已取消喜欢");
     },

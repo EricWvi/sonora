@@ -73,7 +73,13 @@ Album 与 Playlist；不迁入视频、电台与播放量。专辑、歌单卡�
                     v-for="(ar, arIndex) in item.artists"
                     :key="arIndex"
                     class="ar"
-                    @click.stop="openJumpArtist(item.artists, ar.id)"
+                    @click.stop="
+                      openJumpArtist(
+                        item.artists,
+                        ar.id,
+                        item.source === 'online',
+                      )
+                    "
                   >
                     {{
                       settingStore.hideBracketedContent
@@ -153,6 +159,7 @@ import { useMusicStore, useStatusStore, useSettingStore } from "@/stores";
 import { debounce } from "lodash-es";
 import { removeBrackets } from "@/utils/format";
 import { coverUrl, defaultCovers } from "@/utils/cover";
+import { albumRoute } from "@/utils/track";
 import { openJumpArtist } from "@/utils/modal";
 import { usePlayerController } from "@/core/player/PlayerController";
 import { useVirtualGrid } from "@/composables/List/useVirtualGrid";
@@ -229,6 +236,11 @@ const isTrack = (item: Album | Playlist | Track): item is Track =>
 // 点击卡片：歌曲直接播放，其他查看详情
 const openItem = (item: Album | Playlist | Track) => {
   if (isTrack(item)) playList(item);
+  else if (item.source === "online")
+    router.push({
+      name: "online-list",
+      query: { type: props.type, id: item.id },
+    });
   else router.push({ name: props.type, query: { id: item.id } });
 };
 
@@ -245,8 +257,8 @@ const openMenu = (e: MouseEvent, item: Album | Playlist | Track) => {
 };
 
 // 歌曲所属的专辑
-const goAlbum = ({ album }: Track) => {
-  if (album) router.push({ name: "album", query: { id: album.id } });
+const goAlbum = (song: Track) => {
+  if (song.album) router.push(albumRoute(song));
 };
 
 // 播放歌单
@@ -264,7 +276,7 @@ const playList = debounce(
       // 开始加载
       loadingId.value = item.id;
       // 获取播放列表
-      const list = await getListData(item.id);
+      const list = await getListData(item);
       player.updatePlayList(list, undefined, listId(item.id));
     } catch (error) {
       console.log("Error to play: ", error);
@@ -277,10 +289,18 @@ const playList = debounce(
 );
 
 // 获取列表数据：整个专辑或歌单
-const getListData = (id: number): Promise<Track[]> =>
-  props.type === "album"
+const getListData = async ({
+  id,
+  source: origin,
+}: Album | Playlist): Promise<Track[]> => {
+  if (origin === "online")
+    return (
+      await source.onlineList(props.type === "album" ? "album" : "playlist", id)
+    ).tracks;
+  return props.type === "album"
     ? fetchAll((offset, limit) => source.tracks({ albumId: id, offset, limit }))
     : fetchAll((offset, limit) => source.playlistTracks(id, { offset, limit }));
+};
 </script>
 
 <style lang="scss" scoped>

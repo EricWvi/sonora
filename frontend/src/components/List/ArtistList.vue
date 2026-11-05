@@ -21,10 +21,14 @@
             :key="item.id"
             :class="['artist-item', { 'no-cover': hiddenCover }]"
             @click="
-              router.push({
-                name: 'artist',
-                query: { id: item.id },
-              })
+              router.push(
+                item.source === 'online'
+                  ? {
+                      name: 'online-list',
+                      query: { type: 'artist', id: item.id },
+                    }
+                  : { name: 'artist', query: { id: item.id } },
+              )
             "
           >
             <!-- 封面 -->

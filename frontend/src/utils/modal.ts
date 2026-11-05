@@ -1,5 +1,6 @@
 import type { ArtistRef, Track } from "@/api/types";
 import type { SettingType } from "@/types/settings";
+import { isOnline } from "@/utils/track";
 import { NScrollbar } from "naive-ui";
 import router from "@/router";
 import { isFunction } from "lodash-es";
@@ -90,7 +91,15 @@ export const openContextMenuManager = async () => {
  * @param data 歌手列表
  * @param id 点击的歌手
  */
-export const openJumpArtist = async (data: ArtistRef[], id?: number) => {
+export const openJumpArtist = async (
+  data: ArtistRef[],
+  id?: number,
+  online: boolean = false,
+) => {
+  if (online && id) {
+    router.push({ name: "online-list", query: { type: "artist", id } });
+    return;
+  }
   if (data.length <= 2 && id) {
     router.push({ name: "artist", query: { id } });
     return;
@@ -110,8 +119,12 @@ export const openJumpArtist = async (data: ArtistRef[], id?: number) => {
 };
 
 // 添加到歌单
-export const openPlaylistAdd = async (data: Track[]) => {
-  if (!data.length) return window.$message.warning("请正确选择歌曲");
+export const openPlaylistAdd = async (selected: Track[]) => {
+  // 本地歌单只放曲库中的歌曲，在线歌曲要先导入
+  const data = selected.filter((song) => !isOnline(song));
+  if (data.length < selected.length)
+    window.$message.warning("在线歌曲不能加入本地歌单，已跳过");
+  if (!data.length) return;
   const { default: PlaylistAdd } =
     await import("@/components/Modal/PlaylistAdd.vue");
   const modal = window.$modal.create({
@@ -155,7 +168,7 @@ export const openBatchList = async (
   options: {
     playlistId?: number;
     liked?: boolean;
-    onRemoved?: (ids: number[]) => void;
+    onRemoved?: (keys: string[]) => void;
   } = {},
 ) => {
   if (!data.length) return window.$message.warning("列表中没有歌曲");

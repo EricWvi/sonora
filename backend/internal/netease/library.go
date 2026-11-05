@@ -1,0 +1,524 @@
+package netease
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
+)
+
+const (
+	// songDetailChunk is how many songs one /song/detail call takes.
+	songDetailChunk = 500
+	// likedPlaylist is the specialType of a user's "liked songs" playlist.
+	likedPlaylist = 5
+	// sublistPage is the page size for an account's collected albums and artists.
+	sublistPage = 100
+	// maxSublistPages bounds that walk, in case hasMore never turns false.
+	maxSublistPages = 100
+)
+
+// The JSON of the types below matches the player API's own tracks, playlists,
+// albums and artists, so the player's lists take either; Source tells them
+// apart, and Cover.URL stands in for a local cover's content hash.
+
+// Ref names an artist.
+type Ref struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
+// Cover is a NetEase image. Name and Thumbhash stay empty: they belong to
+// local covers.
+type Cover struct {
+	Name      string `json:"name"`
+	Thumbhash string `json:"thumbhash"`
+	URL       string `json:"url"`
+}
+
+// AlbumRef is the album a song belongs to.
+type AlbumRef struct {
+	ID      int64  `json:"id"`
+	Title   string `json:"title"`
+	Artists []Ref  `json:"artists"`
+}
+
+// Song is a NetEase song in the player's track shape.
+type Song struct {
+	ID         int64     `json:"id"`
+	Title      string    `json:"title"`
+	Artists    []Ref     `json:"artists"`
+	Album      *AlbumRef `json:"album"`
+	TrackNo    int       `json:"trackNo"`
+	DiscNo     int       `json:"discNo"`
+	Year       int       `json:"year"`
+	DurationMs int64     `json:"durationMs"`
+	Format     string    `json:"format"`
+	Cover      *Cover    `json:"cover"`
+	HasLyrics  bool      `json:"hasLyrics"`
+	Source     string    `json:"source"`
+	// Playable is false for a song NetEase offers nobody, such as one
+	// whose rights ended. A song is playable to some accounts only by a
+	// trial; that surfaces when its address is requested.
+	Playable bool `json:"playable"`
+}
+
+// Playlist is a NetEase playlist in the player's playlist shape.
+type Playlist struct {
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Cover       *Cover `json:"cover"`
+	TrackCount  int    `json:"trackCount"`
+	DurationMs  int64  `json:"durationMs"`
+	CreatedAt   string `json:"createdAt"`
+	UpdatedAt   string `json:"updatedAt"`
+	Source      string `json:"source"`
+}
+
+// Album is an album the account collected.
+type Album struct {
+	ID         int64  `json:"id"`
+	Title      string `json:"title"`
+	Artists    []Ref  `json:"artists"`
+	Cover      *Cover `json:"cover"`
+	Year       int    `json:"year"`
+	TrackCount int    `json:"trackCount"`
+	DurationMs int64  `json:"durationMs"`
+	Source     string `json:"source"`
+}
+
+// Artist is an artist the account collected.
+type Artist struct {
+	ID         int64  `json:"id"`
+	Name       string `json:"name"`
+	Image      *Cover `json:"image"`
+	TrackCount int    `json:"trackCount"`
+	AlbumCount int    `json:"albumCount"`
+	Source     string `json:"source"`
+}
+
+// Liked is one entry of the "liked songs" playlist.
+type Liked struct {
+	ID int64
+	At time.Time
+}
+
+const sourceOnline = "online"
+
+func cover(u string) *Cover {
+	if u == "" {
+		return nil
+	}
+	return &Cover{URL: strings.Replace(u, "http://", "https://", 1)}
+}
+
+func millis(ms int64) string {
+	if ms <= 0 {
+		return ""
+	}
+	return time.UnixMilli(ms).UTC().Format(time.RFC3339)
+}
+
+func refs(in []Ref) []Ref {
+	if in == nil {
+		return []Ref{}
+	}
+	return in
+}
+
+type apiSong struct {
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	Artists     []Ref  `json:"ar"`
+	Dt          int64  `json:"dt"`
+	PublishTime int64  `json:"publishTime"`
+	Album       struct {
+		ID     int64  `json:"id"`
+		Name   string `json:"name"`
+		PicURL string `json:"picUrl"`
+	} `json:"al"`
+}
+
+func (a apiSong) song(playable bool) Song {
+	out := Song{
+		ID: a.ID, Title: a.Name, Artists: refs(a.Artists), DurationMs: a.Dt,
+		Format: "mp3", Cover: cover(a.Album.PicURL), HasLyrics: true,
+		Source: sourceOnline, Playable: playable,
+	}
+	if a.Album.ID != 0 {
+		out.Album = &AlbumRef{ID: a.Album.ID, Title: a.Album.Name, Artists: []Ref{}}
+	}
+	if a.PublishTime > 0 {
+		out.Year = time.UnixMilli(a.PublishTime).UTC().Year()
+	}
+	return out
+}
+
+// Songs returns the songs in the order of ids, leaving out any NetEase no
+// longer knows.
+func (c *Client) Songs(ctx context.Context, cookie string, ids []int64) ([]Song, error) {
+	found := make(map[int64]Song, len(ids))
+	for start := 0; start < len(ids); start += songDetailChunk {
+		chunk := ids[start:min(start+songDetailChunk, len(ids))]
+		parts := make([]string, len(chunk))
+		for i, id := range chunk {
+			parts[i] = strconv.FormatInt(id, 10)
+		}
+		var out struct {
+			Songs      []apiSong `json:"songs"`
+			Privileges []struct {
+				ID int64 `json:"id"`
+				St int   `json:"st"`
+			} `json:"privileges"`
+		}
+		if err := c.call(ctx, "/song/detail", cookie, url.Values{"ids": {strings.Join(parts, ",")}}, &out); err != nil {
+			return nil, err
+		}
+		blocked := map[int64]bool{}
+		for _, p := range out.Privileges {
+			blocked[p.ID] = p.St < 0
+		}
+		for _, s := range out.Songs {
+			found[s.ID] = s.song(!blocked[s.ID])
+		}
+	}
+	songs := make([]Song, 0, len(ids))
+	for _, id := range ids {
+		if s, ok := found[id]; ok {
+			songs = append(songs, s)
+		}
+	}
+	return songs, nil
+}
+
+type apiPlaylist struct {
+	ID          int64   `json:"id"`
+	Name        string  `json:"name"`
+	Description *string `json:"description"`
+	CoverImgURL string  `json:"coverImgUrl"`
+	TrackCount  int     `json:"trackCount"`
+	Subscribed  bool    `json:"subscribed"`
+	SpecialType int     `json:"specialType"`
+	CreateTime  int64   `json:"createTime"`
+	UpdateTime  int64   `json:"updateTime"`
+	TrackIDs    []struct {
+		ID int64 `json:"id"`
+		At int64 `json:"at"`
+	} `json:"trackIds"`
+}
+
+func (a apiPlaylist) playlist() Playlist {
+	out := Playlist{
+		ID: a.ID, Name: a.Name, Cover: cover(a.CoverImgURL), TrackCount: a.TrackCount,
+		CreatedAt: millis(a.CreateTime), UpdatedAt: millis(a.UpdateTime), Source: sourceOnline,
+	}
+	if a.Description != nil {
+		out.Description = *a.Description
+	}
+	return out
+}
+
+func (c *Client) userPlaylists(ctx context.Context, cookie string, account int64) ([]apiPlaylist, error) {
+	var out struct {
+		Playlist []apiPlaylist `json:"playlist"`
+	}
+	params := url.Values{"uid": {strconv.FormatInt(account, 10)}, "limit": {"1000"}}
+	if err := c.call(ctx, "/user/playlist", cookie, params, &out); err != nil {
+		return nil, err
+	}
+	return out.Playlist, nil
+}
+
+// Playlists returns the account's own playlists and the ones it collected.
+// "Liked songs" is in neither: the sidebar's liked entry covers it.
+func (c *Client) Playlists(ctx context.Context, cookie string, account int64) (created, collected []Playlist, err error) {
+	all, err := c.userPlaylists(ctx, cookie, account)
+	if err != nil {
+		return nil, nil, err
+	}
+	created, collected = []Playlist{}, []Playlist{}
+	for _, p := range all {
+		switch {
+		case p.SpecialType == likedPlaylist:
+		case p.Subscribed:
+			collected = append(collected, p.playlist())
+		default:
+			created = append(created, p.playlist())
+		}
+	}
+	return created, collected, nil
+}
+
+func (c *Client) playlistDetail(ctx context.Context, cookie string, id int64) (apiPlaylist, error) {
+	var out struct {
+		Playlist *apiPlaylist `json:"playlist"`
+	}
+	params := url.Values{"id": {strconv.FormatInt(id, 10)}}
+	if err := c.call(ctx, "/playlist/detail", cookie, params, &out); err != nil {
+		return apiPlaylist{}, err
+	}
+	if out.Playlist == nil {
+		return apiPlaylist{}, ErrNotFound
+	}
+	return *out.Playlist, nil
+}
+
+// PlaylistSongs returns a playlist with all of its songs.
+func (c *Client) PlaylistSongs(ctx context.Context, cookie string, id int64) (Playlist, []Song, error) {
+	p, err := c.playlistDetail(ctx, cookie, id)
+	if err != nil {
+		return Playlist{}, nil, err
+	}
+	ids := make([]int64, len(p.TrackIDs))
+	for i, t := range p.TrackIDs {
+		ids[i] = t.ID
+	}
+	songs, err := c.Songs(ctx, cookie, ids)
+	return p.playlist(), songs, err
+}
+
+// Likes returns the account's liked songs, most recently liked first. Unlike
+// /likelist, the playlist says when each one was liked.
+func (c *Client) Likes(ctx context.Context, cookie string, account int64) ([]Liked, error) {
+	all, err := c.userPlaylists(ctx, cookie, account)
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range all {
+		if p.SpecialType != likedPlaylist {
+			continue
+		}
+		detail, err := c.playlistDetail(ctx, cookie, p.ID)
+		if err != nil {
+			return nil, err
+		}
+		liked := make([]Liked, len(detail.TrackIDs))
+		for i, t := range detail.TrackIDs {
+			liked[i] = Liked{ID: t.ID, At: time.UnixMilli(t.At)}
+		}
+		return liked, nil
+	}
+	return []Liked{}, nil
+}
+
+// sublist walks a paged list of what the account collected.
+func sublist[T any](ctx context.Context, c *Client, path, cookie string) ([]T, error) {
+	all := []T{}
+	for page := range maxSublistPages {
+		var out struct {
+			Data    []T  `json:"data"`
+			HasMore bool `json:"hasMore"`
+		}
+		params := url.Values{
+			"limit":  {strconv.Itoa(sublistPage)},
+			"offset": {strconv.Itoa(page * sublistPage)},
+		}
+		if err := c.call(ctx, path, cookie, params, &out); err != nil {
+			return nil, err
+		}
+		all = append(all, out.Data...)
+		if !out.HasMore {
+			break
+		}
+	}
+	return all, nil
+}
+
+// CollectedAlbums returns the albums the account collected.
+func (c *Client) CollectedAlbums(ctx context.Context, cookie string) ([]Album, error) {
+	data, err := sublist[struct {
+		ID      int64  `json:"id"`
+		Name    string `json:"name"`
+		PicURL  string `json:"picUrl"`
+		Size    int    `json:"size"`
+		Artists []Ref  `json:"artists"`
+	}](ctx, c, "/album/sublist", cookie)
+	if err != nil {
+		return nil, err
+	}
+	albums := make([]Album, len(data))
+	for i, a := range data {
+		albums[i] = Album{
+			ID: a.ID, Title: a.Name, Artists: refs(a.Artists), Cover: cover(a.PicURL),
+			TrackCount: a.Size, Source: sourceOnline,
+		}
+	}
+	return albums, nil
+}
+
+// CollectedArtists returns the artists the account collected.
+func (c *Client) CollectedArtists(ctx context.Context, cookie string) ([]Artist, error) {
+	data, err := sublist[struct {
+		ID        int64  `json:"id"`
+		Name      string `json:"name"`
+		PicURL    string `json:"picUrl"`
+		AlbumSize int    `json:"albumSize"`
+	}](ctx, c, "/artist/sublist", cookie)
+	if err != nil {
+		return nil, err
+	}
+	artists := make([]Artist, len(data))
+	for i, a := range data {
+		artists[i] = Artist{
+			ID: a.ID, Name: a.Name, Image: cover(a.PicURL), AlbumCount: a.AlbumSize, Source: sourceOnline,
+		}
+	}
+	return artists, nil
+}
+
+// EncodeSong and DecodeSong keep a song as a history snapshot, which survives
+// the song leaving NetEase.
+func EncodeSong(s Song) (string, error) {
+	raw, err := json.Marshal(s)
+	return string(raw), err
+}
+
+// DecodeSong reads a snapshot written by EncodeSong.
+func DecodeSong(raw string) (Song, error) {
+	var s Song
+	err := json.Unmarshal([]byte(raw), &s)
+	return s, err
+}
+
+// playbackLevel is the quality asked for, SPlayer's default.
+const playbackLevel = "exhigh"
+
+// SongURL returns where to play the song, or "" when the account gets no full
+// version: SPlayer does not play trials unless asked to, and neither does
+// Sonora. The address is signed and short-lived, so it is fetched per play.
+func (c *Client) SongURL(ctx context.Context, cookie string, id int64) (string, error) {
+	var out struct {
+		Data []struct {
+			URL           string          `json:"url"`
+			FreeTrialInfo json.RawMessage `json:"freeTrialInfo"`
+		} `json:"data"`
+	}
+	params := url.Values{"id": {strconv.FormatInt(id, 10)}, "level": {playbackLevel}}
+	if err := c.call(ctx, "/song/url/v1", cookie, params, &out); err != nil {
+		return "", err
+	}
+	if len(out.Data) == 0 || out.Data[0].URL == "" {
+		return "", nil
+	}
+	if t := string(out.Data[0].FreeTrialInfo); t != "" && t != "null" {
+		return "", nil
+	}
+	return playableURL(out.Data[0].URL), nil
+}
+
+// playableURL makes an address the page can use, as SPlayer does on the web:
+// the page is https, and m804 and m704 do not serve browsers.
+func playableURL(u string) string {
+	u = strings.Replace(u, "http://", "https://", 1)
+	u = strings.ReplaceAll(u, "m804.music.126.net", "m801.music.126.net")
+	return strings.ReplaceAll(u, "m704.music.126.net", "m701.music.126.net")
+}
+
+// Lyric returns the song's plain LRC lyric, "" without one.
+func (c *Client) Lyric(ctx context.Context, cookie string, id int64) (string, error) {
+	var out struct {
+		Lrc struct {
+			Lyric string `json:"lyric"`
+		} `json:"lrc"`
+	}
+	params := url.Values{"id": {strconv.FormatInt(id, 10)}}
+	if err := c.call(ctx, "/lyric/new", cookie, params, &out); err != nil {
+		return "", err
+	}
+	return out.Lrc.Lyric, nil
+}
+
+// LikedIDs returns the IDs of the account's liked songs.
+func (c *Client) LikedIDs(ctx context.Context, cookie string, account int64) ([]int64, error) {
+	var out struct {
+		IDs []int64 `json:"ids"`
+	}
+	params := url.Values{"uid": {strconv.FormatInt(account, 10)}}
+	if err := c.call(ctx, "/likelist", cookie, params, &out); err != nil {
+		return nil, err
+	}
+	if out.IDs == nil {
+		return []int64{}, nil
+	}
+	return out.IDs, nil
+}
+
+// SetLike likes or unlikes the song on NetEase.
+func (c *Client) SetLike(ctx context.Context, cookie string, id int64, like bool) error {
+	var out struct {
+		Code int `json:"code"`
+	}
+	params := url.Values{"id": {strconv.FormatInt(id, 10)}, "like": {strconv.FormatBool(like)}}
+	if err := c.call(ctx, "/like", cookie, params, &out); err != nil {
+		return err
+	}
+	if out.Code != http.StatusOK {
+		return fmt.Errorf("%w: /like: code %d", ErrUnavailable, out.Code)
+	}
+	return nil
+}
+
+// AlbumSongs returns an album in the playlist shape, with its songs.
+func (c *Client) AlbumSongs(ctx context.Context, cookie string, id int64) (Playlist, []Song, error) {
+	var out struct {
+		Album *struct {
+			Name        string  `json:"name"`
+			PicURL      string  `json:"picUrl"`
+			Description *string `json:"description"`
+		} `json:"album"`
+		Songs []apiSong `json:"songs"`
+	}
+	params := url.Values{"id": {strconv.FormatInt(id, 10)}}
+	if err := c.call(ctx, "/album", cookie, params, &out); err != nil {
+		return Playlist{}, nil, err
+	}
+	if out.Album == nil {
+		return Playlist{}, nil, ErrNotFound
+	}
+	list := Playlist{
+		ID: id, Name: out.Album.Name, Cover: cover(out.Album.PicURL), TrackCount: len(out.Songs), Source: sourceOnline,
+	}
+	if out.Album.Description != nil {
+		list.Description = *out.Album.Description
+	}
+	songs := make([]Song, len(out.Songs))
+	for i, s := range out.Songs {
+		songs[i] = s.song(true)
+		if songs[i].Cover == nil {
+			songs[i].Cover = list.Cover
+		}
+	}
+	return list, songs, nil
+}
+
+// ArtistSongs returns an artist in the playlist shape, with their top songs.
+func (c *Client) ArtistSongs(ctx context.Context, cookie string, id int64) (Playlist, []Song, error) {
+	var out struct {
+		Artist *struct {
+			Name      string `json:"name"`
+			PicURL    string `json:"picUrl"`
+			BriefDesc string `json:"briefDesc"`
+		} `json:"artist"`
+		HotSongs []apiSong `json:"hotSongs"`
+	}
+	params := url.Values{"id": {strconv.FormatInt(id, 10)}}
+	if err := c.call(ctx, "/artists", cookie, params, &out); err != nil {
+		return Playlist{}, nil, err
+	}
+	if out.Artist == nil {
+		return Playlist{}, nil, ErrNotFound
+	}
+	songs := make([]Song, len(out.HotSongs))
+	for i, s := range out.HotSongs {
+		songs[i] = s.song(true)
+	}
+	return Playlist{
+		ID: id, Name: out.Artist.Name, Description: out.Artist.BriefDesc, Cover: cover(out.Artist.PicURL),
+		TrackCount: len(songs), Source: sourceOnline,
+	}, songs, nil
+}

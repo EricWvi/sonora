@@ -242,3 +242,30 @@ func TestDeletingTrackRemovesItFromListenerData(t *testing.T) {
 		t.Fatalf("likes %v, history %d, playlist %d tracks", ids, history.Total, p.TrackCount)
 	}
 }
+
+func TestHistoryLimitCoversOnlineSongs(t *testing.T) {
+	ctx := context.Background()
+	s := openTest(t)
+	u, err := s.UpsertUser(ctx, Identity{Issuer: "i", Subject: "a", Name: "A"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := int64(1); i <= MaxHistory+3; i++ {
+		if err := s.RecordOnlinePlay(ctx, u.ID, i, "{}"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	plays, err := s.OnlineHistory(ctx, u.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plays) != MaxHistory || plays[0].NeteaseID != MaxHistory+3 {
+		t.Fatalf("%d plays, newest %d", len(plays), plays[0].NeteaseID)
+	}
+	if err := s.RecordOnlinePlay(ctx, u.ID, MaxHistory+3, "{}"); err != nil {
+		t.Fatal(err)
+	}
+	if plays, _ := s.OnlineHistory(ctx, u.ID); len(plays) != MaxHistory {
+		t.Fatalf("replay changed the count: %d", len(plays))
+	}
+}

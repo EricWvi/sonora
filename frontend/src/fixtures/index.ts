@@ -419,6 +419,28 @@ function librarySource(lib: Library): DataSource {
     neteaseQRCheck: () => Promise.reject(new ApiError(503, "没有配置")),
     neteaseCookieLogin: () => Promise.reject(new ApiError(503, "没有配置")),
     neteaseLogout: () => reply(() => undefined),
+    // 没有在线部分时，混合列表就是本地列表。
+    mixedLikes: (query) => reply(() => page(lib.likes.map(track), query)),
+    mixedHistory: (query) =>
+      reply(() =>
+        page<HistoryEntry>(
+          lib.history.map((e) => ({
+            track: track(e.trackId),
+            playedAt: e.playedAt,
+          })),
+          query,
+        ),
+      ),
+    recordOnlinePlay: () => reply(() => undefined),
+    onlinePlaylists: () => reply(() => ({ created: [], collected: [] })),
+    onlineAlbums: () => reply(() => ({ items: [], total: 0 })),
+    onlineArtists: () => reply(() => ({ items: [], total: 0 })),
+    onlineList: () => Promise.reject(new ApiError(503, "没有配置")),
+    onlineSongUrl: () => Promise.reject(new ApiError(503, "没有配置")),
+    onlineLyrics: () => reply(() => ({ format: "" as const, lyrics: "" })),
+    onlineLikeIds: () => reply(() => []),
+    onlineLike: () => reply(() => undefined),
+    onlineUnlike: () => reply(() => undefined),
     tracks: (query = {}) =>
       reply(() => {
         let list = newestFirst();

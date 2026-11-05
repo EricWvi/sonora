@@ -1,6 +1,6 @@
 <!-- 我喜欢的音乐。照搬 SPlayer views/List/liked.vue：头部为 ListDetail，封面为 SPlayer 的
 默认封面，信息只有歌曲数（阶段 2 的“详情页头部”）；歌曲一次载入全部，默认最近喜欢的在前。
-不迁入歌单编辑、拖动排序、评论与分享。“更多”只有批量操作（阶段 7），其中“取消喜欢”是 Sonora 新增。 -->
+本地与在线歌曲混合（阶段 7），服务端按喜欢时间混排。不迁入歌单编辑、拖动排序、评论与分享。“更多”只有批量操作（阶段 7），其中“取消喜欢”是 Sonora 新增。 -->
 <template>
   <div class="liked-list">
     <ListDetail
@@ -47,7 +47,7 @@ import type { ListDetailData } from "@/viewmodels";
 import { ApiError, source } from "@/api/source";
 import { fetchAll } from "@/api/pages";
 import { useStatusStore } from "@/stores";
-import { listSortQuery } from "@/utils/meta";
+import { sortTracks, trackKey } from "@/utils/track";
 import { useListDetail } from "@/composables/List/useListDetail";
 import { useListSearch } from "@/composables/List/useListSearch";
 import { useListScroll } from "@/composables/List/useListScroll";
@@ -122,8 +122,8 @@ const moreOptions = computed<DropdownOption[]>(() => [
 ]);
 
 // 取消喜欢后从列表移除，并更新头部的数量
-const removeSongs = (ids: number[]) => {
-  setListData(listData.value.filter((song) => !ids.includes(song.id)));
+const removeSongs = (keys: string[]) => {
+  setListData(listData.value.filter((song) => !keys.includes(trackKey(song))));
   if (detailData.value)
     setDetailData({ ...detailData.value, count: listData.value.length });
 };
@@ -133,12 +133,19 @@ const getLikedSongs = async () => {
   setLoading(true);
   error.value = "";
   try {
-    const songs = await fetchAll((offset, limit) =>
-      source.likes({
-        offset,
-        limit,
-        ...listSortQuery(statusStore.listSortField, statusStore.listSortOrder),
-      }),
+    let onlineFailed = false;
+    const mixed = await fetchAll(async (offset, limit) => {
+      const page = await source.mixedLikes({ offset, limit });
+      onlineFailed ||= !!page.onlineFailed;
+      return page;
+    });
+    if (onlineFailed)
+      window.$message.warning("网易云暂时无法读取，只显示本地歌曲");
+    // 在线歌曲不在数据库中，混合列表在浏览器中排序
+    const songs = sortTracks(
+      mixed,
+      statusStore.listSortField,
+      statusStore.listSortOrder,
     );
     setDetailData({
       id: 0,

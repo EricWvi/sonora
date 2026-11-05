@@ -1,6 +1,7 @@
 import { fixturePlayer, source, type DataSource } from "@/api/source";
 import { connection } from "@/api/connection";
 import type { Track } from "@/api/types";
+import { isOnline, sameTrack } from "@/utils/track";
 import {
   AudioErrorCode,
   type IPlaybackEngine,
@@ -54,7 +55,7 @@ export interface PlaybackDeps {
    * 过期的解析可以被丢弃，也便于测试切歌竞态
    */
   resolveAudio(track: Track): Promise<string>;
-  source: Pick<DataSource, "recordPlay" | "audioStatus">;
+  source: Pick<DataSource, "recordPlay" | "recordOnlinePlay" | "audioStatus">;
   storage: PlayerStorage;
   message: Pick<Window["$message"], "success" | "error" | "warning">;
   /** 切换歌曲时更新歌词、封面取色与系统媒体信息，歌词载入后完成 */
@@ -573,9 +574,10 @@ export class PlayerController {
     const entry = this.currentEntry();
     if (!entry) return;
     this.recorded = true;
-    this.deps.source
-      .recordPlay(entry.id)
-      .catch((error) => console.error("记录最近播放失败", error));
+    (isOnline(entry)
+      ? this.deps.source.recordOnlinePlay(entry)
+      : this.deps.source.recordPlay(entry.id)
+    ).catch((error) => console.error("记录最近播放失败", error));
   }
 
   /**
@@ -600,7 +602,10 @@ export class PlayerController {
     this.playAttempt++;
     this.engine.stop();
     this.setState("error");
-    const status = await this.deps.source.audioStatus(entry.id);
+    // 在线歌曲的地址在网易云 CDN 上，无法也不必经 Sonora 查询状态
+    const status = isOnline(entry)
+      ? 200
+      : await this.deps.source.audioStatus(entry.id);
     if (token !== this.currentRequestToken) return;
     if (status === 401) {
       this.stopAfterError();
@@ -882,7 +887,7 @@ export class PlayerController {
     if (!data || !data.length) return;
     this.resetFailures();
     const entries = data.map(newEntry);
-    const songIndex = song ? data.findIndex((s) => s.id === song.id) : -1;
+    const songIndex = song ? data.findIndex((s) => sameTrack(s, song)) : -1;
     const start = entries[Math.max(songIndex, 0)];
     // 处理随机模式
     if (statusStore.shuffleMode === "on") {
@@ -892,7 +897,7 @@ export class PlayerController {
     }
     const newIndex = useDataStore().playList.indexOf(start);
     musicStore.playPlaylistId = pid ?? "";
-    if (song && musicStore.playSong.id === song.id && this.state !== "idle") {
+    if (song && sameTrack(musicStore.playSong, song) && this.state !== "idle") {
       // 如果是同一首歌，仅更新索引
       statusStore.playIndex = newIndex;
       this.saveQueue();
@@ -949,7 +954,7 @@ export class PlayerController {
     const dataStore = useDataStore();
     const musicStore = useMusicStore();
     const current = this.currentEntry();
-    if (current && musicStore.playSong.id === song.id) {
+    if (current && sameTrack(musicStore.playSong, song)) {
       await this.play();
       this.deps.message.success("已开始播放");
       return;

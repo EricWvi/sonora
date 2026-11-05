@@ -118,6 +118,33 @@
 | `POST netease/login/cookie`  | `{cookie}`，服务端校验后保存，返回与 `status` 相同的形态；`cookie` 可以是从浏览器复制的整段请求头。无效时返回 400 `invalid`                                                                                                                                                                                                                           |
 | `POST netease/logout`        | 只删除 Sonora 保存的会话，幂等，204。与 SPlayer 不同，不调用接口服务的 `/logout`，以免让同一个 Cookie 在别的客户端失效                                                                                                                                                                                                                                |
 
+### 网易云内容
+
+下面的接口需要已登录网易云：没有登录时返回 403 `netease_signed_out`，登录失效时返回 403 `netease_expired`。用 403 而不是 401，因为失效的只是网易云，401 表示播放端会话失效。
+
+在线内容的 JSON 形态与本地相同，列表可以混用，另有 `source: "online"`；本地内容没有 `source`。封面为 `{name: "", thumbhash: "", url}`，`url` 是网易云的图片地址，由浏览器直接加载。在线歌曲另有 `playable`，`false` 表示网易云不提供这首歌；没有 `trackNo`、`discNo`，`year` 取发行时间。本地与在线的 ID 都是整数，可能相同，比较时要同时比较来源。
+
+| 方法与路径                                                                  | 说明                                                                                              |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `GET netease/playlists`                                                     | `{created, collected}`：自己创建的与收藏的歌单，不含“我喜欢的音乐”                                |
+| `GET netease/playlists/{id}`、`netease/albums/{id}`、`netease/artists/{id}` | `{playlist, tracks}`：详情都以歌单的形态返回，全部歌曲一次返回；艺术家为热门歌曲                  |
+| `GET netease/albums`、`GET netease/artists`                                 | 收藏的专辑与歌手，`{items, total}`                                                                |
+| `GET netease/songs/{id}/url`                                                | `{url}`：音质 `exhigh`，地址带时效，每次播放时获取；只有试听或没有地址时返回 404 `netease_no_url` |
+| `GET netease/songs/{id}/lyrics`                                             | 与 `tracks/{id}/lyrics` 相同的 `{format, lyrics}`，目前只有 LRC                                   |
+| `GET netease/likes/ids`                                                     | `{ids}`：喜欢的在线歌曲                                                                           |
+| `PUT netease/likes/{id}`、`DELETE netease/likes/{id}`                       | 在网易云上喜欢 / 取消，204                                                                        |
+
+### 混合列表
+
+本地与在线歌曲混合的列表，分页与其他列表相同，不接受 `sort`（在线歌曲不在数据库中，排序由播放端完成）。没有登录网易云时只有本地歌曲。
+
+| 方法与路径                   | 说明                                                                                                                                                             |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET likes/mixed`            | 按喜欢时间混排。同一首歌本地与在线都喜欢时只有一条，优先本地（按 `tracks.netease_id` 判断），时间取较晚的。网易云读取失败时返回本地歌曲并带 `onlineFailed: true` |
+| `GET history/mixed`          | `{items: [{track, playedAt}], total}`，按时间混排；本地与在线共用 500 条的上限                                                                                   |
+| `POST history/online`        | `{song}` 记录一次在线歌曲的播放，服务端保存歌曲的快照（JSON 不超过 16 KB），204                                                                                  |
+| `DELETE history/online/{id}` | 删除一条，204；`DELETE history` 同时清空本地与在线的记录                                                                                                         |
+
 ## 播放端用户数据
 
 设置、喜爱、歌单与播放历史属于当前登录的用户，同样需要播放端会话。别人的歌单一律返回 404，不区分“不存在”与“无权访问”。管理端删除歌曲时，它会从所有人的喜爱、歌单与历史中消失。

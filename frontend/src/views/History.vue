@@ -1,4 +1,4 @@
-<!-- 最近播放。照搬 SPlayer views/History.vue，记录来自服务端（GET history），一次载入全部。 -->
+<!-- 最近播放。照搬 SPlayer views/History.vue，记录来自服务端（GET history/mixed，本地与在线歌曲混合），一次载入全部。 -->
 <template>
   <div class="history">
     <div class="title">
@@ -80,7 +80,7 @@ const load = async () => {
   error.value = "";
   try {
     const entries = await fetchAll((offset, limit) =>
-      source.history({ offset, limit }),
+      source.mixedHistory({ offset, limit }),
     );
     historyList.value = entries.map((entry) => entry.track);
   } catch (e) {

@@ -31,6 +31,12 @@ const (
 // listener's session says nothing about it.
 var ErrUnavailable = errors.New("netease: api service unavailable")
 
+// ErrNotFound means NetEase has no such item.
+var ErrNotFound = errors.New("netease: not found")
+
+// ErrExpired means NetEase refused the session.
+var ErrExpired = errors.New("netease: session expired")
+
 // ErrInvalidCookie means a cookie cannot sign anyone in.
 var ErrInvalidCookie = errors.New("netease: cookie has no MUSIC_U")
 
@@ -41,6 +47,9 @@ const (
 	QRConfirm   = 802
 	QRSucceeded = 803
 )
+
+// needLogin is the code NetEase answers with when a call needs a session.
+const needLogin = 301
 
 // Client calls the API service.
 type Client struct {
@@ -103,7 +112,20 @@ func (c *Client) call(ctx context.Context, path, cookie string, params url.Value
 	if resp.StatusCode >= http.StatusInternalServerError {
 		return fmt.Errorf("%w: %s: status %d", ErrUnavailable, path, resp.StatusCode)
 	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, maxResponse)).Decode(out); err != nil {
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxResponse))
+	if err != nil {
+		return fmt.Errorf("%w: %s: unreadable response", ErrUnavailable, path)
+	}
+	var head struct {
+		Code int `json:"code"`
+	}
+	if err := json.Unmarshal(raw, &head); err != nil {
+		return fmt.Errorf("%w: %s: unreadable response", ErrUnavailable, path)
+	}
+	if head.Code == needLogin {
+		return fmt.Errorf("%w: %s", ErrExpired, path)
+	}
+	if err := json.Unmarshal(raw, out); err != nil {
 		return fmt.Errorf("%w: %s: unreadable response", ErrUnavailable, path)
 	}
 	return nil

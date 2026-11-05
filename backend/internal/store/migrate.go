@@ -277,6 +277,25 @@ var migrations = []migration{
 		refreshed_at TEXT    NOT NULL
 	);
 	`),
+
+	// online_history records NetEase songs a listener played. They are not in
+	// tracks, so each row keeps a snapshot of the song; play_history stays as
+	// it is and the two are merged when read, under one MaxHistory.
+	// tracks.netease_id marks a track imported from NetEase: it is local from
+	// then on, and the ID is what tells it is the same song.
+	execSQL(`
+	CREATE TABLE online_history (
+		id         INTEGER PRIMARY KEY,
+		user_id    INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+		netease_id INTEGER NOT NULL,
+		song       TEXT    NOT NULL,
+		played_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+		UNIQUE (user_id, netease_id)
+	);
+
+	ALTER TABLE tracks ADD COLUMN netease_id INTEGER;
+	CREATE UNIQUE INDEX tracks_netease_id ON tracks (netease_id) WHERE netease_id IS NOT NULL;
+	`),
 }
 
 func migrate(db *sql.DB) error {

@@ -124,7 +124,7 @@ const getHomeData = async () => {
   error.value = "";
   try {
     const [likes, songs, albums, history] = await Promise.all([
-      source.likes({ limit: 50 }),
+      source.mixedLikes({ limit: 50 }),
       // 默认新入库在前，“最近添加的歌曲”取前 12 首
       source.tracks({ limit: 50 }),
       // 与 SPlayer 不同：最近添加的专辑不含标记为单曲的专辑
@@ -134,7 +134,7 @@ const getHomeData = async () => {
         limit: 12,
         hideSingles: true,
       }),
-      source.history({ limit: 10 }),
+      source.mixedHistory({ limit: 10 }),
     ]);
     likedSongs.value = likes.items;
     librarySongs.value = songs.items;

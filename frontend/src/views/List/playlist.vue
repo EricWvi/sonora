@@ -263,7 +263,8 @@ const toDeletePlaylist = () => {
 };
 
 // 删除歌曲：服务端确认后从列表中移除，并更新头部的数量
-const removeSong = (ids: number[]) => {
+const removeSong = (keys: (string | number)[]) => {
+  const ids = keys.map(Number);
   setListData(listData.value.filter((song) => !ids.includes(song.id)));
   if (detailData.value)
     setDetailData({ ...detailData.value, count: listData.value.length });

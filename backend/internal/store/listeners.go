@@ -155,11 +155,7 @@ func (s *Store) RecordPlay(ctx context.Context, userID, trackID int64) error {
 			`INSERT INTO play_history (user_id, track_id) VALUES (?, ?)`, userID, trackID); err != nil {
 			return err
 		}
-		_, err := tx.ExecContext(ctx, `
-			DELETE FROM play_history WHERE user_id = ? AND id NOT IN (
-				SELECT id FROM play_history WHERE user_id = ? ORDER BY id DESC LIMIT ?)`,
-			userID, userID, MaxHistory)
-		return err
+		return trimHistory(ctx, tx, userID)
 	})
 }
 
@@ -171,8 +167,13 @@ func (s *Store) RemoveFromHistory(ctx context.Context, userID, trackID int64) er
 
 // ClearHistory empties the user's history.
 func (s *Store) ClearHistory(ctx context.Context, userID int64) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM play_history WHERE user_id = ?`, userID)
-	return err
+	return s.inTx(ctx, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM play_history WHERE user_id = ?`, userID); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, `DELETE FROM online_history WHERE user_id = ?`, userID)
+		return err
+	})
 }
 
 // --- playlists -------------------------------------------------------------

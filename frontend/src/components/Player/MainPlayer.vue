@@ -70,7 +70,7 @@
             <!-- 喜欢 -->
             <SvgIcon
               :name="
-                dataStore.isLikeSong(musicStore.playSong.id)
+                dataStore.isLikeSong(musicStore.playSong)
                   ? 'Favorite'
                   : 'FavoriteBorder'
               "
@@ -79,7 +79,7 @@
               @click="
                 toLikeSong(
                   musicStore.playSong,
-                  !dataStore.isLikeSong(musicStore.playSong.id),
+                  !dataStore.isLikeSong(musicStore.playSong),
                 )
               "
             />
@@ -119,7 +119,11 @@
                       :key="index"
                       class="ar-item"
                       @click="
-                        openJumpArtist(musicStore.playSong.artists, item.id)
+                        openJumpArtist(
+                          musicStore.playSong.artists,
+                          item.id,
+                          musicStore.playSong.source === 'online',
+                        )
                       "
                     >
                       {{

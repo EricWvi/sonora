@@ -21,13 +21,13 @@
             @click="
               toLikeSong(
                 musicStore.playSong,
-                !dataStore.isLikeSong(musicStore.playSong.id),
+                !dataStore.isLikeSong(musicStore.playSong),
               )
             "
           >
             <SvgIcon
               :name="
-                dataStore.isLikeSong(musicStore.playSong.id)
+                dataStore.isLikeSong(musicStore.playSong)
                   ? 'Favorite'
                   : 'FavoriteBorder'
               "

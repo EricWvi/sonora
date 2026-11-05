@@ -1,4 +1,5 @@
 import { parseTTML, type LyricLine } from "@applemusic-like-lyrics/lyric";
+import { isOnline } from "@/utils/track";
 import { source } from "@/api/source";
 import type { Lyrics, Track } from "@/api/types";
 import {
@@ -173,7 +174,9 @@ class LyricManager {
     const req = ++this.lyricReqSeq;
     try {
       const lyrics: Lyrics = song.hasLyrics
-        ? await source.lyrics(song.id)
+        ? await (isOnline(song)
+            ? source.onlineLyrics(song.id)
+            : source.lyrics(song.id))
         : { format: "", lyrics: "" };
       if (this.lyricReqSeq !== req) return;
       const { data, usingTTMLLyric } = this.parseLyrics(lyrics);

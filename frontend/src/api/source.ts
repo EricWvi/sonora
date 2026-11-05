@@ -1,5 +1,6 @@
 import { ApiError } from "./error";
 import { connection } from "./connection";
+import { onlineImage } from "@/utils/onlineImage";
 import type {
   Album,
   AlbumQuery,
@@ -8,8 +9,11 @@ import type {
   HistoryEntry,
   ListQuery,
   Lyrics,
+  MixedPage,
   NeteaseQRState,
   NeteaseStatus,
+  OnlineList,
+  OnlineListType,
   Page,
   Playlist,
   PlaylistInput,
@@ -35,6 +39,27 @@ export interface DataSource {
   neteaseCookieLogin(cookie: string): Promise<NeteaseStatus>;
   /** 只退出网易云，不影响 Sonora 的登录。 */
   neteaseLogout(): Promise<void>;
+  /** 我喜欢的音乐：本地与在线按喜欢时间混排，同一首歌只有一条，优先本地。 */
+  mixedLikes(
+    query?: Pick<ListQuery, "offset" | "limit">,
+  ): Promise<MixedPage<Track>>;
+  /** 最近播放：本地与在线按时间混排。 */
+  mixedHistory(
+    query?: Pick<ListQuery, "offset" | "limit">,
+  ): Promise<MixedPage<HistoryEntry>>;
+  /** 记录一首在线歌曲的播放，服务端保存歌曲的快照。 */
+  recordOnlinePlay(song: Track): Promise<void>;
+  /** 自己创建的与收藏的在线歌单。 */
+  onlinePlaylists(): Promise<{ created: Playlist[]; collected: Playlist[] }>;
+  onlineAlbums(): Promise<Page<Album>>;
+  onlineArtists(): Promise<Page<Artist>>;
+  onlineList(type: OnlineListType, id: number): Promise<OnlineList>;
+  /** 在线歌曲的播放地址，带时效，每次播放时获取。 */
+  onlineSongUrl(id: number): Promise<string>;
+  onlineLyrics(id: number): Promise<Lyrics>;
+  onlineLikeIds(): Promise<number[]>;
+  onlineLike(id: number): Promise<void>;
+  onlineUnlike(id: number): Promise<void>;
   tracks(query?: TrackQuery): Promise<Page<Track>>;
   track(id: number): Promise<Track>;
   lyrics(trackId: number): Promise<Lyrics>;
@@ -177,6 +202,20 @@ const httpSource: DataSource = {
   neteaseCookieLogin: (cookie) =>
     write("POST", "netease/login/cookie", { cookie }),
   neteaseLogout: () => send("POST", "netease/logout"),
+  mixedLikes: (query) => get("likes/mixed", query),
+  mixedHistory: (query) => get("history/mixed", query),
+  recordOnlinePlay: (song) => send("POST", "history/online", { song }),
+  onlinePlaylists: () => get("netease/playlists"),
+  onlineAlbums: () => get("netease/albums"),
+  onlineArtists: () => get("netease/artists"),
+  onlineList: (type, id) => get(`netease/${type}s/${id}`),
+  onlineSongUrl: async (id) =>
+    (await get<{ url: string }>(`netease/songs/${id}/url`)).url,
+  onlineLyrics: (id) => get(`netease/songs/${id}/lyrics`),
+  onlineLikeIds: async () =>
+    (await get<{ ids: number[] }>("netease/likes/ids")).ids,
+  onlineLike: (id) => send("PUT", `netease/likes/${id}`),
+  onlineUnlike: (id) => send("DELETE", `netease/likes/${id}`),
   tracks: (query) => get("tracks", query),
   track: (id) => get(`tracks/${id}`),
   lyrics: (trackId) => get(`tracks/${trackId}/lyrics`),
@@ -238,7 +277,9 @@ const httpSource: DataSource = {
     if (!res.ok) throw new ApiError(res.status, "退出登录失败");
   },
   coverUrl: (cover, size) =>
-    withQuery(`${api}covers/${encodeURIComponent(cover.name)}`, { size }),
+    cover.url
+      ? onlineImage(cover.url, size ?? 1024)
+      : withQuery(`${api}covers/${encodeURIComponent(cover.name)}`, { size }),
   audioUrl: (trackId) => `${api}tracks/${trackId}/audio`,
 };
 

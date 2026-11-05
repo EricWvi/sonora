@@ -1,4 +1,5 @@
 import { loginUrl, source, usingFixture } from "@/api/source";
+import { isOnline } from "@/utils/track";
 import { AudioElementPlayer } from "@/core/audio-player/AudioElementPlayer";
 import { SilentAudioPlayer } from "@/core/audio-player/SilentAudioPlayer";
 import { useMusicStore } from "@/stores";
@@ -15,7 +16,10 @@ import { browserStorage, memoryStorage } from "./storage";
 export function browserDeps(): PlaybackDeps {
   return {
     engine: usingFixture ? new SilentAudioPlayer() : new AudioElementPlayer(),
-    resolveAudio: async (track) => source.audioUrl(track.id),
+    resolveAudio: async (track) =>
+      isOnline(track)
+        ? source.onlineSongUrl(track.id)
+        : source.audioUrl(track.id),
     source,
     storage: usingFixture ? memoryStorage() : browserStorage,
     message: {

@@ -237,6 +237,7 @@
 </template>
 
 <script setup lang="ts">
+import { sameTrack, trackKey } from "@/utils/track";
 import type { Track } from "@/api/types";
 import { useMusicStore, useStatusStore, useSettingStore } from "@/stores";
 import { isEmpty } from "lodash-es";
@@ -369,7 +370,7 @@ const listData = computed<Track[]>(() => props.data);
 
 // 虚拟列表项类型
 type VirtualListItem =
-  | { type: "song"; data: Track; key: number; index: number }
+  | { type: "song"; data: Track; key: number | string; index: number }
   | { type: "disc"; data: null; key: string; disc: number }
   | { type: "footer"; data: null; key: string };
 
@@ -404,7 +405,7 @@ const virtualListItems = computed<VirtualListItem[]>(() => {
     items.push({
       type: "song" as const,
       data: song,
-      key: song.id,
+      key: trackKey(song),
       // SongCard 显示 index + 1
       index: trackNumbered.value ? song.trackNo - 1 : i - discStart,
     });
@@ -432,7 +433,7 @@ const listKey = computed(() => {
 // 列表是否具有播放歌曲（虚拟列表中的位置，分组时包含碟号标题）
 const hasPlaySong = computed(() => {
   return virtualListItems.value.findIndex(
-    (item) => item.type === "song" && item.data.id === musicStore.playSong.id,
+    (item) => item.type === "song" && sameTrack(item.data, musicStore.playSong),
   );
 });
 

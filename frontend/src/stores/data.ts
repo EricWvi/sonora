@@ -1,5 +1,7 @@
 import { defineStore } from "pinia";
+import type { Track } from "@/api/types";
 import type { QueueEntry } from "@/core/player/queue";
+import { isOnline } from "@/utils/track";
 
 /**
  * 播放列表与喜爱的歌曲。字段名照搬 SPlayer stores/data.ts 中播放器用到的部分。
@@ -13,9 +15,10 @@ interface DataState {
   originalPlayList: QueueEntry[];
   /** 搜索历史 */
   searchHistory: string[];
-  /** 用户喜欢的数据；Sonora 只有歌曲 */
+  /** 用户喜欢的数据；Sonora 只有歌曲。本地与在线的 ID 可能相同，分开保存 */
   userLikeData: {
     songs: number[];
+    onlineSongs: number[];
   };
 }
 
@@ -24,12 +27,15 @@ export const useDataStore = defineStore("data", {
     playList: [],
     originalPlayList: [],
     searchHistory: [],
-    userLikeData: { songs: [] },
+    userLikeData: { songs: [], onlineSongs: [] },
   }),
   getters: {
     // 是否为喜欢的歌曲
-    isLikeSong: (state) => (id: number) =>
-      state.userLikeData.songs.includes(id),
+    isLikeSong: (state) => (song: Pick<Track, "id" | "source">) =>
+      (isOnline(song)
+        ? state.userLikeData.onlineSongs
+        : state.userLikeData.songs
+      ).includes(song.id),
   },
   actions: {
     /**

@@ -3,11 +3,11 @@
 <template>
   <div class="song-card">
     <div
-      :class="['song-content', { play: musicStore.playSong.id === song.id }]"
+      :class="['song-content', { play: sameTrack(musicStore.playSong, song) }]"
     >
       <!-- 序号 -->
       <div class="num" @dblclick.stop>
-        <n-text v-if="musicStore.playSong.id !== song.id" depth="3">
+        <n-text v-if="!sameTrack(musicStore.playSong, song)" depth="3">
           {{ index + 1 }}
         </n-text>
         <SvgIcon v-else :size="22" name="Music" />
@@ -62,7 +62,7 @@
                   v-for="ar in song.artists"
                   :key="ar.id"
                   class="ar"
-                  @click="openJumpArtist(song.artists, ar.id)"
+                  @click="openJumpArtist(song.artists, ar.id, isOnline(song))"
                 >
                   {{
                     settingStore.hideBracketedContent
@@ -86,12 +86,7 @@
         <n-text
           v-if="song.album"
           class="album-text"
-          @click="
-            router.push({
-              name: 'album',
-              query: { id: song.album?.id },
-            })
-          "
+          @click="router.push(albumRoute(song))"
         >
           {{ albumName }}
         </n-text>
@@ -108,9 +103,9 @@
       >
         <!-- 喜欢歌曲 -->
         <SvgIcon
-          :name="dataStore.isLikeSong(song.id) ? 'Favorite' : 'FavoriteBorder'"
+          :name="dataStore.isLikeSong(song) ? 'Favorite' : 'FavoriteBorder'"
           :size="20"
-          @click.stop="toLikeSong(song, !dataStore.isLikeSong(song.id))"
+          @click.stop="toLikeSong(song, !dataStore.isLikeSong(song))"
           @delclick.stop
         />
       </div>
@@ -137,6 +132,7 @@ import {
 import { openJumpArtist } from "@/utils/modal";
 import { removeBrackets } from "@/utils/format";
 import { toLikeSong } from "@/utils/auth";
+import { albumRoute, isOnline, sameTrack } from "@/utils/track";
 import { coverUrl } from "@/utils/cover";
 import { msToTime } from "@/utils/time";
 import { usePlayerController } from "@/core/player/PlayerController";

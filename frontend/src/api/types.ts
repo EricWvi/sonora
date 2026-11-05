@@ -9,7 +9,12 @@ export type User = {
 export type Cover = {
   name: string;
   thumbhash: string;
+  /** 在线内容的图片地址；有值时 `name` 与 `thumbhash` 为空 */
+  url?: string;
 };
+
+/** 内容来自网易云；本地内容没有这个字段。 */
+export type Source = "online";
 
 export type Page<T> = {
   items: T[];
@@ -42,6 +47,9 @@ export type Track = {
   /** 歌曲实际显示的封面：单曲封面优先，否则为专辑封面。 */
   cover: Cover | null;
   hasLyrics: boolean;
+  source?: Source;
+  /** 在线歌曲是否可以播放；本地歌曲没有这个字段 */
+  playable?: boolean;
 };
 
 export type Album = {
@@ -54,6 +62,7 @@ export type Album = {
   description: string;
   trackCount: number;
   durationMs: number;
+  source?: Source;
 };
 
 export type Artist = {
@@ -65,6 +74,7 @@ export type Artist = {
   description: string;
   trackCount: number;
   albumCount: number;
+  source?: Source;
 };
 
 export type Playlist = {
@@ -76,6 +86,7 @@ export type Playlist = {
   durationMs: number;
   createdAt: string;
   updatedAt: string;
+  source?: Source;
 };
 
 /** 新建与修改歌单的内容：名称 1–100 个字符，简介最多 1000 个字符。 */
@@ -147,3 +158,18 @@ export interface NeteaseQRState {
   nickname: string;
   avatarUrl: string;
 }
+
+/**
+ * 本地与在线歌曲混合的列表。`onlineFailed` 表示在线部分没有读到（登录失效或接口服务不可用），
+ * 列表只有本地歌曲。
+ */
+export type MixedPage<T> = Page<T> & { onlineFailed?: boolean };
+
+/** 在线列表的种类，对应同一个详情页。 */
+export type OnlineListType = "playlist" | "album" | "artist";
+
+/** 在线歌单、专辑或艺术家的详情，都以歌单的形态返回。 */
+export type OnlineList = {
+  playlist: Playlist;
+  tracks: Track[];
+};

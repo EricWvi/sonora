@@ -43,6 +43,22 @@ func (s *server) registerNetease(private *http.ServeMux) {
 	private.HandleFunc("GET "+p+"login/qr/{key}", s.checkNeteaseQR)
 	private.HandleFunc("POST "+p+"login/cookie", s.neteaseCookieLogin)
 	private.HandleFunc("POST "+p+"logout", s.neteaseLogout)
+	private.HandleFunc("GET "+p+"playlists", s.listNeteasePlaylists)
+	private.HandleFunc("GET "+p+"playlists/{id}", s.getNeteasePlaylist)
+	private.HandleFunc("GET "+p+"albums", s.listNeteaseAlbums)
+	private.HandleFunc("GET "+p+"albums/{id}", s.getNeteaseAlbum)
+	private.HandleFunc("GET "+p+"artists", s.listNeteaseArtists)
+	private.HandleFunc("GET "+p+"artists/{id}", s.getNeteaseArtist)
+	private.HandleFunc("GET "+p+"songs/{id}/url", s.getNeteaseSongURL)
+	private.HandleFunc("GET "+p+"songs/{id}/lyrics", s.getNeteaseLyrics)
+	private.HandleFunc("GET "+p+"likes/ids", s.listNeteaseLikeIDs)
+	private.HandleFunc("PUT "+p+"likes/{id}", s.setNeteaseLike)
+	private.HandleFunc("DELETE "+p+"likes/{id}", s.setNeteaseLike)
+
+	private.HandleFunc("GET "+PlayerAPIPrefix+"likes/mixed", s.listMixedLikes)
+	private.HandleFunc("GET "+PlayerAPIPrefix+"history/mixed", s.listMixedHistory)
+	private.HandleFunc("POST "+PlayerAPIPrefix+"history/online", s.recordOnlinePlay)
+	private.HandleFunc("DELETE "+PlayerAPIPrefix+"history/online/{id}", s.removeOnlinePlay)
 }
 
 // neteaseReady answers for the endpoints that need the API service.
@@ -55,12 +71,38 @@ func (s *server) neteaseReady(w http.ResponseWriter) bool {
 }
 
 func writeNeteaseError(w http.ResponseWriter, r *http.Request, err error) {
-	if errors.Is(err, netease.ErrUnavailable) {
+	switch {
+	case errors.Is(err, netease.ErrUnavailable):
 		slog.Warn("netease api", "path", r.URL.Path, "err", err)
 		admin.WriteError(w, http.StatusBadGateway, "netease_unavailable", "网易云接口服务不可用，请稍后重试")
 		return
+	case errors.Is(err, netease.ErrExpired):
+		admin.WriteError(w, http.StatusForbidden, "netease_expired", "网易云登录已失效，请重新登录")
+		return
+	case errors.Is(err, netease.ErrNotFound):
+		admin.WriteError(w, http.StatusNotFound, "not_found", "内容不存在或已被删除")
+		return
 	}
 	writeStoreError(w, r, err)
+}
+
+// neteaseSession returns the listener's session for an endpoint that needs
+// one, or answers the request. The status is 403, not 401: only NetEase is
+// signed out, and the player treats 401 as its own session ending.
+func (s *server) neteaseSession(w http.ResponseWriter, r *http.Request) (store.NeteaseSession, bool) {
+	if !s.neteaseReady(w) {
+		return store.NeteaseSession{}, false
+	}
+	session, err := s.store.NeteaseSession(r.Context(), userID(r))
+	if errors.Is(err, store.ErrNotFound) {
+		admin.WriteError(w, http.StatusForbidden, "netease_signed_out", "没有登录网易云")
+		return session, false
+	}
+	if err != nil {
+		writeStoreError(w, r, err)
+		return session, false
+	}
+	return session, true
 }
 
 func (s *server) getNeteaseStatus(w http.ResponseWriter, r *http.Request) {
