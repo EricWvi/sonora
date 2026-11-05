@@ -11,6 +11,8 @@ import type { RepeatModeType, ShuffleModeType } from "@/types/play-mode";
 export interface StatusState {
   /** 菜单折叠状态 */
   menuCollapsed: boolean;
+  /** 侧边栏歌单模式（照搬 SPlayer）：在线为网易云创建的歌单，本地为 Sonora 歌单 */
+  playlistMode: "online" | "local";
   /** 播放控制条 */
   showPlayBar: boolean;
   /** 全屏播放器 */
@@ -79,6 +81,8 @@ export interface StatusState {
 export const useStatusStore = defineStore("status", {
   state: (): StatusState => ({
     menuCollapsed: false,
+    // 与 SPlayer 不同：默认本地歌单
+    playlistMode: "local",
     showPlayBar: true,
     playStatus: false,
     playLoading: true,
@@ -263,6 +267,7 @@ export const useStatusStore = defineStore("status", {
     storage: localStorage,
     pick: [
       "menuCollapsed",
+      "playlistMode",
       "currentTimeOffsetMap",
       "pureLyricMode",
       "playVolume",

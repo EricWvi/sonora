@@ -144,8 +144,6 @@ export interface SettingState {
     | "mask-top";
   /** 菜单显示封面 */
   menuShowCover: boolean;
-  /** 菜单展开项（设备） */
-  menuExpandedKeys: (string | number)[];
   /** 侧边栏隐藏（只保留 Sonora 侧栏中可隐藏的项） */
   sidebarHide: {
     /** 隐藏最近播放 */
@@ -336,7 +334,6 @@ export const defaultSettingState = (): SettingState => ({
   showSongArtist: true,
   routeAnimation: "slide",
   menuShowCover: true,
-  menuExpandedKeys: [],
   sidebarHide: {
     hideHistory: false,
     hideUserPlaylists: false,

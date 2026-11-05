@@ -18,6 +18,18 @@
       }
     }
   }
+  // Sonora：歌单分组不能折叠，标题不响应点击与悬停，去掉展开箭头（侧边栏收起时照常弹出）
+  &.fixed {
+    :deep(.n-submenu > .n-menu-item > .n-menu-item-content) {
+      cursor: default;
+      &::before {
+        background-color: transparent !important;
+      }
+      .n-menu-item-content__arrow {
+        display: none;
+      }
+    }
+  }
   &.cover {
     :deep(.n-submenu-children) {
       --n-item-height: 50px;

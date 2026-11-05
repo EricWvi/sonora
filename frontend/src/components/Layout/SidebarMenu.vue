@@ -1,10 +1,13 @@
-<!-- 主菜单：按 SPlayer Menu.vue 改编，条目见阶段 2 的信息架构 -->
+<!-- 主菜单：按 SPlayer Menu.vue 改编，条目见阶段 2 的信息架构。
+与 SPlayer 不同（阶段 7，Eric 决定 2026-11-05）：歌单分组不能折叠，始终展开，标题是普通的小标题，
+文字样式不变。在线/本地歌单的切换按钮照搬 SPlayer（NPopselect），默认本地歌单；
+接入网易云之前“在线歌单”不可选。 -->
 <template>
   <n-menu
     ref="menuRef"
     :value="activeKey"
-    v-model:expanded-keys="settingStore.menuExpandedKeys"
-    :class="{ cover: settingStore.menuShowCover }"
+    :expanded-keys="expandedKeys"
+    :class="{ cover: settingStore.menuShowCover, fixed: !collapsed }"
     :indent="0"
     :root-indent="26"
     :collapsed="collapsed"
@@ -35,6 +38,7 @@ import {
   NAvatar,
   NButton,
   NEllipsis,
+  NPopselect,
   NText,
   type MenuInst,
   type MenuOption,
@@ -59,6 +63,7 @@ const route = useRoute();
 const router = useRouter();
 const settingStore = useSettingStore();
 const userStore = useUserStore();
+const statusStore = useStatusStore();
 const menuRef = ref<MenuInst | null>(null);
 
 const renderIcon = (name: string, style?: Record<string, string>) => () =>
@@ -66,6 +71,9 @@ const renderIcon = (name: string, style?: Record<string, string>) => () =>
 
 // 前三项与 SPlayer 一样上移 1px，对齐文字基线。
 const lift = { transform: "translateY(-1px)" };
+
+// 歌单分组始终展开（不能折叠）
+const expandedKeys = ["user-playlists"];
 
 const options = computed<MenuOption[]>(() => [
   { key: "home", link: "home", label: "首页", icon: renderIcon("Home", lift) },
@@ -108,7 +116,34 @@ const options = computed<MenuOption[]>(() => [
     icon: props.collapsed ? renderIcon("PlaylistAdd") : undefined,
     label: () =>
       h("div", { class: "user-list" }, [
-        h(NText, { depth: 3 }, () => "创建的歌单"),
+        h(NText, { depth: 3 }, () =>
+          statusStore.playlistMode === "online" ? "创建的歌单" : "本地歌单",
+        ),
+        h(
+          NPopselect,
+          {
+            options: [
+              // 在线歌单在接入网易云登录后可选
+              { label: "在线歌单", value: "online", disabled: true },
+              { label: "本地歌单", value: "local" },
+            ],
+            value: statusStore.playlistMode,
+            trigger: "click",
+            onUpdateValue: (value: "online" | "local") => {
+              statusStore.playlistMode = value;
+            },
+          },
+          () =>
+            h(NButton, {
+              type: "tertiary",
+              round: true,
+              strong: true,
+              secondary: true,
+              renderIcon: renderIcon("Menu"),
+              "aria-label": "切换歌单",
+              onClick: (event: Event) => event.stopPropagation(),
+            }),
+        ),
         h(NButton, {
           type: "tertiary",
           round: true,
@@ -122,7 +157,10 @@ const options = computed<MenuOption[]>(() => [
           },
         }),
       ]),
-    children: userStore.playlists.map((playlist) => ({
+    children: (statusStore.playlistMode === "local"
+      ? userStore.playlists
+      : []
+    ).map((playlist) => ({
       key: playlist.id,
       label: () =>
         settingStore.menuShowCover
@@ -145,7 +183,6 @@ const options = computed<MenuOption[]>(() => [
 // 歌单项右键菜单：条目与专辑、歌单卡片的 CoverMenu 一致（查看详情、播放或暂停、复制名称与 ID），
 // 另加编辑歌单、删除歌单，复用歌单详情页的弹窗与确认（Eric 确认，2026-11-04）
 const musicStore = useMusicStore();
-const statusStore = useStatusStore();
 const player = usePlayerController();
 const playlistMenu = reactive({ x: 0, y: 0, show: false });
 const playlistMenuOptions = ref<DropdownOption[]>([]);

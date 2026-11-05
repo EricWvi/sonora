@@ -21,12 +21,8 @@ import { defaultShortcutState, type ShortcutList } from "@/stores/shortcut";
  *   待上传的改动时重新读取。
  */
 
-/** 留在浏览器中的设备相关设置：输出设备、同步补偿与侧栏展开状态 */
-export const DEVICE_KEYS = [
-  "playDevice",
-  "audioDelayCompensation",
-  "menuExpandedKeys",
-] as const;
+/** 留在浏览器中的设备相关设置：输出设备与同步补偿 */
+export const DEVICE_KEYS = ["playDevice", "audioDelayCompensation"] as const;
 
 type DeviceKey = (typeof DEVICE_KEYS)[number];
 
