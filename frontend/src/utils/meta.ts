@@ -1,4 +1,5 @@
 // 照搬 SPlayer utils/meta.ts 中页面用到的常量。
+import { h } from "vue";
 import type { ImageRenderToolbarProps } from "naive-ui";
 import type { SortField, SortOrder } from "@/api/types";
 
@@ -54,3 +55,30 @@ export const renderToolbar = ({ nodes }: ImageRenderToolbarProps) => {
     nodes.close,
   ];
 };
+
+/**
+ * 渲染图片工具栏，下载按钮改为执行 onDownload。
+ * Naive UI 的下载按钮只会跳转到图片地址，也没有提供替换点击行为的入口，
+ * 所以在捕获阶段拦下点击；保留原节点是为了留住图标和提示。
+ * @param onDownload 点击下载按钮时执行
+ * @returns 图片工具栏的渲染函数
+ */
+export const renderDownloadToolbar =
+  (onDownload: () => void) =>
+  ({ nodes }: ImageRenderToolbarProps) =>
+    renderToolbar({
+      nodes: {
+        ...nodes,
+        download: h(
+          "span",
+          {
+            style: { display: "contents" },
+            onClickCapture: (e: MouseEvent) => {
+              e.stopPropagation();
+              onDownload();
+            },
+          },
+          nodes.download,
+        ),
+      },
+    });

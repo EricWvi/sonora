@@ -57,6 +57,39 @@ export const coverLoaded = (e: Event) => {
   }
 };
 
+/** 图片类型对应的文件扩展名；网易云的图片会返回不规范的 image/jpg。 */
+const imageExtensions: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/jpg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+};
+
+/**
+ * 把图片下载为文件，而不是在浏览器里打开。
+ * 网易云的图片跨域，`<a download>` 对它不生效，所以先取回内容再保存。
+ * @param url 图片地址
+ * @param name 不含扩展名的文件名
+ */
+export const downloadImage = async (url: string, name: string) => {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const extension = imageExtensions[blob.type];
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = extension ? `${name}.${extension}` : name;
+    a.click();
+    URL.revokeObjectURL(objectUrl);
+  } catch (err) {
+    console.error("下载图片失败", err);
+    window.$message.error("下载图片失败");
+  }
+};
+
 /**
  * 复制数据到剪贴板（原生实现）
  * @param text 要复制的数据

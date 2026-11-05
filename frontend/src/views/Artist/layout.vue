@@ -14,7 +14,7 @@
             :previewed-img-props="{ style: { borderRadius: '8px' } }"
             :preview-src="previewSrc"
             :preview-disabled="!artistDetailData.image"
-            :renderToolbar="renderToolbar"
+            :renderToolbar="artistImageToolbar"
             show-toolbar-tooltip
             class="cover-img"
             @load="coverLoaded"
@@ -172,8 +172,8 @@ import { fetchAll } from "@/api/pages";
 import { listSortQuery } from "@/utils/meta";
 import { source } from "@/api/source";
 import { useLoadError } from "@/composables/List/useLoadError";
-import { coverLoaded, renderIcon } from "@/utils/helper";
-import { renderToolbar } from "@/utils/meta";
+import { coverLoaded, downloadImage, renderIcon } from "@/utils/helper";
+import { renderDownloadToolbar } from "@/utils/meta";
 import { removeBrackets } from "@/utils/format";
 import { coverUrl, defaultCovers } from "@/utils/cover";
 import { useSettingStore, useStatusStore } from "@/stores";
@@ -208,6 +208,9 @@ const coverSrc = computed(() =>
 );
 const previewSrc = computed(() =>
   coverUrl(artistDetailData.value?.image, "cover", defaultCovers.artist),
+);
+const artistImageToolbar = renderDownloadToolbar(() =>
+  downloadImage(previewSrc.value, artistDetailData.value?.name || "artist"),
 );
 
 // 列表是否滚动

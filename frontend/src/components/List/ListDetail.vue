@@ -11,7 +11,7 @@ Sonora 增加的信息项，样式沿用其他信息项。 -->
             :previewed-img-props="{ style: { borderRadius: '8px' } }"
             :preview-src="previewSrc"
             :preview-disabled="!detailData.cover"
-            :renderToolbar="renderToolbar"
+            :renderToolbar="coverToolbar"
             show-toolbar-tooltip
             class="cover-img"
             @load="coverLoaded"
@@ -201,9 +201,9 @@ Sonora 增加的信息项，样式沿用其他信息项。 -->
 import type { Track } from "@/api/types";
 import type { ListDetailData } from "@/viewmodels";
 import type { DropdownOption } from "naive-ui";
-import { coverLoaded } from "@/utils/helper";
+import { coverLoaded, downloadImage } from "@/utils/helper";
 import { removeBrackets } from "@/utils/format";
-import { renderToolbar } from "@/utils/meta";
+import { renderDownloadToolbar } from "@/utils/meta";
 import { coverUrl, defaultCovers } from "@/utils/cover";
 import { formatTimestamp, msToTime } from "@/utils/time";
 import { openDescModal, openJumpArtist } from "@/utils/modal";
@@ -252,6 +252,10 @@ const coverSrc = computed(() =>
 );
 const previewSrc = computed(() =>
   coverUrl(props.detailData?.cover, "cover", defaultCovers.album),
+);
+
+const coverToolbar = renderDownloadToolbar(() =>
+  downloadImage(previewSrc.value, titleText.value),
 );
 
 // 标题文本
