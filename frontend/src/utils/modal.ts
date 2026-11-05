@@ -127,6 +127,23 @@ export const openPlaylistAdd = async (data: Track[]) => {
 };
 
 /**
+ * 登录网易云（照搬 SPlayer 的 openUserLogin；只有二维码与 Cookie 两种方式）
+ */
+export const openOnlineLogin = async () => {
+  const { default: Login } = await import("@/components/Modal/Login/Login.vue");
+  const modal = window.$modal.create({
+    preset: "card",
+    transformOrigin: "center",
+    autoFocus: false,
+    maskClosable: false,
+    closeOnEsc: false,
+    closable: false,
+    style: { width: "400px" },
+    content: () => h(Login, { onClose: () => modal.destroy() }),
+  });
+};
+
+/**
  * 开启批量操作（照搬 SPlayer 的 openBatchList；参数按 Sonora 的操作调整，见 BatchList.vue）
  * @param data 歌曲列表
  * @param options.playlistId 用户歌单 ID，提供“删除选中的歌曲”

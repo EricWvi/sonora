@@ -266,6 +266,17 @@ var migrations = []migration{
 	execSQL(`
 	ALTER TABLE artists ADD COLUMN description TEXT NOT NULL DEFAULT '';
 	`),
+
+	// netease_sessions binds each listener to their own NetEase account. The
+	// cookie lives here rather than in the browser.
+	execSQL(`
+	CREATE TABLE netease_sessions (
+		user_id      INTEGER PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+		cookie       TEXT    NOT NULL,
+		account_id   INTEGER NOT NULL,
+		refreshed_at TEXT    NOT NULL
+	);
+	`),
 }
 
 func migrate(db *sql.DB) error {

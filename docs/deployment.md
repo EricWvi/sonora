@@ -1,6 +1,6 @@
 # 部署 Sonora
 
-更新日期：2026-11-02。镜像由 CI 构建（[阶段 6](phase/phase-6-first-release.md)），不在开发机上构建镜像。
+更新日期：2026-11-05。镜像由 CI 构建（[阶段 6](phase/phase-6-first-release.md)），不在开发机上构建镜像。
 
 ## 构建
 
@@ -12,12 +12,12 @@
 
 构建步骤与 `scripts/build.sh` 相同，另加两项检查：两份前端的 ESLint，以及产物中不含开发 fixture。运行层是 `gcr.io/distroless/static-debian12:nonroot`（用户 65532）：
 
-| 路径 | 用途 |
-| --- | --- |
-| `/app/config.yaml` | 配置文件，只读挂载 |
-| `/data` | 数据卷：`sonora.db` 与 `covers/` |
-| `/media` | 存储卷：上传的音频 |
-| 端口 `14560` | HTTP，放在反向代理之后 |
+| 路径               | 用途                             |
+| ------------------ | -------------------------------- |
+| `/app/config.yaml` | 配置文件，只读挂载               |
+| `/data`            | 数据卷：`sonora.db` 与 `covers/` |
+| `/media`           | 存储卷：上传的音频               |
+| 端口 `14560`       | HTTP，放在反向代理之后           |
 
 两个卷在宿主机上须属于 `65532:65532`，否则服务无法写入。
 
@@ -35,6 +35,17 @@ services:
     environment:
       - TZ=Asia/Shanghai
       - SONORA_OIDC_CLIENT_SECRET=${SONORA_OIDC_CLIENT_SECRET}
+
+  # 可选：网易云接口服务，见“网易云音乐”一节
+  netease-api:
+    image: node:22-alpine
+    restart: unless-stopped
+    user: node
+    command: npx -y @neteasecloudmusicapienhanced/api@4.41.1
+    volumes:
+      - ./netease-api/npm-cache:/home/node/.npm
+    environment:
+      - PORT=3000
 ```
 
 `config.yaml`：
@@ -47,6 +58,8 @@ public_url: "https://music.example.com"
 oidc:
   issuer: "https://auth.example.com"
   client_id: "sonora"
+netease:
+  api_url: "http://netease-api:3000" # 可选
 ```
 
 反向代理把整个域名转发到 `sonora:14560`，不要加 forward_auth：播放端自己走 OIDC，管理后台有自己的登录（密码 bcrypt，失败全局每分钟至多 10 次）。Sonora 本身不压缩响应，建议在反向代理上开启压缩（Caddy 为 `encode zstd gzip`），播放端的 JS 与 CSS 约 1.6 MB，压缩后约 0.5 MB；缓存头由 Sonora 设置，反向代理不必改。
@@ -55,13 +68,14 @@ oidc:
 
 参考 [config.example.yaml](../backend/config.example.yaml)，通过 `-config` 指定文件路径：
 
-| 键 | 说明 |
-| --- | --- |
-| `listen` | 监听地址，默认 `:14560` |
-| `data_dir` | SQLite 数据库与封面，挂载为数据卷 |
-| `media_dir` | 音频存储卷，只由 Sonora 写入；手动放入的文件不会入库 |
-| `public_url` | 浏览器访问的 origin，例如 `https://music.example.com`；写请求必须来自该 origin，OIDC 回调地址为 `<public_url>/auth/callback` |
+| 键                                                    | 说明                                                                                                                              |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `listen`                                              | 监听地址，默认 `:14560`                                                                                                           |
+| `data_dir`                                            | SQLite 数据库与封面，挂载为数据卷                                                                                                 |
+| `media_dir`                                           | 音频存储卷，只由 Sonora 写入；手动放入的文件不会入库                                                                              |
+| `public_url`                                          | 浏览器访问的 origin，例如 `https://music.example.com`；写请求必须来自该 origin，OIDC 回调地址为 `<public_url>/auth/callback`      |
 | `oidc.issuer`、`oidc.client_id`、`oidc.client_secret` | 播放端登录用的 Authelia；三项必填（开发模式除外），secret 建议用环境变量 `SONORA_OIDC_CLIENT_SECRET` 提供，它会覆盖配置文件中的值 |
+| `netease.api_url`                                     | 网易云接口服务的地址，可选；不填时网易云功能关闭，播放端不显示相关入口                                                            |
 
 两个目录必须不同，并分别挂载持久卷；备份时两者都要包含。
 
@@ -75,9 +89,9 @@ oidc:
 - client_id: sonora
   client_name: Sonora
   # authelia crypto hash generate pbkdf2 --variant sha512 生成；明文给 SONORA_OIDC_CLIENT_SECRET
-  client_secret: '$pbkdf2-sha512$...'
+  client_secret: "$pbkdf2-sha512$..."
   public: false
-  authorization_policy: two_factor  # 按自己的策略
+  authorization_policy: two_factor # 按自己的策略
   require_pkce: true
   pkce_challenge_method: S256
   redirect_uris:
@@ -89,6 +103,15 @@ oidc:
 ```
 
 Sonora 首次有人登录时才去发现 issuer，Authelia 不可用时服务照常启动，只是暂时无法登录。
+
+## 网易云音乐
+
+网易云功能依赖 [`@neteasecloudmusicapienhanced/api`](https://github.com/NeteaseCloudMusicApiEnhanced/api-enhanced)，它单独运行一个容器，Sonora 镜像不变。不配置 `netease.api_url` 时，其他功能不受影响。
+
+- **不要暴露这个服务**：它没有鉴权。只放在 compose 内部网络，不映射端口，不经反向代理，由 Sonora 用 `http://netease-api:3000` 访问。
+- **锁定版本**：`npx` 的包名要带版本号。缓存目录挂载到卷上，容器重建时不必重新下载；目录在宿主机上须属于 `1000:1000`（镜像的 `node` 用户）。升级版本时核对 Sonora 用到的接口，并确认下一条仍然成立。
+- **响应缓存**：该服务默认缓存响应 2 分钟，缓存键不含 POST 正文中的 Cookie。Sonora 的每个请求都带 `x-apicache-bypass` 并使用不同的 URL，避免用户之间串数据；不要让其他程序共用这个服务。
+- **会话**：用户的网易云 Cookie 以明文保存在 `sonora.db` 的 `netease_sessions` 中，不进入浏览器，也不写入日志。数据卷与备份要按凭据保管。用户退出网易云时只删除 Sonora 保存的会话，不让网易云一侧的登录失效，这个 Cookie 可能还在别的客户端使用。
 
 ## 首次初始化
 

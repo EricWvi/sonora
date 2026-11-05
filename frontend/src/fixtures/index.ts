@@ -413,6 +413,12 @@ function librarySource(lib: Library): DataSource {
 
   return {
     me: () => reply(() => user),
+    // fixture 没有网易云接口服务，与服务器未配置时相同。
+    neteaseStatus: () => reply(() => ({ state: "disabled", profile: null })),
+    neteaseQRStart: () => Promise.reject(new ApiError(503, "没有配置")),
+    neteaseQRCheck: () => Promise.reject(new ApiError(503, "没有配置")),
+    neteaseCookieLogin: () => Promise.reject(new ApiError(503, "没有配置")),
+    neteaseLogout: () => reply(() => undefined),
     tracks: (query = {}) =>
       reply(() => {
         let list = newestFirst();

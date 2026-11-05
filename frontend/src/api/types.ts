@@ -122,3 +122,28 @@ export type AlbumQuery = Omit<ListQuery, "sort"> & {
   /** 不含标记为单曲的专辑（专辑页与首页用，Sonora 新增）。 */
   hideSingles?: boolean;
 };
+
+/** 登录的网易云账号，头像地址由网易云的图片服务提供。 */
+export interface NeteaseProfile {
+  userId: number;
+  nickname: string;
+  avatarUrl: string;
+  /** 0 表示不是会员 */
+  vipType: number;
+}
+
+/**
+ * 当前用户的网易云账号状态：`disabled` 服务器没有配置接口服务；`signedOut` 没有登录；
+ * `signedIn` 已登录；`expired` 登录已失效；`unavailable` 接口服务暂时不可用。
+ */
+export interface NeteaseStatus {
+  state: "disabled" | "signedOut" | "signedIn" | "expired" | "unavailable";
+  profile: NeteaseProfile | null;
+}
+
+/** 二维码登录的进度，`code` 为 800 过期、801 等待扫码、802 待确认、803 成功。 */
+export interface NeteaseQRState {
+  code: number;
+  nickname: string;
+  avatarUrl: string;
+}

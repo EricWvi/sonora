@@ -20,6 +20,7 @@ import (
 	"sonora/internal/auth"
 	"sonora/internal/config"
 	"sonora/internal/devmode"
+	"sonora/internal/netease"
 	"sonora/internal/server"
 	"sonora/internal/store"
 )
@@ -82,7 +83,11 @@ func run(configPath string) error {
 		DevUser:      devUser(cfg),
 	})
 
-	handler, err := server.New(st, authn, listeners, sonora.Player(), sonora.Admin(), server.Options{Version: version})
+	opts := server.Options{Version: version}
+	if cfg.Netease.APIURL != "" {
+		opts.Netease = netease.New(cfg.Netease.APIURL)
+	}
+	handler, err := server.New(st, authn, listeners, sonora.Player(), sonora.Admin(), opts)
 	if err != nil {
 		return err
 	}

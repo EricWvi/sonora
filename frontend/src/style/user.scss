@@ -42,6 +42,9 @@
     background-color: rgba(var(--primary), 0.12);
   }
 }
+.vip-img {
+  height: 18px;
+}
 .user-menu {
   display: flex;
   justify-content: center;
@@ -55,8 +58,23 @@
       font-size: 12px;
       max-width: 220px;
     }
+    .online-state {
+      font-size: 12px;
+    }
+    .online-name {
+      max-width: 100%;
+      .nickname {
+        min-width: 0;
+      }
+      .vip-img {
+        flex-shrink: 0;
+      }
+    }
   }
   .n-divider {
     margin: 12px 0;
+  }
+  .online-action {
+    margin-top: 12px;
   }
 }

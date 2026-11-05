@@ -18,3 +18,8 @@ oidc:
   issuer: "https://auth.example.com"
   client_id: "sonora"
   client_secret: ""
+
+# NetEase Cloud Music API service. Leave it out to turn NetEase off. Keep the
+# service on an internal network: it has no authentication of its own.
+netease:
+  api_url: "http://netease-api:3000"

@@ -30,6 +30,7 @@ const (
 )
 
 type testServer struct {
+	opts Options
 	http.Handler
 	t        *testing.T
 	store    *store.Store
@@ -79,11 +80,17 @@ func (ts *testServer) restart() {
 	listeners := auth.New(ts.store, auth.Config{
 		PublicURL: origin, Issuer: "http://127.0.0.1:1", ClientID: "sonora", ClientSecret: "secret",
 	})
-	h, err := New(ts.store, authn, listeners, player, console, Options{Version: "test"})
+	h, err := New(ts.store, authn, listeners, player, console, ts.options())
 	if err != nil {
 		ts.t.Fatal(err)
 	}
 	ts.Handler, ts.authn = h, authn
+}
+
+func (ts *testServer) options() Options {
+	opts := ts.opts
+	opts.Version = "test"
+	return opts
 }
 
 func (ts *testServer) send(req *http.Request) *httptest.ResponseRecorder {

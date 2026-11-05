@@ -15,6 +15,7 @@ import (
 	"sonora/internal/admin"
 	"sonora/internal/auth"
 	"sonora/internal/media"
+	"sonora/internal/netease"
 	"sonora/internal/store"
 )
 
@@ -28,6 +29,8 @@ const (
 // Options are server-wide settings.
 type Options struct {
 	Version string
+	// Netease is the API service client; nil turns NetEase off.
+	Netease *netease.Client
 }
 
 type server struct {

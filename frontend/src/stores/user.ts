@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { ApiError, loginUrl, source } from "@/api/source";
 import { connection } from "@/api/connection";
-import type { Playlist, User } from "@/api/types";
+import type { NeteaseStatus, Playlist, User } from "@/api/types";
 
 /** 当前登录用户与其歌单。 */
 export const useUserStore = defineStore("sonora-user", () => {
@@ -9,6 +9,8 @@ export const useUserStore = defineStore("sonora-user", () => {
   const playlists = ref<Playlist[]>([]);
   /** 本浏览器已退出登录，等待用户重新登录。 */
   const signedOut = ref(false);
+  /** 网易云账号，与 Sonora 的登录互相独立：退出一个不影响另一个。 */
+  const netease = ref<NeteaseStatus>({ state: "disabled", profile: null });
 
   // 会话已失效：回到登录页。本浏览器已退出时停在退出页，否则 Authelia 会立即重新登录。
   function toLogin() {
@@ -22,7 +24,22 @@ export const useUserStore = defineStore("sonora-user", () => {
     return true;
   }
 
+  // 单独读取：接口服务慢或不可用时，不耽误页面载入。
+  async function loadNetease(): Promise<void> {
+    try {
+      netease.value = await source.neteaseStatus();
+    } catch (error) {
+      if (!unauthorized(error)) console.error("❌ 读取网易云账号失败:", error);
+    }
+  }
+
+  async function logoutNetease(): Promise<void> {
+    await source.neteaseLogout();
+    netease.value = { state: "signedOut", profile: null };
+  }
+
   async function load(): Promise<void> {
+    void loadNetease();
     try {
       const [me, list] = await Promise.all([source.me(), source.playlists()]);
       user.value = me;
@@ -56,5 +73,15 @@ export const useUserStore = defineStore("sonora-user", () => {
     signedOut.value = true;
   }
 
-  return { user, playlists, signedOut, load, loadPlaylists, logout };
+  return {
+    user,
+    playlists,
+    signedOut,
+    netease,
+    load,
+    loadPlaylists,
+    loadNetease,
+    logoutNetease,
+    logout,
+  };
 });

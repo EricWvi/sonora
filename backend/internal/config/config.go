@@ -37,6 +37,8 @@ type Config struct {
 	PublicURL string `yaml:"public_url"`
 	// OIDC signs listeners in to the player.
 	OIDC OIDC `yaml:"oidc"`
+	// Netease connects the NetEase Cloud Music API service.
+	Netease Netease `yaml:"netease"`
 	// Dev signs in with fixed accounts, skipping the admin setup token and
 	// OIDC. Only a binary built with -tags dev accepts it.
 	Dev bool `yaml:"dev"`
@@ -47,6 +49,13 @@ type OIDC struct {
 	Issuer       string `yaml:"issuer"`
 	ClientID     string `yaml:"client_id"`
 	ClientSecret string `yaml:"client_secret"`
+}
+
+// Netease configures the NetEase Cloud Music integration.
+type Netease struct {
+	// APIURL is the base URL of the API service container, reachable only
+	// from Sonora. Empty turns NetEase off.
+	APIURL string `yaml:"api_url"`
 }
 
 // Default returns the configuration used when no file is present.
@@ -90,6 +99,12 @@ func (c Config) validate() error {
 	}
 	if filepath.Clean(c.DataDir) == filepath.Clean(c.MediaDir) {
 		return errors.New("config: data_dir and media_dir must be different directories")
+	}
+	if c.Netease.APIURL != "" {
+		u, err := url.Parse(c.Netease.APIURL)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return errors.New("config: netease.api_url must be a URL such as http://netease-api:3000")
+		}
 	}
 	if c.Dev {
 		if !devmode.Available {

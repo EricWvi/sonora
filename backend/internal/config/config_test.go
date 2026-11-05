@@ -57,6 +57,7 @@ func TestLoadRejectsInvalid(t *testing.T) {
 		"same dirs":       "public_url: https://music.test\ndata_dir: ./x\nmedia_dir: x\n" + oidcYAML,
 		"empty media dir": "public_url: https://music.test\nmedia_dir: \"\"\n" + oidcYAML,
 		"no oidc":         "public_url: https://music.test\n",
+		"bad netease url": "public_url: https://music.test\nnetease:\n  api_url: netease-api:3000\n" + oidcYAML,
 		"no secret":       "public_url: https://music.test\noidc:\n  issuer: https://auth.test\n  client_id: sonora\n",
 	} {
 		if _, err := Load(write(t, content)); err == nil {

@@ -8,6 +8,8 @@ import type {
   HistoryEntry,
   ListQuery,
   Lyrics,
+  NeteaseQRState,
+  NeteaseStatus,
   Page,
   Playlist,
   PlaylistInput,
@@ -24,6 +26,15 @@ export type CoverSize = 96 | 100 | 300 | 1024;
 /** 播放端读取数据的唯一入口。页面与 store 只通过它访问服务端，开发时可整体换成 fixture。 */
 export interface DataSource {
   me(): Promise<User>;
+  /** 网易云账号的状态。Cookie 只保存在服务端，不经过播放端。 */
+  neteaseStatus(): Promise<NeteaseStatus>;
+  /** 开始二维码登录，`url` 是二维码的内容。 */
+  neteaseQRStart(): Promise<{ key: string; url: string }>;
+  /** 查询二维码登录的进度；成功时服务端已保存会话。 */
+  neteaseQRCheck(key: string): Promise<NeteaseQRState>;
+  neteaseCookieLogin(cookie: string): Promise<NeteaseStatus>;
+  /** 只退出网易云，不影响 Sonora 的登录。 */
+  neteaseLogout(): Promise<void>;
   tracks(query?: TrackQuery): Promise<Page<Track>>;
   track(id: number): Promise<Track>;
   lyrics(trackId: number): Promise<Lyrics>;
@@ -160,6 +171,12 @@ const write = <T>(method: string, path: string, body?: unknown) =>
 
 const httpSource: DataSource = {
   me: () => get("me"),
+  neteaseStatus: () => get("netease/status"),
+  neteaseQRStart: () => write("POST", "netease/login/qr"),
+  neteaseQRCheck: (key) => get(`netease/login/qr/${encodeURIComponent(key)}`),
+  neteaseCookieLogin: (cookie) =>
+    write("POST", "netease/login/cookie", { cookie }),
+  neteaseLogout: () => send("POST", "netease/logout"),
   tracks: (query) => get("tracks", query),
   track: (id) => get(`tracks/${id}`),
   lyrics: (trackId) => get(`tracks/${trackId}/lyrics`),
