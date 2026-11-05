@@ -754,6 +754,20 @@ describe("播放失败", () => {
     expect(engine.loads).toEqual(["/audio/1", "/audio/1"]);
   });
 
+  it("在线歌曲的文件取不到时不归咎于格式", async () => {
+    const online = (id: number): Track => ({ ...track(id), source: "online" });
+    const player = newPlayer();
+    void player.updatePlayList([online(1), online(2)]);
+    await settle();
+    engine.fail(AudioErrorCode.SRC_NOT_SUPPORTED);
+    await settle();
+    expect(deps.message.error).toHaveBeenLastCalledWith(
+      "这首歌暂时无法播放，已自动跳过",
+    );
+    await vi.advanceTimersByTimeAsync(500);
+    expect(useMusicStore().playSong.id).toBe(2);
+  });
+
   it("未登录时回到登录页，不跳过", async () => {
     await failing([track(1), track(2)], 401);
     engine.fail(AudioErrorCode.SRC_NOT_SUPPORTED);

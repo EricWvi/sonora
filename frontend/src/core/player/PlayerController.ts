@@ -638,7 +638,10 @@ export class PlayerController {
       this.deps.unauthorized();
       return;
     }
-    const reason = errorReason(status, errCode);
+    // 查不到 CDN 的状态，浏览器的错误码也说明不了原因：地址失效时同样报“格式不支持”
+    const reason = isOnline(entry)
+      ? "这首歌暂时无法播放"
+      : errorReason(status, errCode);
     console.error(`❌ [${entry.id}] 播放失败：${reason}`, { status, errCode });
     const dataStore = useDataStore();
     const statusStore = useStatusStore();
