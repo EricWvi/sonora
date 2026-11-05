@@ -5,3 +5,6 @@ listen: "127.0.0.1:14560"
 data_dir: "./.data/data"
 media_dir: "./.data/media"
 dev: true
+# Started by `task run:server`, which removes it again on exit.
+netease:
+  api_url: "http://127.0.0.1:14562"

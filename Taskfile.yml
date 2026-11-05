@@ -1,5 +1,10 @@
 version: "3"
 
+vars:
+  # Keep in step with the version in docs/deployment.md.
+  NETEASE_API_IMAGE: moefurina/ncm-api:4.41.1
+  NETEASE_API_CONTAINER: sonora-netease-api-dev
+
 tasks:
   default:
     cmds:
@@ -178,7 +183,18 @@ tasks:
       - pnpm dev:admin {{.CLI_ARGS}}
 
   run:server:
-    desc: Run the Go service in development mode (127.0.0.1:14560, admin / admin)
+    desc: Run the Go service in development mode (127.0.0.1:14560, admin / admin) with the NetEase API container
     dir: backend
     cmds:
+      # The container goes away with the server; its keys stay in .data. The
+      # mode lets the container's user write there under rootless Docker too,
+      # where it maps to neither the owner nor the group.
+      - mkdir -p .data/netease-api && chmod 777 .data/netease-api
+      - docker rm -f {{.NETEASE_API_CONTAINER}} > /dev/null 2>&1 || true
+      - >-
+        docker run -d --rm --name {{.NETEASE_API_CONTAINER}}
+        -p 127.0.0.1:14562:3000
+        -v "$PWD/.data/netease-api:/tmp"
+        {{.NETEASE_API_IMAGE}} > /dev/null
+      - defer: docker rm -f {{.NETEASE_API_CONTAINER}} > /dev/null 2>&1 || true
       - go run -tags dev ./cmd/sonora -config config.dev.yaml {{.CLI_ARGS}}

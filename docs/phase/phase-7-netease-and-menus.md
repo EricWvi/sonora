@@ -59,7 +59,8 @@
   - 入口：在线歌曲的右键菜单“导入到曲库”，以及底部栏与全屏播放器的菜单。
 - **本次只做单曲导入**；批量导入、专辑导入，以及检测本地歌曲对应的在线歌曲是否有逐字歌词并替换，作为后续工作包。
 - **发布**（Eric，2026-11-05）：网易云开发前不发 v1.5.0，CI 中的版本号注入等下一次发布时验证。
-- **接口服务的运行方式**（Eric，2026-11-05）：`node:22-alpine` 运行锁定版本的 `npx -y @neteasecloudmusicapienhanced/api@<版本>`，挂缓存卷，不必每次启动都下载；走 compose 内部网络，不映射端口、不经 Caddy（该服务没有鉴权，不能暴露）；地址写在 Sonora 的配置文件。
+- **接口服务的运行方式**（Eric，2026-11-05）：使用现成的镜像 `moefurina/ncm-api`（接口包 README 指向的镜像，有 amd64，版本锁定为 `4.41.1`），不自己打包，也不用 `npx`；走 compose 内部网络，不映射端口、不经 Caddy（该服务没有鉴权，不能暴露）；地址写在 Sonora 的配置文件。不设置 `ENABLE_GENERAL_UNBLOCK`（Eric，2026-11-05）：解锁只在它等于 `true` 时开启，镜像没有设置，所以不设置就是关闭。
+- **开发环境**（Eric，2026-11-05）：`task run:server` 自动启动接口服务的容器（`127.0.0.1:14562`），退出时删除，匿名令牌与接口密钥保留在 `backend/.data/netease-api`（已被 Git 忽略）。开发机不保留接口包的源码。
 - **ID3 写入**（Eric，2026-11-05）：`dhowden/tag` 只能读，写入引入 `bogem/id3v2`；引入前确认许可与维护情况。
 - **开发账号**（Eric，2026-11-05）：开发与测试网易云功能时使用 `.local/credentials/splayer/only_session` 中的网易云 Cookie。这是对“凭据只用于参考实例”的明确例外，范围只限本机的开发实例与接口服务：只取 `MUSIC_U`、`__csrf`、`NMTID`，`only_session` 不是网易云的 Cookie，不发送；凭据不输出、不提交、不写入测试产物，临时实例的数据库用完删除。
 
@@ -94,7 +95,7 @@
 
   Eric 在临时实例上用手机扫码登录成功（2026-11-05），按钮与菜单显示正常；菜单中的昵称与 VIP 标志按 Eric 的要求改为一行（SPlayer 分两行，因为第二行还有 Lv 标签）。
 
-  待验证：部署说明中 compose 的写法（本机是 `node app.js`，没有在容器里运行）。
+  待验证：部署说明中 compose 的写法（开发环境已用同一镜像运行，线上 compose 待部署时确认）。
 
 - [x] b. 侧边栏第二块（2026-11-05）：我喜欢的音乐、我的收藏、最近播放（迁移 11，历史记录支持在线歌曲），在线歌单模式，首页入口，含未登录、登录失效和接口失败时的状态。先把队列改为带来源的键。实现：[mixed.go](../../backend/internal/server/mixed.go)、[netease/library.go](../../backend/internal/netease/library.go)、[track.ts](../../frontend/src/utils/track.ts)、[Collection](../../frontend/src/views/Collection/index.vue)、[onlineList.vue](../../frontend/src/views/List/onlineList.vue)。
 
