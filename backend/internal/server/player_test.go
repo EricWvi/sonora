@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -64,6 +65,18 @@ func TestPlayerCatalog(t *testing.T) {
 	if rec.Code != http.StatusOK || decodeBody[store.Artist](t, rec).Image == nil {
 		t.Fatalf("artist image: %d %s", rec.Code, rec.Body)
 	}
+	artistIn, _ := json.Marshal(map[string]any{"name": tr.Artists[0].Name, "description": "歌手简介"})
+	if rec := ts.do("PUT", api+"artists/"+itoa(tr.Artists[0].ID), string(artistIn)); rec.Code != http.StatusOK {
+		t.Fatalf("artist description: %d %s", rec.Code, rec.Body)
+	}
+	albumArtists := []string{}
+	for _, a := range tr.Album.Artists {
+		albumArtists = append(albumArtists, a.Name)
+	}
+	albumIn, _ := json.Marshal(map[string]any{"title": tr.Album.Title, "artists": albumArtists, "year": tr.Year, "description": "专辑简介"})
+	if rec := ts.do("PUT", api+"albums/"+itoa(tr.Album.ID), string(albumIn)); rec.Code != http.StatusOK {
+		t.Fatalf("album description: %d %s", rec.Code, rec.Body)
+	}
 	ts.cookie = ""
 	ts.signIn("alice", "Alice")
 
@@ -95,7 +108,7 @@ func TestPlayerCatalog(t *testing.T) {
 	}
 
 	album := decodeBody[playerAlbum](t, ts.do("GET", playerAPI+"albums/"+itoa(tr.Album.ID), ""))
-	if album.TrackCount != 1 || album.Cover == nil || album.Title != tr.Album.Title {
+	if album.TrackCount != 1 || album.Cover == nil || album.Title != tr.Album.Title || album.Description != "专辑简介" {
 		t.Fatalf("album = %+v", album)
 	}
 	albums := decodeBody[store.Page[playerAlbum]](t, ts.do("GET", playerAPI+"albums?artistId="+itoa(tr.Artists[0].ID), ""))
@@ -104,7 +117,7 @@ func TestPlayerCatalog(t *testing.T) {
 	}
 	artist := decodeBody[playerArtist](t, ts.do("GET", playerAPI+"artists/"+itoa(tr.Artists[0].ID), ""))
 	artists := decodeBody[store.Page[playerArtist]](t, ts.do("GET", playerAPI+"artists", ""))
-	if artist.TrackCount != 1 || artist.AlbumCount != 1 || artist.Image == nil || artists.Total != 1 ||
+	if artist.TrackCount != 1 || artist.AlbumCount != 1 || artist.Image == nil || artist.Description != "歌手简介" || artists.Total != 1 ||
 		artists.Items[0].Image == nil {
 		t.Fatalf("artist = %+v, artists = %+v", artist, artists)
 	}

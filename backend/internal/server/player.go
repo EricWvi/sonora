@@ -84,21 +84,25 @@ type playerAlbumRef struct {
 }
 
 type playerAlbum struct {
-	ID         int64        `json:"id"`
-	Title      string       `json:"title"`
-	Artists    []store.Ref  `json:"artists"`
-	Year       int          `json:"year"`
-	Cover      *store.Cover `json:"cover"`
-	TrackCount int          `json:"trackCount"`
-	DurationMs int64        `json:"durationMs"`
+	ID      int64        `json:"id"`
+	Title   string       `json:"title"`
+	Artists []store.Ref  `json:"artists"`
+	Year    int          `json:"year"`
+	Cover   *store.Cover `json:"cover"`
+	// Description is written by the admin; empty when there is none.
+	Description string `json:"description"`
+	TrackCount  int    `json:"trackCount"`
+	DurationMs  int64  `json:"durationMs"`
 }
 
 type playerArtist struct {
-	ID         int64        `json:"id"`
-	Name       string       `json:"name"`
-	Image      *store.Cover `json:"image"`
-	TrackCount int          `json:"trackCount"`
-	AlbumCount int          `json:"albumCount"`
+	ID    int64        `json:"id"`
+	Name  string       `json:"name"`
+	Image *store.Cover `json:"image"`
+	// Description is written by the admin; empty when there is none.
+	Description string `json:"description"`
+	TrackCount  int    `json:"trackCount"`
+	AlbumCount  int    `json:"albumCount"`
 }
 
 // toPlayerTrack resolves the cover the track shows: its own art, or else
@@ -119,13 +123,13 @@ func toPlayerTrack(t store.Track) playerTrack {
 
 func toPlayerAlbum(a store.Album) playerAlbum {
 	return playerAlbum{
-		ID: a.ID, Title: a.Title, Artists: a.Artists, Year: a.Year, Cover: a.Cover,
+		ID: a.ID, Title: a.Title, Artists: a.Artists, Year: a.Year, Cover: a.Cover, Description: a.Description,
 		TrackCount: a.TrackCount, DurationMs: a.DurationMs,
 	}
 }
 
 func toPlayerArtist(a store.Artist) playerArtist {
-	return playerArtist{ID: a.ID, Name: a.Name, Image: a.Image, TrackCount: a.TrackCount, AlbumCount: a.AlbumCount}
+	return playerArtist{ID: a.ID, Name: a.Name, Image: a.Image, Description: a.Description, TrackCount: a.TrackCount, AlbumCount: a.AlbumCount}
 }
 
 func mapPage[T, U any](p store.Page[T], f func(T) U) store.Page[U] {
