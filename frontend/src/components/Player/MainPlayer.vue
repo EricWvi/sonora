@@ -67,6 +67,16 @@
                 (statusStore.showFullPlayer = true)
               "
             />
+            <!-- 倍速 -->
+            <n-tag
+              v-if="statusStore.playRate !== 1"
+              type="primary"
+              size="small"
+              round
+              @click="openChangeRate"
+            >
+              {{ statusStore.playRate }}x
+            </n-tag>
             <!-- 喜欢 -->
             <SvgIcon
               :name="
@@ -196,7 +206,7 @@
         <!-- 时间相关 -->
         <Transition name="fade" mode="out-in">
           <n-flex
-            key="time"
+            :key="statusStore.autoClose.enable ? 'autoClose' : 'time'"
             :size="4"
             justify="center"
             class="time-container"
@@ -206,6 +216,19 @@
               <n-text depth="2">{{ timeDisplay[0] }}</n-text>
               <n-text depth="2">{{ timeDisplay[1] }}</n-text>
             </div>
+            <!-- 自动关闭 -->
+            <n-tag
+              v-if="statusStore.autoClose.enable"
+              size="small"
+              type="primary"
+              round
+              @click="openAutoClose"
+            >
+              {{ msToTime(statusStore.autoClose.remainTime * 1000) }}
+              <template #icon>
+                <SvgIcon name="TimeAuto" />
+              </template>
+            </n-tag>
           </n-flex>
         </Transition>
         <!-- 功能区 -->
@@ -216,7 +239,7 @@
 </template>
 
 <script setup lang="ts">
-import { toLikeSong } from "@/utils/auth";
+import { importSong, toLikeSong } from "@/utils/auth";
 import { usePlayerController } from "@/core/player/PlayerController";
 import {
   useDataStore,
@@ -227,8 +250,16 @@ import {
 import { useTimeFormat } from "@/composables/useTimeFormat";
 import { useSwipe } from "@vueuse/core";
 import { copyData, coverLoaded, renderIcon } from "@/utils/helper";
-import { openJumpArtist, openPlaylistAdd } from "@/utils/modal";
+import {
+  openAutoClose,
+  openChangeRate,
+  openJumpArtist,
+  openPlaylistAdd,
+} from "@/utils/modal";
 import { removeBrackets } from "@/utils/format";
+import { useUserStore } from "@/stores/user";
+import { canImportSong, isOnline } from "@/utils/track";
+import { msToTime } from "@/utils/time";
 import type { DropdownOption } from "naive-ui";
 
 // 照搬 SPlayer components/Player/MainPlayer.vue。去掉倍速、定时关闭、电台与私人 FM；
@@ -239,6 +270,7 @@ const dataStore = useDataStore();
 const musicStore = useMusicStore();
 const statusStore = useStatusStore();
 const settingStore = useSettingStore();
+const userStore = useUserStore();
 
 const player = usePlayerController();
 
@@ -278,6 +310,16 @@ const songMoreOptions = computed<DropdownOption[]>(() => {
           },
           icon: renderIcon("Copy", { size: 18 }),
         },
+        // 在线歌曲按 SPlayer；本地歌曲的 ID 对听众没有用，保持现状
+        {
+          key: "code-id",
+          label: "复制歌曲 ID",
+          show: isOnline(song),
+          props: {
+            onClick: () => copyData(song.id),
+          },
+          icon: renderIcon("Copy", { size: 18 }),
+        },
       ],
     },
     {
@@ -300,6 +342,16 @@ const songMoreOptions = computed<DropdownOption[]>(() => {
         onClick: () => openPlaylistAdd([song]),
       },
       icon: renderIcon("AddList"),
+    },
+    // 对应 SPlayer 的“下载歌曲”（阶段 7，Eric 决定）
+    {
+      key: "import",
+      label: "导入到曲库",
+      show: canImportSong(song, userStore.user),
+      props: {
+        onClick: () => importSong(song),
+      },
+      icon: renderIcon("Download"),
     },
   ];
 });

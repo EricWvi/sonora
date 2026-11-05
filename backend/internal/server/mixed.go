@@ -2,11 +2,14 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"sonora/internal/admin"
@@ -351,6 +354,159 @@ func (s *server) getNeteaseArtist(w http.ResponseWriter, r *http.Request) {
 	s.songList(w, r, s.opts.Netease.ArtistSongs)
 }
 
+func (s *server) listNeteaseArtistAlbums(w http.ResponseWriter, r *http.Request) {
+	id, ok := onlineID(w, r)
+	if !ok {
+		return
+	}
+	session, ok := s.neteaseSession(w, r)
+	if !ok {
+		return
+	}
+	page := window(r)
+	if page.Limit <= 0 {
+		page.Limit = artistAlbumPage
+	}
+	page.Offset = max(page.Offset, 0)
+	albums, total, err := s.opts.Netease.ArtistAlbums(r.Context(), session.Cookie, id, page.Offset, page.Limit)
+	if err != nil {
+		writeNeteaseError(w, r, err)
+		return
+	}
+	respond(w, r, map[string]any{"items": albums, "total": total}, nil)
+}
+
+// artistAlbumPage is the page size when the request names none.
+const artistAlbumPage = 50
+
+// maxPlaylistBody caps a NetEase playlist's name and description.
+const maxPlaylistBody = 16 << 10
+
+// readNeteasePlaylist reads a playlist's fields from the request; the name
+// must not be empty.
+func readNeteasePlaylist(w http.ResponseWriter, r *http.Request) (name, description string, private, ok bool) {
+	var body struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		Private     bool   `json:"private"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxPlaylistBody)
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		admin.WriteError(w, http.StatusBadRequest, "bad_request", "请求格式错误")
+		return "", "", false, false
+	}
+	name = strings.TrimSpace(body.Name)
+	if name == "" {
+		writeNeteaseError(w, r, fmt.Errorf("%w: 歌单名称不能为空", store.ErrInvalid))
+		return "", "", false, false
+	}
+	return name, strings.TrimSpace(body.Description), body.Private, true
+}
+
+func (s *server) createNeteasePlaylist(w http.ResponseWriter, r *http.Request) {
+	session, ok := s.neteaseSession(w, r)
+	if !ok {
+		return
+	}
+	name, _, private, ok := readNeteasePlaylist(w, r)
+	if !ok {
+		return
+	}
+	playlist, err := s.opts.Netease.CreatePlaylist(r.Context(), session.Cookie, name, private)
+	if err != nil {
+		writeNeteaseError(w, r, err)
+		return
+	}
+	respond(w, r, playlist, nil)
+}
+
+// ownNeteasePlaylist finds a playlist the account created, or answers the
+// request. Writes go through it so that a stray ID cannot reach "liked songs"
+// or a collected playlist: on NetEase those are playlists too.
+func (s *server) ownNeteasePlaylist(w http.ResponseWriter, r *http.Request) (store.NeteaseSession, netease.Playlist, bool) {
+	id, ok := onlineID(w, r)
+	if !ok {
+		return store.NeteaseSession{}, netease.Playlist{}, false
+	}
+	session, ok := s.neteaseSession(w, r)
+	if !ok {
+		return session, netease.Playlist{}, false
+	}
+	created, _, err := s.opts.Netease.Playlists(r.Context(), session.Cookie, session.AccountID)
+	if err != nil {
+		writeNeteaseError(w, r, err)
+		return session, netease.Playlist{}, false
+	}
+	for _, p := range created {
+		if p.ID == id {
+			return session, p, true
+		}
+	}
+	writeNeteaseError(w, r, netease.ErrNotFound)
+	return session, netease.Playlist{}, false
+}
+
+func (s *server) updateNeteasePlaylist(w http.ResponseWriter, r *http.Request) {
+	session, current, ok := s.ownNeteasePlaylist(w, r)
+	if !ok {
+		return
+	}
+	name, description, _, ok := readNeteasePlaylist(w, r)
+	if !ok {
+		return
+	}
+	// Only what changed: these are two requests, and either can be refused.
+	if name != current.Name {
+		if err := s.opts.Netease.RenamePlaylist(r.Context(), session.Cookie, current.ID, name); err != nil {
+			writeNeteaseError(w, r, err)
+			return
+		}
+	}
+	if description != current.Description {
+		if err := s.opts.Netease.DescribePlaylist(r.Context(), session.Cookie, current.ID, description); err != nil {
+			writeNeteaseError(w, r, err)
+			return
+		}
+	}
+	respondEmpty(w, r, nil)
+}
+
+func (s *server) deleteNeteasePlaylist(w http.ResponseWriter, r *http.Request) {
+	session, current, ok := s.ownNeteasePlaylist(w, r)
+	if !ok {
+		return
+	}
+	if err := s.opts.Netease.DeletePlaylist(r.Context(), session.Cookie, current.ID); err != nil {
+		writeNeteaseError(w, r, err)
+		return
+	}
+	respondEmpty(w, r, nil)
+}
+
+func (s *server) addToNeteasePlaylist(w http.ResponseWriter, r *http.Request) {
+	session, current, ok := s.ownNeteasePlaylist(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		IDs []int64 `json:"ids"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxPlaylistBody)
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		admin.WriteError(w, http.StatusBadRequest, "bad_request", "请求格式错误")
+		return
+	}
+	if len(body.IDs) == 0 {
+		writeNeteaseError(w, r, fmt.Errorf("%w: 没有选择歌曲", store.ErrInvalid))
+		return
+	}
+	if err := s.opts.Netease.AddToPlaylist(r.Context(), session.Cookie, current.ID, body.IDs); err != nil {
+		writeNeteaseError(w, r, err)
+		return
+	}
+	respondEmpty(w, r, nil)
+}
+
 func (s *server) listNeteaseAlbums(w http.ResponseWriter, r *http.Request) {
 	session, ok := s.neteaseSession(w, r)
 	if !ok {
@@ -407,16 +563,13 @@ func (s *server) getNeteaseLyrics(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	lyric, err := s.opts.Netease.Lyric(r.Context(), session.Cookie, id)
+	lyrics, err := s.opts.Netease.Lyrics(r.Context(), session.Cookie, id)
 	if err != nil {
 		writeNeteaseError(w, r, err)
 		return
 	}
-	format := "lrc"
-	if lyric == "" {
-		format = ""
-	}
-	respond(w, r, map[string]string{"format": format, "lyrics": lyric}, nil)
+	text, format := lyrics.Compose()
+	respond(w, r, map[string]string{"format": format, "lyrics": text}, nil)
 }
 
 func (s *server) listNeteaseLikeIDs(w http.ResponseWriter, r *http.Request) {

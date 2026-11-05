@@ -57,7 +57,7 @@ Album 与 Playlist；不迁入视频、电台与播放量。专辑、歌单卡�
                   <template #icon>
                     <SvgIcon
                       :size="32"
-                      :name="isPlaying(item.id) ? 'Pause' : 'Play'"
+                      :name="isPlaying(item) ? 'Pause' : 'Play'"
                     />
                   </template>
                 </n-button>
@@ -159,7 +159,7 @@ import { useMusicStore, useStatusStore, useSettingStore } from "@/stores";
 import { debounce } from "lodash-es";
 import { removeBrackets } from "@/utils/format";
 import { coverUrl, defaultCovers } from "@/utils/cover";
-import { albumRoute } from "@/utils/track";
+import { albumRoute, listKey, listRoute, sameTrack } from "@/utils/track";
 import { openJumpArtist } from "@/utils/modal";
 import { usePlayerController } from "@/core/player/PlayerController";
 import { useVirtualGrid } from "@/composables/List/useVirtualGrid";
@@ -222,13 +222,14 @@ const nameOf = (item: Album | Playlist | Track) =>
   "title" in item ? item.title : item.name;
 
 // 播放列表来源（见 music store 的 playPlaylistId）
-const listId = (id: number) => `${props.type}-${id}`;
+const listId = (item: { id: number; source?: string }) =>
+  listKey(props.type === "album" ? "album" : "playlist", item);
 
 // 是否处于当前播放列表
-const isPlaying = (id: number) =>
-  (props.type === "song"
-    ? musicStore.playSong.id === id
-    : musicStore.playPlaylistId === listId(id)) && statusStore.playStatus;
+const isPlaying = (item: Album | Playlist | Track) =>
+  (isTrack(item)
+    ? sameTrack(musicStore.playSong, item)
+    : musicStore.playPlaylistId === listId(item)) && statusStore.playStatus;
 
 const isTrack = (item: Album | Playlist | Track): item is Track =>
   "album" in item;
@@ -236,12 +237,7 @@ const isTrack = (item: Album | Playlist | Track): item is Track =>
 // 点击卡片：歌曲直接播放，其他查看详情
 const openItem = (item: Album | Playlist | Track) => {
   if (isTrack(item)) playList(item);
-  else if (item.source === "online")
-    router.push({
-      name: "online-list",
-      query: { type: props.type, id: item.id },
-    });
-  else router.push({ name: props.type, query: { id: item.id } });
+  else router.push(listRoute(props.type as "playlist" | "album", item));
 };
 
 // 右键菜单
@@ -267,17 +263,17 @@ const playList = debounce(
     try {
       // 歌曲：播放这首，这几张卡片作为播放列表（同 SongList）
       if (isTrack(item)) {
-        if (musicStore.playSong.id === item.id) return player.playOrPause();
+        if (sameTrack(musicStore.playSong, item)) return player.playOrPause();
         return player.updatePlayList(shownItems.value as Track[], item);
       }
       // 是否为当前列表
-      if (musicStore.playPlaylistId === listId(item.id))
+      if (musicStore.playPlaylistId === listId(item))
         return player.playOrPause();
       // 开始加载
       loadingId.value = item.id;
       // 获取播放列表
       const list = await getListData(item);
-      player.updatePlayList(list, undefined, listId(item.id));
+      player.updatePlayList(list, undefined, listId(item));
     } catch (error) {
       console.log("Error to play: ", error);
     } finally {

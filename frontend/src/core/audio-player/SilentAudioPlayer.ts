@@ -86,6 +86,7 @@ export class SilentAudioPlayer
   public preload() {}
 
   public setFilterGain() {}
+  public setRate() {}
 
   public getFrequencyData() {
     return new Uint8Array(0);

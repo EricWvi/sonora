@@ -5,7 +5,7 @@ import type { RepeatModeType, ShuffleModeType } from "@/types/play-mode";
 
 /**
  * 运行状态。字段名与默认值照搬 SPlayer stores/status.ts，只迁入 Sonora 保留的功能：
- * 侧栏、主题与播放器。不迁入的有倍速、定时关闭、AB 循环、音质与音源、私人 FM、
+ * 侧栏、主题与播放器。不迁入的有音质与音源、私人 FM、
  * 桌面与任务栏歌词、评论、更新、自定义背景。
  */
 export interface StatusState {
@@ -25,6 +25,26 @@ export interface StatusState {
   playStatus: boolean;
   /** 播放加载状态 */
   playLoading: boolean;
+  /** 播放速度 */
+  playRate: number;
+  /** 自动关闭 */
+  autoClose: {
+    enable: boolean;
+    /** 时长（分钟） */
+    time: number;
+    /** 剩余时长（秒） */
+    remainTime: number;
+    /** 结束时间（毫秒时间戳） */
+    endTime: number;
+    /** 等待歌曲结束 */
+    waitSongEnd: boolean;
+  };
+  /** AB 循环，换歌时清除；单位是秒 */
+  abLoop: {
+    enable: boolean;
+    pointA: number | null;
+    pointB: number | null;
+  };
   /** 播放音量 */
   playVolume: number;
   /** 静音前音量 */
@@ -99,6 +119,19 @@ export const useStatusStore = defineStore("status", {
     playIndex: -1,
     lyricIndex: -1,
     lyricLoading: false,
+    playRate: 1,
+    autoClose: {
+      enable: false,
+      time: 30,
+      remainTime: 0,
+      endTime: 0,
+      waitSongEnd: true,
+    },
+    abLoop: {
+      enable: false,
+      pointA: null,
+      pointB: null,
+    },
     playVolume: 0.7,
     playVolumeMute: 0,
     repeatMode: "off",
@@ -270,6 +303,8 @@ export const useStatusStore = defineStore("status", {
       "playlistMode",
       "currentTimeOffsetMap",
       "pureLyricMode",
+      "playRate",
+      "autoClose",
       "playVolume",
       "playVolumeMute",
       "repeatMode",

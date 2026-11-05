@@ -41,6 +41,15 @@
           >
             <SvgIcon name="AddList" />
           </div>
+          <!-- 导入到曲库：在 SPlayer “下载”的位置（阶段 7，Eric 决定），本地歌曲没有 -->
+          <div
+            v-if="canImportSong(musicStore.playSong, userStore.user)"
+            class="menu-icon"
+            title="导入到曲库"
+            @click.stop="importSong(musicStore.playSong)"
+          >
+            <SvgIcon name="Download" />
+          </div>
         </n-flex>
         <div class="center">
           <div class="btn">
@@ -113,7 +122,9 @@
 </template>
 
 <script setup lang="ts">
-import { toLikeSong } from "@/utils/auth";
+import { importSong, toLikeSong } from "@/utils/auth";
+import { canImportSong } from "@/utils/track";
+import { useUserStore } from "@/stores/user";
 import { usePlayerController } from "@/core/player/PlayerController";
 import {
   useDataStore,
@@ -131,6 +142,7 @@ const dataStore = useDataStore();
 const musicStore = useMusicStore();
 const statusStore = useStatusStore();
 const settingStore = useSettingStore();
+const userStore = useUserStore();
 
 const player = usePlayerController();
 

@@ -26,6 +26,8 @@ type provider struct {
 type lazyProvider struct {
 	issuer, clientID, clientSecret, redirectURL string
 	http                                        *http.Client
+	// groups asks for the user's groups as well.
+	groups bool
 
 	mu  sync.Mutex
 	got *provider
@@ -50,11 +52,22 @@ func (l *lazyProvider) get(ctx context.Context) (*provider, error) {
 			ClientSecret: l.clientSecret,
 			Endpoint:     p.Endpoint(),
 			RedirectURL:  l.redirectURL,
-			Scopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+			Scopes:       l.scopes(),
 		},
 		verifier: p.Verifier(&oidc.Config{ClientID: l.clientID}),
 	}
 	return l.got, nil
+}
+
+// scopes are what to ask for. groups only when something uses them: Authelia
+// refuses a login that asks for a scope the client is not allowed, so asking
+// unconditionally would lock everyone out until its configuration changed.
+func (l *lazyProvider) scopes() []string {
+	scopes := []string{oidc.ScopeOpenID, "profile", "email"}
+	if l.groups {
+		scopes = append(scopes, "groups")
+	}
+	return scopes
 }
 
 // context routes the OIDC and OAuth2 libraries through the configured
@@ -93,9 +106,10 @@ func (l *lazyProvider) identify(ctx context.Context, code string, flow loginFlow
 	}
 
 	var profile struct {
-		Name              string `json:"name"`
-		PreferredUsername string `json:"preferred_username"`
-		Email             string `json:"email"`
+		Name              string   `json:"name"`
+		PreferredUsername string   `json:"preferred_username"`
+		Email             string   `json:"email"`
+		Groups            []string `json:"groups"`
 	}
 	idToken.Claims(&profile)
 	if info, err := p.oidc.UserInfo(ctx, oauth2.StaticTokenSource(token)); err == nil && info.Subject == idToken.Subject {
@@ -110,5 +124,6 @@ func (l *lazyProvider) identify(ctx context.Context, code string, flow loginFlow
 		Subject: idToken.Subject,
 		Name:    name,
 		Email:   profile.Email,
+		Groups:  profile.Groups,
 	}, nil
 }

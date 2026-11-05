@@ -1,11 +1,17 @@
 import type { DropdownOption } from "naive-ui";
-import { albumRoute, isOnline, sameTrack } from "@/utils/track";
+import {
+  albumRoute,
+  canImportSong,
+  isOnline,
+  isPlayable,
+  sameTrack,
+} from "@/utils/track";
 import type { Track } from "@/api/types";
-import { useMusicStore, useSettingStore } from "@/stores";
+import { useMusicStore, useSettingStore, useUserStore } from "@/stores";
 import { usePlayerController } from "@/core/player/PlayerController";
 import { renderIcon, copyData } from "@/utils/helper";
 import { openJumpArtist, openPlaylistAdd } from "@/utils/modal";
-import { deleteSongs } from "@/utils/auth";
+import { deleteSongs, importSong } from "@/utils/auth";
 
 /**
  * 歌曲菜单。照搬 SPlayer composables/useSongMenu.ts，条目按阶段 2 的“歌曲列表”：
@@ -20,6 +26,7 @@ export const useSongMenu = () => {
   const musicStore = useMusicStore();
   const settingStore = useSettingStore();
   const player = usePlayerController();
+  const userStore = useUserStore();
 
   // 生成菜单选项
   const getMenuOptions = (
@@ -29,12 +36,17 @@ export const useSongMenu = () => {
   ): DropdownOption[] => {
     const isCurrent = sameTrack(musicStore.playSong, song);
     const options = settingStore.contextMenuOptions;
+    const showPlay = options.play && isPlayable(song);
+    const showNext = options.playNext && !isCurrent && isPlayable(song);
+    // 本地歌单只放曲库中的歌曲；在线歌曲只能加入网易云歌单，所以没有登录时不显示
+    const showAdd =
+      options.addToPlaylist && (!isOnline(song) || userStore.onlineSignedIn);
 
     return [
       {
         key: "play",
         label: "立即播放",
-        show: options.play,
+        show: showPlay,
         props: {
           onClick: () => player.addNextSong(song, true),
         },
@@ -43,7 +55,7 @@ export const useSongMenu = () => {
       {
         key: "play-next",
         label: "下一首播放",
-        show: options.playNext && !isCurrent,
+        show: showNext,
         props: {
           onClick: () => player.addNextSong(song, false),
         },
@@ -52,17 +64,29 @@ export const useSongMenu = () => {
       {
         key: "playlist-add",
         label: "添加到歌单",
-        // 本地歌单只放曲库中的歌曲，在线歌曲要先导入
-        show: options.addToPlaylist && !isOnline(song),
+        show: showAdd,
         props: {
           onClick: () => openPlaylistAdd([song]),
         },
         icon: renderIcon("AddList", { size: 18 }),
       },
       {
+        key: "import",
+        label: "导入到曲库",
+        show: canImportSong(song, userStore.user),
+        props: {
+          onClick: () => importSong(song),
+        },
+        icon: renderIcon("Download", { size: 18 }),
+      },
+      {
         key: "line-1",
         type: "divider",
-        show: options.play || options.playNext || options.addToPlaylist,
+        show:
+          showPlay ||
+          showNext ||
+          showAdd ||
+          canImportSong(song, userStore.user),
       },
       {
         key: "more",

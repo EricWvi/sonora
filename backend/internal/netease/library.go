@@ -1,9 +1,11 @@
 package netease
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -142,6 +144,19 @@ type apiSong struct {
 		Name   string `json:"name"`
 		PicURL string `json:"picUrl"`
 	} `json:"al"`
+	// Privilege comes inside the song from /album and /artists; /song/detail
+	// returns privileges separately.
+	Privilege *struct {
+		St int `json:"st"`
+	} `json:"privilege"`
+}
+
+// blockedStatus says from a privilege's st whether NetEase offers the song to nobody.
+func blockedStatus(st int) bool { return st < 0 }
+
+// listed reads a song that carries its own privilege.
+func (a apiSong) listed() Song {
+	return a.song(a.Privilege == nil || !blockedStatus(a.Privilege.St))
 }
 
 func (a apiSong) song(playable bool) Song {
@@ -181,7 +196,7 @@ func (c *Client) Songs(ctx context.Context, cookie string, ids []int64) ([]Song,
 		}
 		blocked := map[int64]bool{}
 		for _, p := range out.Privileges {
-			blocked[p.ID] = p.St < 0
+			blocked[p.ID] = blockedStatus(p.St)
 		}
 		for _, s := range out.Songs {
 			found[s.ID] = s.song(!blocked[s.ID])
@@ -388,27 +403,67 @@ func DecodeSong(raw string) (Song, error) {
 // playbackLevel is the quality asked for, SPlayer's default.
 const playbackLevel = "exhigh"
 
-// SongURL returns where to play the song, or "" when the account gets no full
-// version: SPlayer does not play trials unless asked to, and neither does
-// Sonora. The address is signed and short-lived, so it is fetched per play.
-func (c *Client) SongURL(ctx context.Context, cookie string, id int64) (string, error) {
+// SongFile is the file behind a song at the playback quality.
+type SongFile struct {
+	// URL is signed and short-lived, so it is fetched per use. "" when the
+	// account gets no full version: SPlayer does not play trials unless asked
+	// to, and neither does Sonora.
+	URL string
+	// Type is the file type NetEase reports, such as "mp3".
+	Type string
+}
+
+// SongFile asks where the song's file is.
+func (c *Client) SongFile(ctx context.Context, cookie string, id int64) (SongFile, error) {
 	var out struct {
 		Data []struct {
 			URL           string          `json:"url"`
+			Type          string          `json:"type"`
 			FreeTrialInfo json.RawMessage `json:"freeTrialInfo"`
 		} `json:"data"`
 	}
 	params := url.Values{"id": {strconv.FormatInt(id, 10)}, "level": {playbackLevel}}
 	if err := c.call(ctx, "/song/url/v1", cookie, params, &out); err != nil {
-		return "", err
+		return SongFile{}, err
 	}
 	if len(out.Data) == 0 || out.Data[0].URL == "" {
-		return "", nil
+		return SongFile{}, nil
 	}
 	if t := string(out.Data[0].FreeTrialInfo); t != "" && t != "null" {
-		return "", nil
+		return SongFile{}, nil
 	}
-	return playableURL(out.Data[0].URL), nil
+	return SongFile{URL: playableURL(out.Data[0].URL), Type: out.Data[0].Type}, nil
+}
+
+// SongURL returns where to play the song, "" when it cannot be played.
+func (c *Client) SongURL(ctx context.Context, cookie string, id int64) (string, error) {
+	f, err := c.SongFile(ctx, cookie, id)
+	return f.URL, err
+}
+
+// Download writes the file at u to w, at most limit bytes. It goes to NetEase's
+// CDN rather than the API service and sends no session: the address is signed.
+func (c *Client) Download(ctx context.Context, u string, w io.Writer, limit int64) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return fmt.Errorf("%w: download: bad address", ErrUnavailable)
+	}
+	resp, err := c.Downloads.Do(req)
+	if err != nil {
+		return fmt.Errorf("%w: download: request failed", ErrUnavailable)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("%w: download: status %d", ErrUnavailable, resp.StatusCode)
+	}
+	n, err := io.Copy(w, io.LimitReader(resp.Body, limit+1))
+	if err != nil {
+		return fmt.Errorf("%w: download interrupted", ErrUnavailable)
+	}
+	if n > limit {
+		return &RejectedError{Message: "文件超过大小限制"}
+	}
+	return nil
 }
 
 // playableURL makes an address the page can use, as SPlayer does on the web:
@@ -419,18 +474,27 @@ func playableURL(u string) string {
 	return strings.ReplaceAll(u, "m704.music.126.net", "m701.music.126.net")
 }
 
-// Lyric returns the song's plain LRC lyric, "" without one.
-func (c *Client) Lyric(ctx context.Context, cookie string, id int64) (string, error) {
+// Lyrics returns everything NetEase has for the song's lyric.
+func (c *Client) Lyrics(ctx context.Context, cookie string, id int64) (LyricSet, error) {
+	type part struct {
+		Lyric string `json:"lyric"`
+	}
 	var out struct {
-		Lrc struct {
-			Lyric string `json:"lyric"`
-		} `json:"lrc"`
+		Lrc      part `json:"lrc"`
+		Tlyric   part `json:"tlyric"`
+		Romalrc  part `json:"romalrc"`
+		Yrc      part `json:"yrc"`
+		Ytlrc    part `json:"ytlrc"`
+		Yromalrc part `json:"yromalrc"`
 	}
 	params := url.Values{"id": {strconv.FormatInt(id, 10)}}
 	if err := c.call(ctx, "/lyric/new", cookie, params, &out); err != nil {
-		return "", err
+		return LyricSet{}, err
 	}
-	return out.Lrc.Lyric, nil
+	return LyricSet{
+		LRC: out.Lrc.Lyric, Translation: out.Tlyric.Lyric, Roman: out.Romalrc.Lyric,
+		YRC: out.Yrc.Lyric, YTranslated: out.Ytlrc.Lyric, YRoman: out.Yromalrc.Lyric,
+	}, nil
 }
 
 // LikedIDs returns the IDs of the account's liked songs.
@@ -488,7 +552,7 @@ func (c *Client) AlbumSongs(ctx context.Context, cookie string, id int64) (Playl
 	}
 	songs := make([]Song, len(out.Songs))
 	for i, s := range out.Songs {
-		songs[i] = s.song(true)
+		songs[i] = s.listed()
 		if songs[i].Cover == nil {
 			songs[i].Cover = list.Cover
 		}
@@ -515,10 +579,147 @@ func (c *Client) ArtistSongs(ctx context.Context, cookie string, id int64) (Play
 	}
 	songs := make([]Song, len(out.HotSongs))
 	for i, s := range out.HotSongs {
-		songs[i] = s.song(true)
+		songs[i] = s.listed()
 	}
 	return Playlist{
 		ID: id, Name: out.Artist.Name, Description: out.Artist.BriefDesc, Cover: cover(out.Artist.PicURL),
 		TrackCount: len(songs), Source: sourceOnline,
 	}, songs, nil
+}
+
+// ArtistAlbums returns a page of the artist's albums and how many there are.
+func (c *Client) ArtistAlbums(ctx context.Context, cookie string, id int64, offset, limit int) ([]Album, int, error) {
+	var out struct {
+		Artist *struct {
+			AlbumSize int `json:"albumSize"`
+		} `json:"artist"`
+		HotAlbums []struct {
+			ID          int64  `json:"id"`
+			Name        string `json:"name"`
+			PicURL      string `json:"picUrl"`
+			Size        int    `json:"size"`
+			PublishTime int64  `json:"publishTime"`
+			Artists     []Ref  `json:"artists"`
+		} `json:"hotAlbums"`
+		More bool `json:"more"`
+	}
+	params := url.Values{
+		"id":     {strconv.FormatInt(id, 10)},
+		"limit":  {strconv.Itoa(limit)},
+		"offset": {strconv.Itoa(offset)},
+	}
+	if err := c.call(ctx, "/artist/album", cookie, params, &out); err != nil {
+		return nil, 0, err
+	}
+	if out.Artist == nil {
+		return nil, 0, ErrNotFound
+	}
+	albums := make([]Album, len(out.HotAlbums))
+	for i, a := range out.HotAlbums {
+		albums[i] = Album{
+			ID: a.ID, Title: a.Name, Artists: refs(a.Artists), Cover: cover(a.PicURL),
+			TrackCount: a.Size, Source: sourceOnline,
+		}
+		if a.PublishTime > 0 {
+			albums[i].Year = time.UnixMilli(a.PublishTime).UTC().Year()
+		}
+	}
+	// albumSize can count albums the list does not return; without this the
+	// player would keep asking for a next page that never comes.
+	total := out.Artist.AlbumSize
+	if !out.More {
+		total = offset + len(albums)
+	}
+	return albums, total, nil
+}
+
+// writeResult is what the write endpoints answer.
+type writeResult struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Msg     string `json:"msg"`
+}
+
+func (w writeResult) check() error {
+	switch w.Code {
+	case http.StatusOK:
+		return nil
+	case needLogin:
+		return ErrExpired
+	}
+	return &RejectedError{Message: cmp.Or(w.Message, w.Msg)}
+}
+
+func (c *Client) write(ctx context.Context, path, cookie string, params url.Values) error {
+	var out writeResult
+	if err := c.call(ctx, path, cookie, params, &out); err != nil {
+		return err
+	}
+	return out.check()
+}
+
+// CreatePlaylist creates a playlist on the account. NetEase takes only a name
+// and a privacy here; a description has to be set afterwards.
+func (c *Client) CreatePlaylist(ctx context.Context, cookie, name string, private bool) (Playlist, error) {
+	privacy := "0"
+	if private {
+		privacy = "10"
+	}
+	var out struct {
+		writeResult
+		Playlist *apiPlaylist `json:"playlist"`
+	}
+	params := url.Values{"name": {name}, "privacy": {privacy}}
+	if err := c.call(ctx, "/playlist/create", cookie, params, &out); err != nil {
+		return Playlist{}, err
+	}
+	if err := out.check(); err != nil {
+		return Playlist{}, err
+	}
+	if out.Playlist == nil {
+		return Playlist{}, fmt.Errorf("%w: /playlist/create: no playlist", ErrUnavailable)
+	}
+	return out.Playlist.playlist(), nil
+}
+
+// RenamePlaylist and DescribePlaylist are separate because the service's
+// /playlist/update clears the tags unless they are sent again, and Sonora does
+// not show tags. It also pastes the values into JSON unescaped.
+func (c *Client) RenamePlaylist(ctx context.Context, cookie string, id int64, name string) error {
+	return c.write(ctx, "/playlist/name/update", cookie,
+		url.Values{"id": {strconv.FormatInt(id, 10)}, "name": {name}})
+}
+
+// DescribePlaylist sets the playlist's description.
+func (c *Client) DescribePlaylist(ctx context.Context, cookie string, id int64, description string) error {
+	return c.write(ctx, "/playlist/desc/update", cookie,
+		url.Values{"id": {strconv.FormatInt(id, 10)}, "desc": {description}})
+}
+
+// DeletePlaylist deletes the playlist from the account.
+func (c *Client) DeletePlaylist(ctx context.Context, cookie string, id int64) error {
+	return c.write(ctx, "/playlist/delete", cookie, url.Values{"id": {strconv.FormatInt(id, 10)}})
+}
+
+// AddToPlaylist adds songs to the playlist. The service wraps this endpoint's
+// answer in a "body" when it succeeds and returns it bare when NetEase refuses.
+func (c *Client) AddToPlaylist(ctx context.Context, cookie string, id int64, songs []int64) error {
+	parts := make([]string, len(songs))
+	for i, song := range songs {
+		parts[i] = strconv.FormatInt(song, 10)
+	}
+	var out struct {
+		writeResult
+		Body *writeResult `json:"body"`
+	}
+	params := url.Values{
+		"op": {"add"}, "pid": {strconv.FormatInt(id, 10)}, "tracks": {strings.Join(parts, ",")},
+	}
+	if err := c.call(ctx, "/playlist/tracks", cookie, params, &out); err != nil {
+		return err
+	}
+	if out.Body != nil {
+		return out.Body.check()
+	}
+	return out.check()
 }

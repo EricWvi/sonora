@@ -11,11 +11,14 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    ABLoop: typeof import('./src/components/Modal/ABLoop.vue')['default']
     AMLyric: typeof import('./src/components/Player/PlayerLyric/AMLyric.vue')['default']
     AppNav: typeof import('./src/components/Layout/AppNav.vue')['default']
     ArtistList: typeof import('./src/components/List/ArtistList.vue')['default']
+    AutoClose: typeof import('./src/components/Modal/AutoClose.vue')['default']
     BackgroundRender: typeof import('./src/components/AMLL/BackgroundRender.vue')['default']
     BatchList: typeof import('./src/components/Modal/BatchList.vue')['default']
+    ChangeRate: typeof import('./src/components/Modal/ChangeRate.vue')['default']
     ContextMenuManager: typeof import('./src/components/Modal/Setting/ContextMenuManager.vue')['default']
     CopyLyrics: typeof import('./src/components/Modal/CopyLyrics.vue')['default']
     CoverList: typeof import('./src/components/List/CoverList.vue')['default']

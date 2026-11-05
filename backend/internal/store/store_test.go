@@ -953,3 +953,68 @@ func TestPlaceholdersBackfilledOnOpen(t *testing.T) {
 		t.Fatalf("after reopen: %+v, %v", d.Album.Cover, err)
 	}
 }
+
+func taggedMP3(t *testing.T, st *Store, title string) *Upload {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("..", "media", "testdata", "untagged.mp3"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "song.mp3")
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := media.WriteTags(path, media.Meta{Title: title, Artists: []string{"A"}, AlbumArtists: []string{"A"}, Album: "Same"}); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	u, err := st.Receive(f, title+".mp3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return u
+}
+
+func TestImportedAlbumsStayApart(t *testing.T) {
+	st := openTest(t).Store
+	ctx := context.Background()
+	add := func(title string, neteaseID int64) int64 {
+		t.Helper()
+		var res IngestResult
+		var err error
+		if neteaseID != 0 {
+			res, err = st.IngestImported(ctx, taggedMP3(t, st, title), nil, neteaseID)
+		} else {
+			res, err = st.Ingest(ctx, taggedMP3(t, st, title), nil)
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res.Track.Album.ID
+	}
+	upload := add("upload", 0)
+	first := add("first", 1)
+	second := add("second", 2)
+	if upload == first || first == second {
+		t.Fatalf("imports share an album: %d %d %d", upload, first, second)
+	}
+	// Later uploads join the uploaded album, not an imported one.
+	if joined := add("upload two", 0); joined != upload {
+		t.Fatalf("upload joined %d, want %d", joined, upload)
+	}
+	// Editing keeps an imported album apart.
+	if _, err := st.UpdateAlbum(ctx, first, AlbumInput{Title: "Same", Artists: []string{"A"}, Year: 1999}); err != nil {
+		t.Fatalf("edit imported: %v", err)
+	}
+	// Merge is how they come together.
+	if _, err := st.MergeAlbums(ctx, upload, []int64{first}, false); err != nil {
+		t.Fatalf("merge: %v", err)
+	}
+	if res, err := st.Tracks(ctx, TrackQuery{AlbumID: upload}); err != nil || res.Total != 3 {
+		t.Fatalf("merged: %v %+v", err, res.Total)
+	}
+}

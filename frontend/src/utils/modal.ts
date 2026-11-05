@@ -1,4 +1,6 @@
+import type { Component } from "vue";
 import type { ArtistRef, Track } from "@/api/types";
+import { useUserStore } from "@/stores/user";
 import type { SettingType } from "@/types/settings";
 import { isOnline } from "@/utils/track";
 import { NScrollbar } from "naive-ui";
@@ -120,8 +122,13 @@ export const openJumpArtist = async (
 
 // 添加到歌单
 export const openPlaylistAdd = async (selected: Track[]) => {
-  // 本地歌单只放曲库中的歌曲，在线歌曲要先导入
-  const data = selected.filter((song) => !isOnline(song));
+  // 全是在线歌曲时加入网易云歌单。本地歌单只放曲库中的歌曲，在线歌曲要先导入
+  const online = selected.length > 0 && selected.every(isOnline);
+  if (online && !useUserStore().onlineSignedIn) {
+    window.$message.warning("登录网易云后才能把在线歌曲加入歌单");
+    return;
+  }
+  const data = online ? selected : selected.filter((song) => !isOnline(song));
   if (data.length < selected.length)
     window.$message.warning("在线歌曲不能加入本地歌单，已跳过");
   if (!data.length) return;
@@ -134,7 +141,7 @@ export const openPlaylistAdd = async (selected: Track[]) => {
     style: { width: "600px" },
     title: "添加到歌单",
     content: () => {
-      return h(PlaylistAdd, { data, onClose: () => modal.destroy() });
+      return h(PlaylistAdd, { data, online, onClose: () => modal.destroy() });
     },
   });
 };
@@ -190,8 +197,11 @@ export const openBatchList = async (
   });
 };
 
-// 新建歌单
-export const openCreatePlaylist = async () => {
+/**
+ * 新建歌单
+ * @param online 是否新建在线歌单（网易云账号上）
+ */
+export const openCreatePlaylist = async (online: boolean = false) => {
   const { default: CreatePlaylist } =
     await import("@/components/Modal/CreatePlaylist.vue");
   const modal = window.$modal.create({
@@ -199,12 +209,48 @@ export const openCreatePlaylist = async () => {
     transformOrigin: "center",
     autoFocus: false,
     style: { width: "600px" },
-    title: "新建歌单",
+    title: online ? "新建在线歌单" : "新建歌单",
     content: () => {
-      return h(CreatePlaylist, { onClose: () => modal.destroy() });
+      return h(CreatePlaylist, { online, onClose: () => modal.destroy() });
     },
   });
 };
+
+const openCard = (
+  title: string,
+  width: string,
+  load: () => Promise<{ default: Component }>,
+) =>
+  load().then(({ default: content }) => {
+    window.$modal.create({
+      preset: "card",
+      transformOrigin: "center",
+      autoFocus: false,
+      style: { width },
+      title,
+      content: () => h(content),
+    });
+  });
+
+// 播放速度
+export const openChangeRate = () =>
+  openCard(
+    "播放速度",
+    "600px",
+    () => import("@/components/Modal/ChangeRate.vue"),
+  );
+
+// 自动关闭
+export const openAutoClose = () =>
+  openCard(
+    "自动关闭",
+    "600px",
+    () => import("@/components/Modal/AutoClose.vue"),
+  );
+
+// AB 循环
+export const openABLoop = () =>
+  openCard("AB 循环", "500px", () => import("@/components/Modal/ABLoop.vue"));
 
 // 均衡器
 export const openEqualizer = async () => {
@@ -410,11 +456,13 @@ export const openDescModal = (content: string, title: string = "歌单简介") =
  * @param id 歌单 ID
  * @param data 歌单信息
  * @param func 回调函数
+ * @param online 是否为网易云上的歌单
  */
 export const openUpdatePlaylist = async (
   id: number,
   data: { name: string; description?: string },
   func: () => Promise<void>,
+  online: boolean = false,
 ) => {
   const { default: UpdatePlaylist } =
     await import("@/components/Modal/UpdatePlaylist.vue");
@@ -428,6 +476,7 @@ export const openUpdatePlaylist = async (
       return h(UpdatePlaylist, {
         id,
         data,
+        online,
         onSuccess: () => {
           modal.destroy();
           // 触发回调

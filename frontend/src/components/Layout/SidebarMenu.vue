@@ -1,7 +1,8 @@
 <!-- 主菜单：按 SPlayer Menu.vue 改编，条目见阶段 2 的信息架构。
 与 SPlayer 不同（阶段 7，Eric 决定 2026-11-05）：歌单分组不能折叠，始终展开，标题是普通的小标题，
 文字样式不变。在线/本地歌单的切换按钮照搬 SPlayer（NPopselect），默认本地歌单；
-没有登录网易云时“在线歌单”不可选。 -->
+没有登录网易云时“在线歌单”不可选。“+”在在线模式下新建网易云歌单。
+歌单项的右键菜单是 Sonora 新增，SPlayer 的侧边栏没有；在线歌单项的条目与本地相同。 -->
 <template>
   <n-menu
     ref="menuRef"
@@ -53,6 +54,7 @@ import { openCreatePlaylist, openUpdatePlaylist } from "@/utils/modal";
 import { copyData, renderIcon as renderMenuIcon } from "@/utils/helper";
 import { deletePlaylist } from "@/utils/auth";
 import { fetchAll } from "@/api/pages";
+import { isOnline, listKey } from "@/utils/track";
 import { useMusicStore, useStatusStore } from "@/stores";
 import { usePlayerController } from "@/core/player/PlayerController";
 
@@ -72,6 +74,10 @@ const menuRef = ref<MenuInst | null>(null);
 
 const renderIcon = (name: string, style?: Record<string, string>) => () =>
   h(SvgIcon, { name, style });
+
+// 本地歌单以数字 ID 为键，在线歌单带前缀（ID 可能相同）
+const playlistKey = (playlist: Playlist): string | number =>
+  isOnline(playlist) ? `online-${playlist.id}` : playlist.id;
 
 // 前三项与 SPlayer 一样上移 1px，对齐文字基线。
 const lift = { transform: "translateY(-1px)" };
@@ -160,26 +166,24 @@ const options = computed<MenuOption[]>(() => [
               onClick: (event: Event) => event.stopPropagation(),
             }),
         ),
-        // 在线模式的新建待接入网易云的写接口
-        !onlineMode.value &&
-          h(NButton, {
-            type: "tertiary",
-            round: true,
-            strong: true,
-            secondary: true,
-            renderIcon: renderIcon("Add"),
-            "aria-label": "新建歌单",
-            onClick: (event: Event) => {
-              event.stopPropagation();
-              openCreatePlaylist();
-            },
-          }),
+        h(NButton, {
+          type: "tertiary",
+          round: true,
+          strong: true,
+          secondary: true,
+          renderIcon: renderIcon("Add"),
+          "aria-label": "新建歌单",
+          onClick: (event: Event) => {
+            event.stopPropagation();
+            openCreatePlaylist(onlineMode.value);
+          },
+        }),
       ]),
     children: (onlineMode.value
       ? userStore.onlinePlaylists.created
       : userStore.playlists
     ).map((playlist) => ({
-      key: onlineMode.value ? `online-${playlist.id}` : playlist.id,
+      key: playlistKey(playlist),
       label: () =>
         settingStore.menuShowCover
           ? h("div", { class: "pl-cover" }, [
@@ -206,12 +210,14 @@ const playlistMenu = reactive({ x: 0, y: 0, show: false });
 const playlistMenuOptions = ref<DropdownOption[]>([]);
 
 const playPlaylist = async (playlist: Playlist) => {
-  const pid = `playlist-${playlist.id}`;
+  const pid = listKey("playlist", playlist);
   if (musicStore.playPlaylistId === pid) return player.playOrPause();
   try {
-    const list = await fetchAll((offset, limit) =>
-      source.playlistTracks(playlist.id, { offset, limit }),
-    );
+    const list = isOnline(playlist)
+      ? (await source.onlineList("playlist", playlist.id)).tracks
+      : await fetchAll((offset, limit) =>
+          source.playlistTracks(playlist.id, { offset, limit }),
+        );
     if (!list.length) return window.$message.warning("歌单中没有歌曲");
     await player.updatePlayList(list, undefined, pid);
   } catch (error) {
@@ -220,18 +226,27 @@ const playPlaylist = async (playlist: Playlist) => {
   }
 };
 
+// 正在查看这个歌单
+const viewing = (playlist: Playlist) =>
+  isOnline(playlist)
+    ? route.name === "online-list" &&
+      route.query.type === "playlist" &&
+      Number(route.query.id) === playlist.id
+    : route.name === "playlist" && Number(route.query.id) === playlist.id;
+
 const openPlaylistMenu = (e: MouseEvent, playlist: Playlist) => {
   e.preventDefault();
   playlistMenu.show = false;
+  const online = isOnline(playlist);
   const playing =
-    musicStore.playPlaylistId === `playlist-${playlist.id}` &&
+    musicStore.playPlaylistId === listKey("playlist", playlist) &&
     statusStore.playStatus;
   nextTick().then(() => {
     playlistMenuOptions.value = [
       {
         key: "open",
         label: "查看详情",
-        props: { onClick: () => select(playlist.id) },
+        props: { onClick: () => select(playlistKey(playlist)) },
         icon: renderMenuIcon("Eye"),
       },
       {
@@ -250,6 +265,7 @@ const openPlaylistMenu = (e: MouseEvent, playlist: Playlist) => {
               playlist.id,
               { name: playlist.name, description: playlist.description },
               async () => {},
+              online,
             ),
         },
         icon: renderMenuIcon("EditNote"),
@@ -259,14 +275,14 @@ const openPlaylistMenu = (e: MouseEvent, playlist: Playlist) => {
         label: "删除歌单",
         props: {
           onClick: () =>
-            deletePlaylist(playlist.id, () => {
-              // 正在查看这个歌单时回到首页
-              if (
-                route.name === "playlist" &&
-                Number(route.query.id) === playlist.id
-              )
-                void router.push({ name: "home" });
-            }),
+            deletePlaylist(
+              playlist.id,
+              () => {
+                // 正在查看这个歌单时回到首页
+                if (viewing(playlist)) void router.push({ name: "home" });
+              },
+              online,
+            ),
         },
         icon: renderMenuIcon("Delete"),
       },
@@ -292,10 +308,10 @@ const openPlaylistMenu = (e: MouseEvent, playlist: Playlist) => {
 
 // 菜单项的 props 只作用于分隔线，事件要经 node-props 绑定到歌单项
 const nodeProps = (option: MenuOption) => {
-  const playlist =
-    typeof option.key === "number"
-      ? userStore.playlists.find((item) => item.id === option.key)
-      : undefined;
+  const playlist = [
+    ...userStore.playlists,
+    ...userStore.onlinePlaylists.created,
+  ].find((item) => playlistKey(item) === option.key);
   // MenuNodeProps 的类型只允许字符串与数字属性，事件处理函数在运行时照常绑定
   return (
     playlist

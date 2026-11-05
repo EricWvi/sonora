@@ -78,6 +78,15 @@ export const useUserStore = defineStore("sonora-user", () => {
     }
   }
 
+  /** 在线歌单写入后重新读取。 */
+  async function loadOnlinePlaylists(): Promise<void> {
+    try {
+      onlinePlaylists.value = await source.onlinePlaylists();
+    } catch (error) {
+      if (!unauthorized(error)) console.error("❌ 读取在线歌单失败:", error);
+    }
+  }
+
   // 服务恢复后重新读取用户与歌单（启动时不可达则一直为空）
   connection.onReconnect(() => {
     if (!signedOut.value)
@@ -102,6 +111,7 @@ export const useUserStore = defineStore("sonora-user", () => {
     onlineSignedIn,
     load,
     loadPlaylists,
+    loadOnlinePlaylists,
     loadNetease,
     logoutNetease,
     logout,

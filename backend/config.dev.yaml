@@ -8,3 +8,5 @@ dev: true
 # Started by `task run:server`, which removes it again on exit.
 netease:
   api_url: "http://127.0.0.1:14562"
+  # The development listener is in this group, see devmode.Groups.
+  import_group: "sonora-import"

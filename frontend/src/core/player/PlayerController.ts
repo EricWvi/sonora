@@ -1,7 +1,7 @@
 import { fixturePlayer, source, type DataSource } from "@/api/source";
 import { connection } from "@/api/connection";
 import type { Track } from "@/api/types";
-import { isOnline, sameTrack } from "@/utils/track";
+import { isOnline, isPlayable, sameTrack } from "@/utils/track";
 import {
   AudioErrorCode,
   type IPlaybackEngine,
@@ -90,7 +90,10 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * - 播放超过 min(30 秒, 时长的一半) 才记入最近播放，SPlayer 开始播放即记录；
  * - 解析或加载中暂停，加载完成后保持暂停。
  */
+const UNPLAYABLE = "这首歌暂时无法播放";
+
 export class PlayerController {
+  private autoCloseInterval: ReturnType<typeof setInterval> | undefined;
   private state: PlaybackState = "idle";
   /** 用户是否想要播放；解析与加载完成后据此决定是否开始播放 */
   private wantPlay = false;
@@ -366,6 +369,11 @@ export class PlayerController {
     }
     this.wantPlay = autoPlay;
     this.resetListening();
+    // AB 循环只对当前歌曲有效（照搬 SPlayer）
+    statusStore.abLoop.enable = false;
+    statusStore.abLoop.pointA = null;
+    statusStore.abLoop.pointB = null;
+    this.engine.setRate(statusStore.playRate);
     this.setState("resolving");
     // 立即更新 UI（歌曲信息、封面、歌词等），无需等待网络请求
     void this.setupSongUI(entry, seek);
@@ -512,6 +520,11 @@ export class PlayerController {
       console.log(`⏹️ [${useMusicStore().playSong?.id}] 歌曲结束`);
       this.onTimeUpdate.cancel();
       this.handleTimeUpdate();
+      // 自动关闭：等这首歌播完后停止
+      if (this.checkAutoClose()) {
+        this.finish();
+        return;
+      }
       // 自动播放下一首
       void this.nextOrPrev("next", true, true);
     });
@@ -536,6 +549,19 @@ export class PlayerController {
   private handleTimeUpdate() {
     if (this.state !== "playing" && this.state !== "paused") return;
     const statusStore = useStatusStore();
+    // AB 循环（照搬 SPlayer）
+    const { enable, pointA, pointB } = statusStore.abLoop;
+    if (
+      enable &&
+      pointA !== null &&
+      pointB !== null &&
+      pointB > pointA &&
+      this.engine.currentTime >= pointB
+    ) {
+      this.engine.seek(pointA);
+      // 跳转的位移不算收听
+      this.lastTickMs = null;
+    }
     const currentTime = Math.floor(this.engine.currentTime * 1000);
     const duration =
       Math.floor(this.engine.duration * 1000) || statusStore.duration;
@@ -755,6 +781,66 @@ export class PlayerController {
     await this.playSong({ autoPlay: play });
   }
 
+  /**
+   * 设置播放速度（照搬 SPlayer）
+   * @param rate 速度，0.2–2
+   */
+  public setRate(rate: number) {
+    if (!Number.isFinite(rate)) return;
+    const safeRate = Math.max(0.2, Math.min(rate, 2));
+    useStatusStore().playRate = safeRate;
+    this.engine.setRate(safeRate);
+    mediaSessionManager.updatePlaybackRate(safeRate);
+  }
+
+  /**
+   * 开启自动关闭。照搬 SPlayer，计时基于系统时间。
+   * @param time 时长（分钟）
+   * @param remainTime 剩余时长（秒）
+   */
+  public startAutoCloseTimer(time: number, remainTime: number) {
+    const statusStore = useStatusStore();
+    if (!time || !remainTime) return;
+    clearInterval(this.autoCloseInterval);
+    statusStore.autoClose.enable = true;
+    statusStore.autoClose.time = time;
+    statusStore.autoClose.endTime = Date.now() + remainTime * 1000;
+    statusStore.autoClose.remainTime = remainTime;
+    this.autoCloseInterval = setInterval(() => {
+      const { autoClose } = statusStore;
+      autoClose.remainTime = Math.max(
+        0,
+        Math.ceil((autoClose.endTime - Date.now()) / 1000),
+      );
+      if (autoClose.remainTime > 0) return;
+      clearInterval(this.autoCloseInterval);
+      // 等待歌曲结束时，由 ended 事件停止
+      if (autoClose.waitSongEnd) return;
+      void this.pause();
+      this.stopAutoCloseTimer();
+    }, 1000);
+  }
+
+  /**
+   * 关闭自动关闭。与 SPlayer 不同：同时停止计时器。SPlayer 只改状态，
+   * 计时器看到结束时间为 0，下一秒就会暂停播放。
+   */
+  public stopAutoCloseTimer() {
+    const { autoClose } = useStatusStore();
+    clearInterval(this.autoCloseInterval);
+    autoClose.enable = false;
+    autoClose.remainTime = autoClose.time * 60;
+    autoClose.endTime = 0;
+  }
+
+  /** 时间已到且在等歌曲结束时，结束自动关闭并返回 true */
+  private checkAutoClose(): boolean {
+    const { enable, waitSongEnd, remainTime } = useStatusStore().autoClose;
+    if (!enable || !waitSongEnd || remainTime > 0) return false;
+    this.stopAutoCloseTimer();
+    return true;
+  }
+
   /** 播完最后一首，停在末尾 */
   private finish() {
     const statusStore = useStatusStore();
@@ -885,9 +971,19 @@ export class PlayerController {
     const statusStore = useStatusStore();
     const musicStore = useMusicStore();
     if (!data || !data.length) return;
+    // 不可播放的歌曲（Sonora 新增，SPlayer 请求地址失败后才跳过）不进入队列，播放时自然跳过
+    if (song && !isPlayable(song)) {
+      this.deps.message.warning(UNPLAYABLE);
+      return;
+    }
+    const playable = data.filter(isPlayable);
+    if (!playable.length) {
+      this.deps.message.warning("列表中没有可以播放的歌曲");
+      return;
+    }
     this.resetFailures();
-    const entries = data.map(newEntry);
-    const songIndex = song ? data.findIndex((s) => sameTrack(s, song)) : -1;
+    const entries = playable.map(newEntry);
+    const songIndex = song ? playable.findIndex((s) => sameTrack(s, song)) : -1;
     const start = entries[Math.max(songIndex, 0)];
     // 处理随机模式
     if (statusStore.shuffleMode === "on") {
@@ -951,6 +1047,10 @@ export class PlayerController {
    * @param play 是否立即播放
    */
   public async addNextSong(song: Track, play: boolean = false) {
+    if (!isPlayable(song)) {
+      this.deps.message.warning(UNPLAYABLE);
+      return;
+    }
     const dataStore = useDataStore();
     const musicStore = useMusicStore();
     const current = this.currentEntry();
@@ -979,19 +1079,23 @@ export class PlayerController {
    * @param songs 歌曲
    */
   public addNextSongs(songs: Track[]) {
-    if (!songs.length) return;
+    const playable = songs.filter(isPlayable);
+    if (!playable.length) {
+      if (songs.length) this.deps.message.warning(UNPLAYABLE);
+      return;
+    }
     const dataStore = useDataStore();
     const current = this.currentEntry();
     let list: QueueEntry[] = [...dataStore.playList];
     let original: QueueEntry[] = [...dataStore.originalPlayList];
     // 倒序逐个插到当前曲目之后，结果保持给定顺序
-    for (const entry of songs.map(newEntry).reverse()) {
+    for (const entry of playable.map(newEntry).reverse()) {
       list = insertAfter(list, current, entry).list;
       if (original.length)
         original = insertAfter(original, current, entry).list;
     }
     this.setLists(list, original);
-    this.deps.message.success(`已添加 ${songs.length} 首至下一首播放`);
+    this.deps.message.success(`已添加 ${playable.length} 首至下一首播放`);
   }
 
   /**
@@ -1260,6 +1364,18 @@ export async function initPlayer() {
     (offset) => player.setAudioDelayCompensation(offset),
     { immediate: true },
   );
+  // 播放速度
+  player.setRate(statusStore.playRate);
+  // 恢复自动关闭的计时（照搬 SPlayer useInit.ts）；已经过期的不再生效
+  if (statusStore.autoClose.enable) {
+    const { endTime, time } = statusStore.autoClose;
+    if (endTime > Date.now())
+      player.startAutoCloseTimer(
+        time,
+        Math.ceil((endTime - Date.now()) / 1000),
+      );
+    else player.stopAutoCloseTimer();
+  }
   // 关闭页面前保存
   window.addEventListener("pagehide", () => {
     player.flushPersistence();

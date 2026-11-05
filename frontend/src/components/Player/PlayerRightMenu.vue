@@ -1,14 +1,15 @@
 <template>
   <n-flex :size="8" align="center" class="right-menu">
-    <!-- 其他控制：只剩均衡器，改为直接打开（Eric 确认，2026-10-27） -->
-    <div
+    <!-- 其他控制 -->
+    <n-dropdown
       v-if="settingStore.fullscreenPlayerElements.moreSettings"
-      class="menu-icon hidden"
-      title="均衡器"
-      @click.stop="openEqualizer"
+      :options="controlsOptions"
+      :show-arrow="false"
     >
-      <SvgIcon name="Eq" />
-    </div>
+      <div class="menu-icon hidden">
+        <SvgIcon name="Controls" />
+      </div>
+    </n-dropdown>
     <!-- 音量 -->
     <n-popover :show-arrow="false" :style="{ padding: 0 }">
       <template #trigger>
@@ -57,16 +58,50 @@
 <script setup lang="ts">
 import { usePlayerController } from "@/core/player/PlayerController";
 import { useDataStore, useSettingStore, useStatusStore } from "@/stores";
-import { openEqualizer } from "@/utils/modal";
+import type { DropdownOption } from "naive-ui";
+import { renderIcon } from "@/utils/helper";
+import {
+  openABLoop,
+  openAutoClose,
+  openChangeRate,
+  openEqualizer,
+} from "@/utils/modal";
 
-// 照搬 SPlayer components/Player/PlayerRightMenu.vue。去掉音质与桌面歌词；“其他控制”只保留
-// 均衡器，不做自动关闭、AB 循环与播放速度（2026-10-25）。只剩一项的悬停菜单像提示，点按钮
-// 却没有反应，改为均衡器图标、点击直接打开（Eric 确认，2026-10-27）。
+// 照搬 SPlayer components/Player/PlayerRightMenu.vue，去掉音质与桌面歌词。“其他控制”是
+// 与 SPlayer 相同的四项，本地与在线歌曲都有（阶段 7，Eric 决定）；在线歌曲走同一条
+// Web Audio 链路，所以不需要 SPlayer 按引擎禁用的判断。
 
 const dataStore = useDataStore();
 const statusStore = useStatusStore();
 const settingStore = useSettingStore();
 const player = usePlayerController();
+
+const controlsOptions: DropdownOption[] = [
+  {
+    label: "均衡器",
+    key: "equalizer",
+    icon: renderIcon("Eq"),
+    props: { onClick: openEqualizer },
+  },
+  {
+    label: "自动关闭",
+    key: "autoClose",
+    icon: renderIcon("TimeAuto"),
+    props: { onClick: openAutoClose },
+  },
+  {
+    label: "AB 循环",
+    key: "abLoop",
+    icon: renderIcon("Repeat"),
+    props: { onClick: openABLoop },
+  },
+  {
+    label: "播放速度",
+    key: "rate",
+    icon: renderIcon("PlayRate"),
+    props: { onClick: openChangeRate },
+  },
+];
 </script>
 
 <style scoped lang="scss">

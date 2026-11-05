@@ -15,11 +15,13 @@
 | 状态 | code                      | 场景                                                             |
 | ---- | ------------------------- | ---------------------------------------------------------------- |
 | 400  | `bad_request` / `invalid` | 请求格式错误 / 输入不合法（说明可直接展示）                      |
+| 400  | `netease_rejected`        | 网易云拒绝了写操作，`message` 是网易云的说明                     |
 | 401  | `unauthenticated`         | 没有管理会话或会话已过期（播放端为不带 `code` 的 401，见下文）   |
 | 401  | `invalid_credentials`     | 用户名或密码错误                                                 |
 | 403  | `not_initialized`         | 尚未创建管理员时访问其他管理接口                                 |
 | 403  | `invalid_token`           | 初始化 token 缺失或错误                                          |
 | 403  | `bad_origin`              | 跨站写请求                                                       |
+| 403  | `import_forbidden`        | 不在可以导入歌曲的组内                                           |
 | 404  | `not_found`               | 内容不存在或已删除                                               |
 | 409  | `already_initialized`     | 重复初始化                                                       |
 | 409  | `conflict`                | 重命名与现有专辑或艺术家冲突，应改用合并                         |
@@ -90,7 +92,7 @@
 
 | 方法与路径                        | 说明                                                                                                                                                                                             |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `GET me`                          | 当前用户 `{name, email}`                                                                                                                                                                         |
+| `GET me`                          | 当前用户 `{name, email, canImport}`；`canImport` 表示可以导入歌曲                                                                                                                                |
 | `GET tracks`                      | `q`（匹配标题、专辑名、艺术家名）、`albumId`、`artistId`、`sort`、`order`；默认新入库在前，首页“最近添加的歌曲”取前 6 首                                                                         |
 | `GET tracks/{id}`                 | 歌曲详情                                                                                                                                                                                         |
 | `GET tracks/{id}/lyrics`          | `{format, lyrics}`：`format` 为 `lrc` 或 `ttml`，`lyrics` 为原文；没有歌词时都是空字符串。解析由播放端完成                                                                                       |
@@ -124,15 +126,21 @@
 
 在线内容的 JSON 形态与本地相同，列表可以混用，另有 `source: "online"`；本地内容没有 `source`。封面为 `{name: "", thumbhash: "", url}`，`url` 是网易云的图片地址，由浏览器直接加载。在线歌曲另有 `playable`，`false` 表示网易云不提供这首歌；没有 `trackNo`、`discNo`，`year` 取发行时间。本地与在线的 ID 都是整数，可能相同，比较时要同时比较来源。
 
-| 方法与路径                                                                  | 说明                                                                                              |
-| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `GET netease/playlists`                                                     | `{created, collected}`：自己创建的与收藏的歌单，不含“我喜欢的音乐”                                |
-| `GET netease/playlists/{id}`、`netease/albums/{id}`、`netease/artists/{id}` | `{playlist, tracks}`：详情都以歌单的形态返回，全部歌曲一次返回；艺术家为热门歌曲                  |
-| `GET netease/albums`、`GET netease/artists`                                 | 收藏的专辑与歌手，`{items, total}`                                                                |
-| `GET netease/songs/{id}/url`                                                | `{url}`：音质 `exhigh`，地址带时效，每次播放时获取；只有试听或没有地址时返回 404 `netease_no_url` |
-| `GET netease/songs/{id}/lyrics`                                             | 与 `tracks/{id}/lyrics` 相同的 `{format, lyrics}`，目前只有 LRC                                   |
-| `GET netease/likes/ids`                                                     | `{ids}`：喜欢的在线歌曲                                                                           |
-| `PUT netease/likes/{id}`、`DELETE netease/likes/{id}`                       | 在网易云上喜欢 / 取消，204                                                                        |
+| 方法与路径                                                                  | 说明                                                                                                                                                                                                                                                             |
+| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET netease/playlists`                                                     | `{created, collected}`：自己创建的与收藏的歌单，不含“我喜欢的音乐”                                                                                                                                                                                               |
+| `GET netease/playlists/{id}`、`netease/albums/{id}`、`netease/artists/{id}` | `{playlist, tracks}`：详情都以歌单的形态返回，全部歌曲一次返回；艺术家为热门歌曲；不可播放的歌 `playable` 为 `false`                                                                                                                                             |
+| `GET netease/albums`、`GET netease/artists`                                 | 收藏的专辑与歌手，`{items, total}`                                                                                                                                                                                                                               |
+| `GET netease/artists/{id}/albums`                                           | 艺术家的专辑，分页，`{items, total}`                                                                                                                                                                                                                             |
+| `POST netease/playlists`                                                    | `{name, private}` 在网易云账号上新建歌单，返回歌单                                                                                                                                                                                                               |
+| `PUT netease/playlists/{id}`                                                | `{name, description}` 只修改有变化的字段，不影响标签，204；不是该账号自己创建的歌单返回 404                                                                                                                                                                      |
+| `DELETE netease/playlists/{id}`                                             | 删除，204；不是该账号自己创建的歌单（包括“我喜欢”与收藏的歌单）返回 404                                                                                                                                                                                          |
+| `POST netease/playlists/{id}/tracks`                                        | `{ids}` 把在线歌曲加入该账号自己创建的歌单，204；已在歌单中等被网易云拒绝时返回 400 `netease_rejected`                                                                                                                                                           |
+| `GET netease/songs/{id}/url`                                                | `{url}`：音质 `exhigh`，地址带时效，每次播放时获取；只有试听或没有地址时返回 404 `netease_no_url`                                                                                                                                                                |
+| `GET netease/songs/{id}/lyrics`                                             | 与 `tracks/{id}/lyrics` 相同的 `{format, lyrics}`：有逐字歌词时为 TTML，否则 LRC，翻译与罗马音有就放入                                                                                                                                                           |
+| `POST netease/songs/{id}/import`                                            | 导入曲库，需要在 `netease.import_group` 指定的组内，否则 403 `import_forbidden`。由服务端下载，返回 `{status, track}`，`status` 为 `created` 或 `duplicate`（已导入过，不再下载）；账号没有完整版本时 404 `netease_no_url`，不是 MP3 时 415 `unsupported_format` |
+| `GET netease/likes/ids`                                                     | `{ids}`：喜欢的在线歌曲                                                                                                                                                                                                                                          |
+| `PUT netease/likes/{id}`、`DELETE netease/likes/{id}`                       | 在网易云上喜欢 / 取消，204                                                                                                                                                                                                                                       |
 
 ### 混合列表
 

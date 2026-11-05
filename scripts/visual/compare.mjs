@@ -55,9 +55,6 @@ const drift = {
   reason: "封面取色 ±1，或评论层造成的 1–2 个像素",
 };
 const narrow = /^(1280x800|1025x800|1024x800|990x800)$/;
-// The equalizer button replaces SPlayer's one-item "其他控制" menu; its area
-// (recorded by player.mjs as masks) is left out of the comparison.
-const maskReason = "均衡器按钮改用 Eq 图标（Eric 确认，2026-10-27）";
 const accepted = [
   {
     states: /^bar-paused-start$/,
@@ -178,15 +175,10 @@ function judge(viewport, id, diff, refEntry, entry) {
   if (!diff || diff.missing) return { result: "FAIL", detail: "缺少截图" };
   if (diff.size)
     return { result: "FAIL", detail: `尺寸 ${diff.size.join(" / ")}` };
-  if (!diff.count && !diff.masked) return { result: "same", detail: "" };
-  if (!diff.count)
-    return {
-      result: "accepted",
-      detail: `均衡器按钮 ${diff.masked} px（${maskReason}）`,
-    };
+  if (!diff.count) return { result: "same", detail: "" };
   const detail = `${diff.count} px，最大差值 ${diff.maxDelta}，区域 ${diff.box.join(",")}`;
   let left = Object.entries(diff.deltas).map(([d, n]) => [Number(d), n]);
-  const reasons = diff.masked ? [maskReason] : [];
+  const reasons = [];
   if (drift.states.test(id) && left.some(([d]) => d <= drift.delta)) {
     left = left.filter(([d]) => d > drift.delta);
     reasons.push(drift.reason);
@@ -260,23 +252,11 @@ try {
       pattern,
     ]);
     const diffDir = join(out, `diff-${viewport}`);
-    const captured = await readJSON(join(out, viewport, "manifest.json"));
-    const masksFile = join(out, `masks-${viewport}.json`);
-    await writeFile(
-      masksFile,
-      JSON.stringify(
-        Object.fromEntries(
-          (captured?.states ?? []).map((s) => [`${s.id}.png`, s.masks ?? []]),
-        ),
-      ),
-    );
     await run("scripts/baseline/diff.mjs", [
       refDir,
       join(out, viewport),
       "--out",
       diffDir,
-      "--masks",
-      masksFile,
     ]);
     const report = (await readJSON(join(diffDir, "report.json"))) ?? [];
     const refManifest = await readJSON(join(refDir, "manifest.json"));

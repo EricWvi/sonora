@@ -19,7 +19,11 @@ import type { PlayerState } from "@/viewmodels";
 // 播放器基线的歌曲，含网易内容，只在本机由 scripts/fixtures/baseline.mjs 生成到
 // .local/fixtures/baseline/，不进入仓库。
 
-const user: User = { name: "listener", email: "listener@sonora.test" };
+const user: User = {
+  name: "listener",
+  email: "listener@sonora.test",
+  canImport: false,
+};
 
 /** 播放器状态在 fixture 中以歌曲 ID 记录队列。 */
 type PlayerFixture = {
@@ -436,8 +440,14 @@ function librarySource(lib: Library): DataSource {
     onlineAlbums: () => reply(() => ({ items: [], total: 0 })),
     onlineArtists: () => reply(() => ({ items: [], total: 0 })),
     onlineList: () => Promise.reject(new ApiError(503, "没有配置")),
+    onlineArtistAlbums: () => reply(() => ({ items: [], total: 0 })),
+    createOnlinePlaylist: () => Promise.reject(new ApiError(503, "没有配置")),
+    updateOnlinePlaylist: () => Promise.reject(new ApiError(503, "没有配置")),
+    deleteOnlinePlaylist: () => Promise.reject(new ApiError(503, "没有配置")),
+    addToOnlinePlaylist: () => Promise.reject(new ApiError(503, "没有配置")),
     onlineSongUrl: () => Promise.reject(new ApiError(503, "没有配置")),
     onlineLyrics: () => reply(() => ({ format: "" as const, lyrics: "" })),
+    importOnlineSong: () => Promise.reject(new ApiError(503, "没有配置")),
     onlineLikeIds: () => reply(() => []),
     onlineLike: () => reply(() => undefined),
     onlineUnlike: () => reply(() => undefined),

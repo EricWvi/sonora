@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 
 	"sonora/internal/store"
@@ -66,5 +67,14 @@ func TestLoginReportsUnavailableProvider(t *testing.T) {
 	})
 	if rec := serve(h, "GET", "/auth/login"); rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d", rec.Code)
+	}
+}
+
+func TestGroupsScopeOnlyWhenRequested(t *testing.T) {
+	for _, want := range []bool{false, true} {
+		p := &lazyProvider{groups: want}
+		if got := slices.Contains(p.scopes(), "groups"); got != want {
+			t.Fatalf("groups=%v: scopes %v", want, p.scopes())
+		}
 	}
 }

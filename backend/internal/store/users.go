@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"time"
 )
@@ -15,16 +16,19 @@ type User struct {
 	ID    int64  `json:"-"`
 	Name  string `json:"name"`
 	Email string `json:"email"`
+	// Groups are the identity provider groups as of the last login.
+	Groups []string `json:"-"`
 }
 
 // Identity is what the identity provider vouches for. Issuer and Subject
 // identify the person; Name and Email are display attributes that may
-// change between logins.
+// change between logins, and Groups the memberships at this login.
 type Identity struct {
 	Issuer  string
 	Subject string
 	Name    string
 	Email   string
+	Groups  []string
 }
 
 // UpsertUser returns the user bound to the identity, creating it on first
@@ -33,21 +37,25 @@ func (s *Store) UpsertUser(ctx context.Context, id Identity) (User, error) {
 	if id.Issuer == "" || id.Subject == "" {
 		return User{}, invalid("身份缺少 issuer 或 subject")
 	}
-	u := User{Name: id.Name, Email: id.Email}
-	err := s.inTx(ctx, func(tx *sql.Tx) error {
+	u := User{Name: id.Name, Email: id.Email, Groups: id.Groups}
+	groups, err := json.Marshal(append([]string{}, id.Groups...))
+	if err != nil {
+		return User{}, err
+	}
+	err = s.inTx(ctx, func(tx *sql.Tx) error {
 		err := tx.QueryRowContext(ctx,
 			`SELECT id FROM users WHERE issuer = ? AND subject = ?`, id.Issuer, id.Subject).Scan(&u.ID)
 		if err == nil {
 			_, err = tx.ExecContext(ctx,
-				`UPDATE users SET name = ?, email = ? WHERE id = ?`, id.Name, id.Email, u.ID)
+				`UPDATE users SET name = ?, email = ?, idp_groups = ? WHERE id = ?`, id.Name, id.Email, string(groups), u.ID)
 			return err
 		}
 		if !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
 		res, err := tx.ExecContext(ctx,
-			`INSERT INTO users (issuer, subject, name, email) VALUES (?, ?, ?, ?)`,
-			id.Issuer, id.Subject, id.Name, id.Email)
+			`INSERT INTO users (issuer, subject, name, email, idp_groups) VALUES (?, ?, ?, ?, ?)`,
+			id.Issuer, id.Subject, id.Name, id.Email, string(groups))
 		if err != nil {
 			return err
 		}
@@ -77,12 +85,16 @@ func (s *Store) CreateSession(ctx context.Context, userID int64) (string, error)
 func (s *Store) SessionUser(ctx context.Context, token string) (User, time.Time, error) {
 	var u User
 	var lastSeen int64
+	var groups string
 	err := s.db.QueryRowContext(ctx, `
-		SELECT u.id, u.name, u.email, s.last_seen_at
+		SELECT u.id, u.name, u.email, u.idp_groups, s.last_seen_at
 		FROM sessions s JOIN users u ON u.id = s.user_id
-		WHERE s.token_hash = ?`, hashToken(token)).Scan(&u.ID, &u.Name, &u.Email, &lastSeen)
+		WHERE s.token_hash = ?`, hashToken(token)).Scan(&u.ID, &u.Name, &u.Email, &groups, &lastSeen)
 	if errors.Is(err, sql.ErrNoRows) {
 		return u, time.Time{}, ErrNotFound
+	}
+	if err == nil {
+		err = json.Unmarshal([]byte(groups), &u.Groups)
 	}
 	return u, time.Unix(lastSeen, 0), err
 }

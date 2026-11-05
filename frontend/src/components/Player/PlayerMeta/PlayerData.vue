@@ -22,7 +22,7 @@
             v-for="ar in musicStore.playSong.artists"
             :key="ar.id"
             class="ar"
-            @click="jumpPage({ name: 'artist', query: { id: ar.id } })"
+            @click="jumpPage(artistRoute(musicStore.playSong, ar.id))"
           >
             {{
               settingStore.hideBracketedContent
@@ -38,12 +38,7 @@
         <span
           v-if="musicStore.playSong.album"
           class="name-text text-hidden"
-          @click="
-            jumpPage({
-              name: 'album',
-              query: { id: musicStore.playSong.album.id },
-            })
-          "
+          @click="jumpPage(albumRoute(musicStore.playSong))"
         >
           {{
             (settingStore.hideBracketedContent
@@ -62,6 +57,7 @@ import type { RouteLocationRaw } from "vue-router";
 import { useMusicStore, useStatusStore, useSettingStore } from "@/stores";
 import { debounce } from "lodash-es";
 import { removeBrackets } from "@/utils/format";
+import { albumRoute, artistRoute } from "@/utils/track";
 
 // 照搬 SPlayer components/Player/PlayerMeta/PlayerData.vue。歌名下的别名与整行标签（音质、
 // 歌词类型与来源、音源）按 Eric 的决定不显示；去掉云盘与解锁提示、电台。

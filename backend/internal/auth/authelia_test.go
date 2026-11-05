@@ -111,6 +111,70 @@ func TestAutheliaLoginLogout(t *testing.T) {
 	}
 }
 
+// The player's import permission rests on these two: Authelia reports the
+// groups when asked, and refuses a client that is not allowed to ask, which is
+// why Sonora only asks when a group is configured.
+func TestAutheliaGroups(t *testing.T) {
+	issuer, client := startAuthelia(t)
+	st, err := store.Open(t.TempDir(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { st.Close() })
+	newApp := func(clientID string, requestGroups bool) *browser {
+		svc := New(st, Config{
+			PublicURL:     publicURL,
+			Issuer:        issuer,
+			ClientID:      clientID,
+			ClientSecret:  "sonora-test-client-secret",
+			HTTPClient:    client,
+			RequestGroups: requestGroups,
+		})
+		mux := http.NewServeMux()
+		svc.Register(mux)
+		mux.Handle("GET /whoami", svc.Require(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			json.NewEncoder(w).Encode(map[string]any{"id": User(r.Context()).ID, "groups": User(r.Context()).Groups})
+		})))
+		return &browser{t: t, handler: mux, idp: client, issuer: issuer}
+	}
+
+	app := newApp("sonora", true)
+	if got := app.whoami(app.login("alice")); fmt.Sprint(got["groups"]) != "[sonora-import]" {
+		t.Fatalf("alice = %v", got)
+	}
+	if got := app.whoami(app.login("bob")); fmt.Sprint(got["groups"]) != "[]" {
+		t.Fatalf("bob = %v", got)
+	}
+
+	// Not asking stores no groups, even for a member: this is what a login
+	// without netease.import_group does.
+	plain := newApp("sonora", false)
+	if got := plain.whoami(plain.login("alice")); fmt.Sprint(got["groups"]) != "[]" {
+		t.Fatalf("alice without the scope = %v", got)
+	}
+
+	// A client without the scope cannot sign in when asked for groups, and
+	// signs in as usual when not.
+	limited := newApp("sonora-no-groups", true)
+	location, _ := limited.startLogin()
+	res := limited.do(mustRequest(t, location))
+	body := readAll(res)
+	if !strings.Contains(res.Header.Get("Location")+body, "invalid_scope") {
+		t.Fatalf("expected invalid_scope, got %d %s %.200s", res.StatusCode, res.Header.Get("Location"), body)
+	}
+	unaffected := newApp("sonora-no-groups", false)
+	unaffected.whoami(unaffected.login("bob"))
+}
+
+func mustRequest(t *testing.T, url string) *http.Request {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return req
+}
+
 func TestAutheliaCallbackRejectsForeignState(t *testing.T) {
 	issuer, client := startAuthelia(t)
 	st, err := store.Open(t.TempDir(), t.TempDir())

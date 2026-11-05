@@ -4,7 +4,10 @@
       <n-form-item label="歌单名称" path="name">
         <n-input v-model:value="formData.name" placeholder="请输入歌单名称" />
       </n-form-item>
-      <n-form-item label="歌单描述" path="description">
+      <n-form-item v-if="online" label="设为隐私歌单" label-placement="left">
+        <n-switch v-model:value="formData.private" />
+      </n-form-item>
+      <n-form-item v-else label="歌单描述" path="description">
         <n-input
           v-model:value="formData.description"
           type="textarea"
@@ -20,13 +23,18 @@
 </template>
 
 <script setup lang="ts">
-// 照搬 SPlayer 的 CreatePlaylist.vue。Sonora 的歌单只有名称与描述，
-// 沿用其本地歌单的表单。
+// 照搬 SPlayer 的 CreatePlaylist.vue。Sonora 的歌单只有名称与描述，沿用其本地歌单的表单；
+// 在线歌单沿用其在线表单的名称与隐私，与 SPlayer 不同的是没有“歌单类型”
+// （视频歌单不做，共享歌单没有对应功能）。
 import type { FormInst, FormRules } from "naive-ui";
 import { ApiError, loginUrl, source } from "@/api/source";
 import { useUserStore } from "@/stores";
 import { textRule } from "@/utils/rules";
 import { debounce } from "lodash-es";
+
+const props = withDefaults(defineProps<{ online?: boolean }>(), {
+  online: false,
+});
 
 const emit = defineEmits<{ close: [] }>();
 
@@ -34,12 +42,17 @@ const emit = defineEmits<{ close: [] }>();
 interface FormType {
   name: string;
   description: string;
+  private: boolean;
 }
 
 const userStore = useUserStore();
 
 const formRef = ref<FormInst | null>(null);
-const formData = ref<FormType>({ name: "", description: "" });
+const formData = ref<FormType>({
+  name: "",
+  description: "",
+  private: false,
+});
 const formRules: FormRules = { name: textRule };
 
 // 新建歌单
@@ -53,10 +66,16 @@ const toCreatePlaylist = debounce(
       return;
     }
     try {
-      await source.createPlaylist({
-        name: formData.value.name.trim(),
-        description: formData.value.description.trim(),
-      });
+      const name = formData.value.name.trim();
+      await (props.online
+        ? source.createOnlinePlaylist({
+            name,
+            private: formData.value.private,
+          })
+        : source.createPlaylist({
+            name,
+            description: formData.value.description.trim(),
+          }));
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         location.assign(loginUrl);
@@ -69,7 +88,9 @@ const toCreatePlaylist = debounce(
     }
     emit("close");
     window.$message.success("新建歌单成功");
-    await userStore.loadPlaylists();
+    await (props.online
+      ? userStore.loadOnlinePlaylists()
+      : userStore.loadPlaylists());
   },
   300,
   { leading: true, trailing: false },

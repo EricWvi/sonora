@@ -3,6 +3,7 @@ module sonora
 go 1.26.4
 
 require (
+	github.com/bogem/id3v2/v2 v2.1.4
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/dhowden/tag v0.0.0-20240417053706-3d75831295e8
 	github.com/moby/moby/api v1.56.1

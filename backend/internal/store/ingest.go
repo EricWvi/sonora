@@ -79,6 +79,36 @@ type IngestResult struct {
 // lyrics is an optional sidecar LRC or TTML file that takes precedence
 // over lyrics embedded in the tags.
 func (s *Store) Ingest(ctx context.Context, u *Upload, lyrics []byte) (IngestResult, error) {
+	return s.ingest(ctx, u, lyrics, 0)
+}
+
+// IngestImported adds a song imported from NetEase. Unlike an upload it always
+// gets a new album marked single, and keeps its cover as well as giving it to
+// the album, so that the song keeps it when albums are merged later.
+func (s *Store) IngestImported(ctx context.Context, u *Upload, lyrics []byte, neteaseID int64) (IngestResult, error) {
+	return s.ingest(ctx, u, lyrics, neteaseID)
+}
+
+// IncomingFile creates a temporary file in the incoming area, on the same
+// volume as the library. The caller removes it.
+func (s *Store) IncomingFile() (*os.File, error) {
+	return os.CreateTemp(s.incoming, "import-*")
+}
+
+// ImportedTrack returns the track imported from the NetEase song.
+func (s *Store) ImportedTrack(ctx context.Context, neteaseID int64) (TrackDetail, error) {
+	var id int64
+	err := s.db.QueryRowContext(ctx, `SELECT id FROM tracks WHERE netease_id = ?`, neteaseID).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return TrackDetail{}, ErrNotFound
+	}
+	if err != nil {
+		return TrackDetail{}, err
+	}
+	return s.Track(ctx, id)
+}
+
+func (s *Store) ingest(ctx context.Context, u *Upload, lyrics []byte, neteaseID int64) (IngestResult, error) {
 	defer u.Discard()
 	// Embedded lyrics are taken as LRC.
 	text, format := u.info.Tags.Lyrics, LRC
@@ -145,12 +175,19 @@ func (s *Store) Ingest(ctx context.Context, u *Upload, lyrics []byte) (IngestRes
 
 	var d TrackDetail
 	err = s.inTx(ctx, func(tx *sql.Tx) error {
-		artists, album, err := resolveTrackRefs(ctx, tx, in)
+		var artists []int64
+		var album sql.NullInt64
+		var err error
+		if neteaseID != 0 {
+			artists, album, err = newImportedAlbum(ctx, tx, in, neteaseID, cover)
+		} else {
+			artists, album, err = resolveTrackRefs(ctx, tx, in)
+		}
 		if err != nil {
 			return err
 		}
 		trackCover := cover
-		if album.Valid && cover.Valid {
+		if neteaseID == 0 && album.Valid && cover.Valid {
 			// The first embedded picture of an album becomes its cover; a
 			// track keeps its own only when the picture differs.
 			var albumCover sql.NullString
@@ -170,10 +207,10 @@ func (s *Store) Ingest(ctx context.Context, u *Upload, lyrics []byte) (IngestRes
 		var id int64
 		err = tx.QueryRowContext(ctx, `
 			INSERT INTO tracks (title, album_id, track_no, disc_no, year, duration_ms, format, size,
-				sha256, file, original_name, cover, lyrics, lyrics_format)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+				sha256, file, original_name, cover, lyrics, lyrics_format, netease_id)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, 0)) RETURNING id`,
 			in.Title, album, in.TrackNo, in.DiscNo, in.Year, u.info.Duration.Milliseconds(),
-			string(u.info.Format), u.size, u.sha256, rel, u.name, trackCover, text, format).Scan(&id)
+			string(u.info.Format), u.size, u.sha256, rel, u.name, trackCover, text, format, neteaseID).Scan(&id)
 		if err != nil {
 			return err
 		}
@@ -189,6 +226,25 @@ func (s *Store) Ingest(ctx context.Context, u *Upload, lyrics []byte) (IngestRes
 		return IngestResult{}, err
 	}
 	return IngestResult{Status: Created, Track: d}, nil
+}
+
+// newImportedAlbum creates the album of an imported song, see importedSuffix.
+func newImportedAlbum(ctx context.Context, tx *sql.Tx, in TrackInput, neteaseID int64, cover sql.NullString) ([]int64, sql.NullInt64, error) {
+	artists, err := artistIDs(ctx, tx, in.Artists)
+	if err != nil {
+		return nil, sql.NullInt64{}, err
+	}
+	var album sql.NullInt64
+	if in.Album == "" {
+		return artists, album, nil
+	}
+	err = tx.QueryRowContext(ctx,
+		`INSERT INTO albums (title, artist_key, year, cover, single) VALUES (?, ?, ?, ?, 1) RETURNING id`,
+		in.Album, importedKey(artists, neteaseID), in.Year, cover).Scan(&album)
+	if err != nil {
+		return nil, album, err
+	}
+	return artists, album, setArtists(ctx, tx, "album_artists", "album_id", album.Int64, artists)
 }
 
 // AudioFile is an opened track file for streaming.

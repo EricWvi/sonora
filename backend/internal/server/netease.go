@@ -1,6 +1,7 @@
 package server
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -44,13 +45,19 @@ func (s *server) registerNetease(private *http.ServeMux) {
 	private.HandleFunc("POST "+p+"login/cookie", s.neteaseCookieLogin)
 	private.HandleFunc("POST "+p+"logout", s.neteaseLogout)
 	private.HandleFunc("GET "+p+"playlists", s.listNeteasePlaylists)
+	private.HandleFunc("POST "+p+"playlists", s.createNeteasePlaylist)
 	private.HandleFunc("GET "+p+"playlists/{id}", s.getNeteasePlaylist)
+	private.HandleFunc("PUT "+p+"playlists/{id}", s.updateNeteasePlaylist)
+	private.HandleFunc("DELETE "+p+"playlists/{id}", s.deleteNeteasePlaylist)
+	private.HandleFunc("POST "+p+"playlists/{id}/tracks", s.addToNeteasePlaylist)
 	private.HandleFunc("GET "+p+"albums", s.listNeteaseAlbums)
 	private.HandleFunc("GET "+p+"albums/{id}", s.getNeteaseAlbum)
 	private.HandleFunc("GET "+p+"artists", s.listNeteaseArtists)
 	private.HandleFunc("GET "+p+"artists/{id}", s.getNeteaseArtist)
+	private.HandleFunc("GET "+p+"artists/{id}/albums", s.listNeteaseArtistAlbums)
 	private.HandleFunc("GET "+p+"songs/{id}/url", s.getNeteaseSongURL)
 	private.HandleFunc("GET "+p+"songs/{id}/lyrics", s.getNeteaseLyrics)
+	private.HandleFunc("POST "+p+"songs/{id}/import", s.importNeteaseSong)
 	private.HandleFunc("GET "+p+"likes/ids", s.listNeteaseLikeIDs)
 	private.HandleFunc("PUT "+p+"likes/{id}", s.setNeteaseLike)
 	private.HandleFunc("DELETE "+p+"likes/{id}", s.setNeteaseLike)
@@ -71,6 +78,11 @@ func (s *server) neteaseReady(w http.ResponseWriter) bool {
 }
 
 func writeNeteaseError(w http.ResponseWriter, r *http.Request, err error) {
+	var rejected *netease.RejectedError
+	if errors.As(err, &rejected) {
+		admin.WriteError(w, http.StatusBadRequest, "netease_rejected", cmp.Or(rejected.Message, "网易云拒绝了这个操作"))
+		return
+	}
 	switch {
 	case errors.Is(err, netease.ErrUnavailable):
 		slog.Warn("netease api", "path", r.URL.Path, "err", err)

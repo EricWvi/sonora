@@ -208,6 +208,26 @@ func albumKey(artists []int64) string {
 	return strings.Join(parts, ",")
 }
 
+// importedSuffix sets an imported album apart in artist_key. Importing always
+// creates a new album, even when one with the same title and artists exists,
+// and uploads must not join it; the unique index on title and artist_key then
+// holds for both, and the album manager's merge is how they come together.
+const importedSuffix = "#netease:"
+
+// importedKey is the artist_key of the album created for an imported song.
+func importedKey(artists []int64, neteaseID int64) string {
+	return albumKey(artists) + importedSuffix + strconv.FormatInt(neteaseID, 10)
+}
+
+// rekey returns artist_key for the artists, keeping the mark of an imported
+// album from its current key.
+func rekey(artists []int64, current string) string {
+	if i := strings.Index(current, importedSuffix); i >= 0 {
+		return albumKey(artists) + current[i:]
+	}
+	return albumKey(artists)
+}
+
 // placeholderOf selects the ThumbHash of the cover named by col.
 func placeholderOf(col string) string {
 	return `(SELECT thumbhash FROM covers WHERE name = ` + col + `)`
@@ -642,10 +662,19 @@ func (s *Store) UpdateAlbum(ctx context.Context, id int64, in AlbumInput) (Album
 		if err != nil {
 			return err
 		}
+		var current string
+		err = tx.QueryRowContext(ctx, `SELECT artist_key FROM albums WHERE id = ?`, id).Scan(&current)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		key := rekey(artists, current)
 		var other int64
 		err = tx.QueryRowContext(ctx,
 			`SELECT id FROM albums WHERE title = ? COLLATE NOCASE AND artist_key = ? AND id <> ?`,
-			in.Title, albumKey(artists), id).Scan(&other)
+			in.Title, key, id).Scan(&other)
 		if err == nil {
 			return conflict("该艺术家已有同名专辑，请改用合并")
 		}
@@ -655,7 +684,7 @@ func (s *Store) UpdateAlbum(ctx context.Context, id int64, in AlbumInput) (Album
 		res, err := tx.ExecContext(ctx, `
 			UPDATE albums SET title = ?, artist_key = ?, year = ?, single = IFNULL(?, single),
 				description = IFNULL(?, description) WHERE id = ?`,
-			in.Title, albumKey(artists), in.Year, in.Single, in.Description, id)
+			in.Title, key, in.Year, in.Single, in.Description, id)
 		if err != nil {
 			return err
 		}
@@ -914,7 +943,7 @@ func (s *Store) MergeArtists(ctx context.Context, target int64, sources []int64)
 // album into another of the same title whose artists it now matches.
 func rekeyAlbums(ctx context.Context, tx *sql.Tx, artist int64) error {
 	rows, err := tx.QueryContext(ctx, `
-		SELECT al.id, al.title, (SELECT group_concat(artist_id) FROM album_artists WHERE album_id = al.id)
+		SELECT al.id, al.title, al.artist_key, (SELECT group_concat(artist_id) FROM album_artists WHERE album_id = al.id)
 		FROM albums al WHERE EXISTS (SELECT 1 FROM album_artists WHERE album_id = al.id AND artist_id = ?)`, artist)
 	if err != nil {
 		return err
@@ -922,12 +951,13 @@ func rekeyAlbums(ctx context.Context, tx *sql.Tx, artist int64) error {
 	type album struct {
 		id      int64
 		title   string
+		key     string
 		artists string
 	}
 	var albums []album
 	for rows.Next() {
 		var a album
-		if err := rows.Scan(&a.id, &a.title, &a.artists); err != nil {
+		if err := rows.Scan(&a.id, &a.title, &a.key, &a.artists); err != nil {
 			rows.Close()
 			return err
 		}
@@ -946,7 +976,7 @@ func rekeyAlbums(ctx context.Context, tx *sql.Tx, artist int64) error {
 			}
 			ids = append(ids, id)
 		}
-		key := albumKey(ids)
+		key := rekey(ids, a.key)
 		var into int64
 		err := tx.QueryRowContext(ctx, `SELECT id FROM albums WHERE title = ? COLLATE NOCASE AND artist_key = ? AND id <> ?`,
 			a.title, key, a.id).Scan(&into)

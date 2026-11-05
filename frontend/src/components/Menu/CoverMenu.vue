@@ -16,6 +16,7 @@
 
 <script setup lang="ts">
 import type { DropdownOption } from "naive-ui";
+import { listKey, listRoute } from "@/utils/track";
 import type { Album, Playlist } from "@/api/types";
 import { renderIcon, copyData } from "@/utils/helper";
 import { useMusicStore, useStatusStore } from "@/stores";
@@ -48,7 +49,7 @@ const openDropdown = (
     const name = "title" in item ? item.title : item.name;
     // 播放列表来源（见 music store 的 playPlaylistId）
     const playing =
-      musicStore.playPlaylistId === `${type}-${item.id}` &&
+      musicStore.playPlaylistId === listKey(type, item) &&
       statusStore.playStatus;
     nextTick().then(() => {
       dropdownOptions.value = [
@@ -56,7 +57,8 @@ const openDropdown = (
           key: "open",
           label: "查看详情",
           props: {
-            onClick: () => router.push({ name: type, query: { id: item.id } }),
+            // 在线专辑、歌单的详情页是 online-list，ID 可能与本地的相同
+            onClick: () => router.push(listRoute(type, item)),
           },
           icon: renderIcon("Eye"),
         },

@@ -377,6 +377,9 @@ export abstract class BaseAudioPlayer
   /** 预加载下一首的音频，null 释放 */
   public abstract preload(url: string | null): void;
 
+  /** 设置播放速率 */
+  public abstract setRate(rate: number): void;
+
   /** 执行底层播放 */
   protected abstract doPlay(): Promise<void>;
 

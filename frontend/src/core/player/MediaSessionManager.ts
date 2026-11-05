@@ -23,6 +23,11 @@ const supported = () =>
 class MediaSessionManager {
   private currentRate: number = 1;
 
+  /** 播放速度变化时更新系统媒体信息的进度计算 */
+  public updatePlaybackRate(rate: number) {
+    this.currentRate = rate;
+  }
+
   /**
    * 初始化媒体会话
    * @param player 处理操作的播放控制器

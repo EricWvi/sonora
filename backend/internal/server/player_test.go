@@ -40,7 +40,7 @@ func TestPlayerAPIRequiresListenerSession(t *testing.T) {
 		t.Fatalf("listener session on admin API: %d", rec.Code)
 	}
 	rec := ts.do("GET", playerAPI+"me", "")
-	if rec.Code != http.StatusOK || decodeBody[map[string]string](t, rec)["name"] != "Alice" {
+	if rec.Code != http.StatusOK || decodeBody[map[string]any](t, rec)["name"] != "Alice" {
 		t.Fatalf("me: %d %s", rec.Code, rec.Body)
 	}
 	if rec := ts.do("GET", playerAPI+"nope", ""); rec.Code != http.StatusNotFound {

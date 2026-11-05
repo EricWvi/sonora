@@ -135,6 +135,12 @@ export class AudioElementPlayer extends BaseAudioPlayer {
    * 执行底层 Seek
    * @param time 目标时间（秒）
    */
+  /** 同时设置默认速率：载入新音频时，浏览器把速率重置为默认值 */
+  public setRate(rate: number): void {
+    this.audioElement.playbackRate = rate;
+    this.audioElement.defaultPlaybackRate = rate;
+  }
+
   protected doSeek(time: number): void {
     if (Number.isFinite(time)) {
       this.audioElement.currentTime = time;

@@ -1,7 +1,8 @@
 <!-- 歌曲列表的一行。照搬 SPlayer components/Card/SongCard.vue，歌曲是播放端 API 的 Track；
 不迁入音质、原唱翻唱、特权、云盘、MV、脏标标签与电台、移动端分支。 -->
 <template>
-  <div class="song-card">
+  <!-- 置灰不可播放的歌（Sonora 新增，SPlayer 没有这个状态）：右键菜单与链接照常可用 -->
+  <div :class="['song-card', { unplayable: !isPlayable(song) }]">
     <div
       :class="['song-content', { play: sameTrack(musicStore.playSong, song) }]"
     >
@@ -132,7 +133,7 @@ import {
 import { openJumpArtist } from "@/utils/modal";
 import { removeBrackets } from "@/utils/format";
 import { toLikeSong } from "@/utils/auth";
-import { albumRoute, isOnline, sameTrack } from "@/utils/track";
+import { albumRoute, isOnline, isPlayable, sameTrack } from "@/utils/track";
 import { coverUrl } from "@/utils/cover";
 import { msToTime } from "@/utils/time";
 import { usePlayerController } from "@/core/player/PlayerController";
@@ -177,6 +178,19 @@ const albumName = computed(() => {
 .song-card {
   height: 90px;
   cursor: pointer;
+  &.unplayable {
+    cursor: not-allowed;
+    .song-content {
+      opacity: 0.45;
+    }
+    // 不提供播放按钮，序号一直显示
+    .num .play {
+      display: none !important;
+    }
+    .num .n-text {
+      opacity: 1 !important;
+    }
+  }
   .song-content {
     display: flex;
     flex-direction: row;

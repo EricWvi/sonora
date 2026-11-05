@@ -3,6 +3,8 @@
 export type User = {
   name: string;
   email: string;
+  /** 是否可以把在线歌曲导入曲库（指定 Authelia 组的成员） */
+  canImport: boolean;
 };
 
 /** 封面与艺术家图片：内容哈希文件名与 ThumbHash 占位。 */

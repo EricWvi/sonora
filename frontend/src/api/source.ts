@@ -54,9 +54,24 @@ export interface DataSource {
   onlineAlbums(): Promise<Page<Album>>;
   onlineArtists(): Promise<Page<Artist>>;
   onlineList(type: OnlineListType, id: number): Promise<OnlineList>;
+  onlineArtistAlbums(
+    id: number,
+    query?: Pick<ListQuery, "offset" | "limit">,
+  ): Promise<Page<Album>>;
+  createOnlinePlaylist(input: {
+    name: string;
+    private: boolean;
+  }): Promise<Playlist>;
+  updateOnlinePlaylist(id: number, input: PlaylistInput): Promise<void>;
+  deleteOnlinePlaylist(id: number): Promise<void>;
+  addToOnlinePlaylist(id: number, songIds: number[]): Promise<void>;
   /** 在线歌曲的播放地址，带时效，每次播放时获取。 */
   onlineSongUrl(id: number): Promise<string>;
   onlineLyrics(id: number): Promise<Lyrics>;
+  /** 由服务端下载并入库，耗时取决于网络。已导入过时 `status` 为 `duplicate`。 */
+  importOnlineSong(
+    id: number,
+  ): Promise<{ status: "created" | "duplicate"; track: Track }>;
   onlineLikeIds(): Promise<number[]>;
   onlineLike(id: number): Promise<void>;
   onlineUnlike(id: number): Promise<void>;
@@ -209,9 +224,17 @@ const httpSource: DataSource = {
   onlineAlbums: () => get("netease/albums"),
   onlineArtists: () => get("netease/artists"),
   onlineList: (type, id) => get(`netease/${type}s/${id}`),
+  onlineArtistAlbums: (id, query) => get(`netease/artists/${id}/albums`, query),
+  createOnlinePlaylist: (input) => write("POST", "netease/playlists", input),
+  updateOnlinePlaylist: (id, input) =>
+    send("PUT", `netease/playlists/${id}`, input),
+  deleteOnlinePlaylist: (id) => send("DELETE", `netease/playlists/${id}`),
+  addToOnlinePlaylist: (id, ids) =>
+    send("POST", `netease/playlists/${id}/tracks`, { ids }),
   onlineSongUrl: async (id) =>
     (await get<{ url: string }>(`netease/songs/${id}/url`)).url,
   onlineLyrics: (id) => get(`netease/songs/${id}/lyrics`),
+  importOnlineSong: (id) => write("POST", `netease/songs/${id}/import`),
   onlineLikeIds: async () =>
     (await get<{ ids: number[] }>("netease/likes/ids")).ids,
   onlineLike: (id) => send("PUT", `netease/likes/${id}`),

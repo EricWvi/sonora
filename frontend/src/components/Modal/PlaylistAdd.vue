@@ -4,7 +4,7 @@
     <n-scrollbar style="max-height: 70vh">
       <n-list class="playlists-list" hoverable clickable>
         <!-- 新建歌单 -->
-        <n-list-item class="playlist add" @click="openCreatePlaylist">
+        <n-list-item class="playlist add" @click="openCreatePlaylist(online)">
           <template #prefix>
             <SvgIcon name="Add" :size="20" />
           </template>
@@ -12,7 +12,7 @@
         </n-list-item>
         <!-- 已有歌单 -->
         <n-list-item
-          v-for="item in userStore.playlists"
+          v-for="item in playlists"
           :key="item.id"
           class="playlist"
           @click="addToPlaylist(item.id)"
@@ -55,7 +55,8 @@
 
 <script setup lang="ts">
 // 照搬 SPlayer 的 PlaylistAdd.vue。列表是自己的歌单，不含“我喜欢的音乐”
-// （Sonora 的喜爱不是歌单，与 SPlayer 的本地歌单相同）。
+// （Sonora 的喜爱不是歌单，与 SPlayer 的本地歌单相同）。在线歌曲（online）的列表是网易云上
+// 自己创建的歌单，同样不含“我喜欢的音乐”，喜欢由喜欢按钮负责。
 import type { Track } from "@/api/types";
 import type { MessageReactive } from "naive-ui";
 import { ApiError, loginUrl, source } from "@/api/source";
@@ -66,6 +67,7 @@ import { openCreatePlaylist } from "@/utils/modal";
 
 const props = defineProps<{
   data: Track[];
+  online?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -73,6 +75,11 @@ const emit = defineEmits<{
 }>();
 
 const userStore = useUserStore();
+const playlists = computed(() =>
+  props.online ? userStore.onlinePlaylists.created : userStore.playlists,
+);
+const reload = () =>
+  props.online ? userStore.loadOnlinePlaylists() : userStore.loadPlaylists();
 
 // 加载提示
 const loadingMsg = ref<MessageReactive>();
@@ -85,10 +92,13 @@ const addToPlaylist = debounce(
     });
     let added: number;
     try {
-      ({ added } = await source.addToPlaylist(
-        id,
-        props.data.map((item) => item.id),
-      ));
+      const ids = props.data.map((item) => item.id);
+      if (props.online) {
+        await source.addToOnlinePlaylist(id, ids);
+        added = ids.length;
+      } else {
+        ({ added } = await source.addToPlaylist(id, ids));
+      }
     } catch (error) {
       loadingMsg.value?.destroy();
       if (error instanceof ApiError && error.status === 401) {
@@ -98,7 +108,7 @@ const addToPlaylist = debounce(
       // 404：歌单或所选歌曲已在别处被删除，重新读取歌单列表
       if (error instanceof ApiError && error.status === 404) {
         window.$message.error("歌单或歌曲已被删除");
-        await userStore.loadPlaylists();
+        await reload();
         return;
       }
       window.$message.error(
@@ -110,7 +120,7 @@ const addToPlaylist = debounce(
     emit("close");
     if (added > 0) window.$message.success("添加歌曲至歌单成功");
     else window.$message.info("所选歌曲已在歌单中");
-    await userStore.loadPlaylists();
+    await reload();
   },
   500,
   { leading: true, trailing: false },

@@ -55,13 +55,28 @@ const needLogin = 301
 type Client struct {
 	base string
 	http *http.Client
+	// Downloads fetches files from NetEase's CDN. Unlike API calls it has no
+	// overall timeout, since a song can take a while; the request's context
+	// bounds it.
+	Downloads *http.Client
+}
+
+// RejectedError is NetEase refusing a write, such as a playlist name it does
+// not accept. Message is NetEase's own explanation and may be empty.
+type RejectedError struct {
+	Message string
+}
+
+func (e *RejectedError) Error() string {
+	return "netease rejected the request: " + e.Message
 }
 
 // New returns a client for the service at baseURL.
 func New(baseURL string) *Client {
 	return &Client{
-		base: strings.TrimRight(baseURL, "/"),
-		http: &http.Client{Timeout: requestTimeout},
+		base:      strings.TrimRight(baseURL, "/"),
+		http:      &http.Client{Timeout: requestTimeout},
+		Downloads: &http.Client{},
 	}
 }
 

@@ -43,6 +43,11 @@ type Config struct {
 	ClientSecret string
 	// DevUser signs every request in as this local user without OIDC.
 	DevUser string
+	// RequestGroups asks the identity provider for the user's groups. The
+	// client must be allowed the groups scope.
+	RequestGroups bool
+	// DevGroups are the groups of DevUser.
+	DevGroups []string
 	// HTTPClient talks to the identity provider; nil uses a default client.
 	HTTPClient *http.Client
 }
@@ -55,6 +60,7 @@ type Service struct {
 	secure   bool
 
 	devUser     string
+	devGroups   []string
 	devOnce     sync.Once
 	devErr      error
 	devResolved store.User
@@ -62,7 +68,7 @@ type Service struct {
 
 // New returns the auth service. It does not contact the identity provider.
 func New(st *store.Store, cfg Config) *Service {
-	s := &Service{store: st, devUser: cfg.DevUser}
+	s := &Service{store: st, devUser: cfg.DevUser, devGroups: cfg.DevGroups}
 	if cfg.DevUser != "" {
 		return s
 	}
@@ -79,6 +85,7 @@ func New(st *store.Store, cfg Config) *Service {
 		clientSecret: cfg.ClientSecret,
 		redirectURL:  public + "/auth/callback",
 		http:         client,
+		groups:       cfg.RequestGroups,
 	}
 	return s
 }
@@ -118,7 +125,7 @@ func (s *Service) authenticate(w http.ResponseWriter, r *http.Request) (store.Us
 	if s.devUser != "" {
 		s.devOnce.Do(func() {
 			s.devResolved, s.devErr = s.store.UpsertUser(context.WithoutCancel(r.Context()),
-				store.Identity{Issuer: "dev", Subject: s.devUser, Name: s.devUser})
+				store.Identity{Issuer: "dev", Subject: s.devUser, Name: s.devUser, Groups: s.devGroups})
 		})
 		if s.devErr != nil {
 			slog.Error("dev user", "err", s.devErr)

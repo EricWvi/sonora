@@ -23,3 +23,6 @@ oidc:
 # service on an internal network: it has no authentication of its own.
 netease:
   api_url: "http://netease-api:3000"
+  # The Authelia group whose members may import songs. Allow the client the
+  # groups scope first: see docs/deployment.md.
+  # import_group: "sonora-import"

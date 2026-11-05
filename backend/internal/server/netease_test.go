@@ -3,12 +3,18 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"sonora/internal/media"
 	"sonora/internal/netease"
 	"sonora/internal/store"
 )
@@ -16,15 +22,19 @@ import (
 // fakeNetease stands in for the API service: a cookie is valid when it is in
 // accounts, and every answer echoes cookies as the real service does.
 type fakeNetease struct {
-	srv      *httptest.Server
-	accounts map[string]int64 // MUSIC_U value to account ID
-	qrCode   int
-	qrCookie string
-	down     bool
-	expired  bool
-	likes    []string
-	liked    []map[string]int64 // trackIds of the liked playlist
-	calls    map[string]int
+	writes     []string
+	cdn        *httptest.Server
+	downloads  []string
+	albumPages []string
+	srv        *httptest.Server
+	accounts   map[string]int64 // MUSIC_U value to account ID
+	qrCode     int
+	qrCookie   string
+	down       bool
+	expired    bool
+	likes      []string
+	liked      []map[string]int64 // trackIds of the liked playlist
+	calls      map[string]int
 }
 
 func newFakeNetease(t *testing.T) *fakeNetease {
@@ -84,8 +94,12 @@ func newFakeNetease(t *testing.T) *fakeNetease {
 				if id == "999" {
 					continue // gone from NetEase
 				}
-				songs = append(songs, `{"id":`+id+`,"name":"song`+id+`","ar":[{"id":5,"name":"A"}],"dt":1000,
-					"publishTime":1500000000000,"al":{"id":6,"name":"Al","picUrl":"http://p1/`+id+`.jpg"}}`)
+				pic, artists := "http://p1/"+id+".jpg", `[{"id":5,"name":"A"}]`
+				if f.cdn != nil && strings.HasPrefix(id, "7") {
+					pic, artists = f.cdn.URL+"/"+id+".jpg", `[{"id":5,"name":"A"},{"id":6,"name":"B/C"}]`
+				}
+				songs = append(songs, `{"id":`+id+`,"name":"song`+id+`","ar":`+artists+`,"dt":1000,
+					"publishTime":1500000000000,"al":{"id":6,"name":"Al","picUrl":"`+pic+`"}}`)
 				st := "0"
 				if id == "888" {
 					st = "-200"
@@ -94,21 +108,66 @@ func newFakeNetease(t *testing.T) *fakeNetease {
 			}
 			w.Write([]byte(`{"code":200,"songs":[` + strings.Join(songs, ",") + `],"privileges":[` + strings.Join(privileges, ",") + `]}`))
 		case "/song/url/v1":
-			switch r.PostForm.Get("id") {
-			case "1":
+			switch id := r.PostForm.Get("id"); {
+			case f.cdn != nil && id == "790":
+				w.Write([]byte(`{"code":200,"data":[{"url":"` + f.cdn.URL + `/790.flac","type":"flac"}]}`))
+			case f.cdn != nil && strings.HasPrefix(id, "7"):
+				w.Write([]byte(`{"code":200,"data":[{"url":"` + f.cdn.URL + `/` + id + `.mp3","type":"mp3","freeTrialInfo":null}]}`))
+			case id == "1":
 				w.Write([]byte(`{"code":200,"data":[{"url":"http://m804.music.126.net/a.mp3","freeTrialInfo":null}]}`))
-			case "2":
+			case id == "2":
 				w.Write([]byte(`{"code":200,"data":[{"url":"https://m7.music.126.net/t.mp3","freeTrialInfo":{"start":0}}]}`))
 			default:
 				w.Write([]byte(`{"code":200,"data":[{"url":null}]}`))
 			}
 		case "/lyric/new":
+			if r.PostForm.Get("id") == "701" {
+				w.Write([]byte(`{"code":200,"lrc":{"lyric":"[00:01.00]line"},"yrc":{"lyric":"[1000,500](1000,500,0)word"},"ytlrc":{"lyric":"[00:01.00]词"}}`))
+				return
+			}
 			w.Write([]byte(`{"code":200,"lrc":{"lyric":"[00:01.00]line"}}`))
 		case "/likelist":
 			w.Write([]byte(`{"code":200,"ids":[1,2]}`))
 		case "/like":
 			f.likes = append(f.likes, r.PostForm.Get("id")+"="+r.PostForm.Get("like"))
 			w.Write([]byte(`{"code":200}`))
+		case "/playlist/create":
+			f.writes = append(f.writes, "create "+r.PostForm.Get("name")+" "+r.PostForm.Get("privacy"))
+			if r.PostForm.Get("name") == "refused" {
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte(`{"code":400,"message":"名称不可用"}`))
+				return
+			}
+			w.Write([]byte(`{"code":200,"id":103,"playlist":{"id":103,"name":"` + r.PostForm.Get("name") + `","trackCount":0}}`))
+		case "/playlist/name/update":
+			f.writes = append(f.writes, "name "+r.PostForm.Get("id")+" "+r.PostForm.Get("name"))
+			w.Write([]byte(`{"code":200}`))
+		case "/playlist/desc/update":
+			f.writes = append(f.writes, "desc "+r.PostForm.Get("id")+" "+r.PostForm.Get("desc"))
+			w.Write([]byte(`{"code":200}`))
+		case "/playlist/delete":
+			f.writes = append(f.writes, "delete "+r.PostForm.Get("id"))
+			w.Write([]byte(`{"code":200}`))
+		case "/playlist/tracks":
+			f.writes = append(f.writes, "tracks "+r.PostForm.Get("op")+" "+r.PostForm.Get("pid")+" "+r.PostForm.Get("tracks"))
+			if r.PostForm.Get("tracks") == "500" {
+				w.Write([]byte(`{"code":502,"message":"歌单内歌曲重复"}`))
+				return
+			}
+			w.Write([]byte(`{"status":200,"body":{"code":200},"cookie":["MUSIC_U=leak"]}`))
+		case "/album":
+			w.Write([]byte(`{"code":200,"album":{"name":"Al","picUrl":"http://p1/a.jpg"},"songs":[
+				{"id":1,"name":"ok","ar":[],"privilege":{"st":0}},
+				{"id":2,"name":"gone","ar":[],"privilege":{"st":-200}}]}`))
+		case "/artists":
+			w.Write([]byte(`{"code":200,"artist":{"name":"A"},"hotSongs":[
+				{"id":1,"name":"ok","ar":[],"privilege":{"st":0}},
+				{"id":2,"name":"gone","ar":[],"privilege":{"st":-200}}]}`))
+		case "/artist/album":
+			f.albumPages = append(f.albumPages, r.PostForm.Get("offset")+"/"+r.PostForm.Get("limit"))
+			more := r.PostForm.Get("offset") == "0"
+			w.Write([]byte(fmt.Sprintf(`{"code":200,"more":%t,"artist":{"albumSize":9},"hotAlbums":[
+				{"id":7,"name":"Al","picUrl":"http://p1/a.jpg","size":3,"publishTime":1500000000000,"artists":[{"id":5,"name":"A"}]}]}`, more)))
 		case "/album/sublist":
 			w.Write([]byte(`{"code":200,"hasMore":false,"data":[{"id":7,"name":"Al","picUrl":"http://p1/a.jpg","size":3,"artists":[{"id":5,"name":"A"}]}]}`))
 		case "/artist/sublist":
@@ -580,5 +639,302 @@ func TestNeteaseRefreshesAgingSession(t *testing.T) {
 	}
 	if f.calls["/login/refresh"] != 1 || got.Cookie != "MUSIC_U=renewed" || time.Since(got.RefreshedAt) > time.Minute {
 		t.Fatalf("refresh: %d calls, session %+v", f.calls["/login/refresh"], got.RefreshedAt)
+	}
+}
+
+func TestNeteaseListsSayWhichSongsArePlayable(t *testing.T) {
+	ts, f, _ := mixedFixture(t)
+	signInNetease(t, ts, f)
+	for _, path := range []string{"albums/7", "artists/5"} {
+		rec := ts.do("GET", playerAPI+"netease/"+path, "")
+		got := decodeBody[struct {
+			Tracks []netease.Song `json:"tracks"`
+		}](t, rec)
+		if len(got.Tracks) != 2 || !got.Tracks[0].Playable || got.Tracks[1].Playable {
+			t.Fatalf("%s: %s", path, rec.Body)
+		}
+	}
+}
+
+func TestNeteaseArtistAlbums(t *testing.T) {
+	ts, f, _ := mixedFixture(t)
+	if rec := ts.do("GET", playerAPI+"netease/artists/5/albums", ""); rec.Code != http.StatusForbidden {
+		t.Fatalf("signed out: %d", rec.Code)
+	}
+	signInNetease(t, ts, f)
+
+	rec := ts.do("GET", playerAPI+"netease/artists/5/albums?offset=0&limit=50", "")
+	first := decodeBody[struct {
+		Items []netease.Album `json:"items"`
+		Total int             `json:"total"`
+	}](t, rec)
+	if first.Total != 9 || len(first.Items) != 1 || first.Items[0].Year != 2017 || first.Items[0].Source != "online" || first.Items[0].Cover.URL != "https://p1/a.jpg" {
+		t.Fatalf("first page: %s", rec.Body)
+	}
+	if f.albumPages[0] != "0/50" {
+		t.Fatalf("paging: %v", f.albumPages)
+	}
+
+	// The last page ends the list even when albumSize promised more.
+	rec = ts.do("GET", playerAPI+"netease/artists/5/albums?offset=1&limit=50", "")
+	last := decodeBody[struct {
+		Total int `json:"total"`
+	}](t, rec)
+	if last.Total != 2 {
+		t.Fatalf("last page: %s", rec.Body)
+	}
+}
+
+func TestNeteasePlaylistWrites(t *testing.T) {
+	ts, f, _ := mixedFixture(t)
+	if rec := ts.do("POST", playerAPI+"netease/playlists", `{"name":"x"}`); rec.Code != http.StatusForbidden {
+		t.Fatalf("signed out: %d %s", rec.Code, rec.Body)
+	}
+	signInNetease(t, ts, f)
+
+	rec := ts.do("POST", playerAPI+"netease/playlists", `{"name":" new ","private":true}`)
+	created := decodeBody[netease.Playlist](t, rec)
+	if created.ID != 103 || created.Source != "online" {
+		t.Fatalf("create: %s", rec.Body)
+	}
+	if rec := ts.do("POST", playerAPI+"netease/playlists", `{"name":"  "}`); rec.Code != http.StatusBadRequest {
+		t.Fatalf("empty name: %d %s", rec.Code, rec.Body)
+	}
+	rec = ts.do("POST", playerAPI+"netease/playlists", `{"name":"refused"}`)
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "名称不可用") {
+		t.Fatalf("refused: %d %s", rec.Code, rec.Body)
+	}
+
+	// The fake's playlist 101 is named "mine" with no description.
+	if rec := ts.do("PUT", playerAPI+"netease/playlists/101", `{"name":"mine","description":"d"}`); rec.Code != http.StatusNoContent {
+		t.Fatalf("describe: %d %s", rec.Code, rec.Body)
+	}
+	if rec := ts.do("PUT", playerAPI+"netease/playlists/101", `{"name":"renamed"}`); rec.Code != http.StatusNoContent {
+		t.Fatalf("rename: %d %s", rec.Code, rec.Body)
+	}
+	if rec := ts.do("DELETE", playerAPI+"netease/playlists/101", ""); rec.Code != http.StatusNoContent {
+		t.Fatalf("delete: %d %s", rec.Code, rec.Body)
+	}
+	want := []string{"create new 10", "create refused 0", "desc 101 d", "name 101 renamed", "delete 101"}
+	if !slices.Equal(f.writes, want) {
+		t.Fatalf("writes: %q", f.writes)
+	}
+
+	f.writes = nil
+	rec = ts.do("POST", playerAPI+"netease/playlists/101/tracks", `{"ids":[1,2]}`)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("add: %d %s", rec.Code, rec.Body)
+	}
+	if !slices.Equal(f.writes, []string{"tracks add 101 1,2"}) {
+		t.Fatalf("add writes: %q", f.writes)
+	}
+	rec = ts.do("POST", playerAPI+"netease/playlists/101/tracks", `{"ids":[500]}`)
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "歌单内歌曲重复") {
+		t.Fatalf("duplicate: %d %s", rec.Code, rec.Body)
+	}
+	if rec := ts.do("POST", playerAPI+"netease/playlists/101/tracks", `{"ids":[]}`); rec.Code != http.StatusBadRequest {
+		t.Fatalf("no songs: %d %s", rec.Code, rec.Body)
+	}
+
+	// "Liked songs" and a collected playlist are playlists on NetEase, but
+	// not the listener's to edit or delete here.
+	f.writes = nil
+	for _, id := range []string{"100", "102", "999"} {
+		if rec := ts.do("DELETE", playerAPI+"netease/playlists/"+id, ""); rec.Code != http.StatusNotFound {
+			t.Fatalf("delete %s: %d %s", id, rec.Code, rec.Body)
+		}
+		if rec := ts.do("PUT", playerAPI+"netease/playlists/"+id, `{"name":"x"}`); rec.Code != http.StatusNotFound {
+			t.Fatalf("update %s: %d %s", id, rec.Code, rec.Body)
+		}
+		if rec := ts.do("POST", playerAPI+"netease/playlists/"+id+"/tracks", `{"ids":[1]}`); rec.Code != http.StatusNotFound {
+			t.Fatalf("add to %s: %d %s", id, rec.Code, rec.Body)
+		}
+	}
+	if len(f.writes) != 0 {
+		t.Fatalf("writes reached NetEase: %q", f.writes)
+	}
+}
+
+// newImportTest signs in a listener in the import group, with NetEase's CDN
+// answering at https.
+func newImportTest(t *testing.T) (*testServer, *fakeNetease) {
+	t.Helper()
+	f := newFakeNetease(t)
+	mp3, err := os.ReadFile(filepath.Join("..", "media", "testdata", "tagged.mp3"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cover, err := os.ReadFile(filepath.Join("..", "media", "testdata", "cover.jpg"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.cdn = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		f.downloads = append(f.downloads, r.URL.Path)
+		if r.Header.Get("Cookie") != "" {
+			t.Errorf("cookie sent to the CDN")
+		}
+		// Each song is its own file, as on NetEase; only the tags would
+		// otherwise tell them apart.
+		if strings.HasSuffix(r.URL.Path, ".jpg") {
+			w.Write(cover)
+			return
+		}
+		w.Write(append(slices.Clone(mp3), []byte(r.URL.Path)...))
+	}))
+	t.Cleanup(f.cdn.Close)
+	ts := newTest(t)
+	client := netease.New(f.srv.URL)
+	client.Downloads = f.cdn.Client()
+	ts.opts.Netease = client
+	ts.opts.ImportGroup = "importers"
+	ts.restart()
+	ts.setup()
+	ctx := context.Background()
+	u, err := ts.store.UpsertUser(ctx, store.Identity{Issuer: "https://auth.test", Subject: "imp", Name: "imp", Groups: []string{"other", "importers"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ts.listener, err = ts.store.CreateSession(ctx, u.ID); err != nil {
+		t.Fatal(err)
+	}
+	signInNetease(t, ts, f)
+	return ts, f
+}
+
+type importAnswer struct {
+	Status string `json:"status"`
+	Track  struct {
+		ID        int64 `json:"id"`
+		Title     string
+		HasLyrics bool `json:"hasLyrics"`
+		Album     *struct {
+			ID    int64  `json:"id"`
+			Title string `json:"title"`
+		} `json:"album"`
+		Cover *struct {
+			Name string `json:"name"`
+		} `json:"cover"`
+	} `json:"track"`
+}
+
+func TestNeteaseImportNeedsTheGroup(t *testing.T) {
+	ts, f := newImportTest(t)
+	ts.signIn("outsider", "outsider")
+	rec := ts.do("GET", playerAPI+"me", "")
+	if !strings.Contains(rec.Body.String(), `"canImport":false`) {
+		t.Fatalf("me: %s", rec.Body)
+	}
+	rec = ts.do("POST", playerAPI+"netease/songs/701/import", "")
+	if rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), "import_forbidden") {
+		t.Fatalf("outsider: %d %s", rec.Code, rec.Body)
+	}
+	if len(f.downloads) != 0 {
+		t.Fatalf("downloaded: %v", f.downloads)
+	}
+}
+
+func TestNeteaseImportOffWithoutConfiguredGroup(t *testing.T) {
+	ts, _ := newImportTest(t)
+	ts.opts.ImportGroup = ""
+	ts.restart()
+	if rec := ts.do("POST", playerAPI+"netease/songs/701/import", ""); rec.Code != http.StatusForbidden {
+		t.Fatalf("no group configured: %d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestNeteaseImport(t *testing.T) {
+	ts, f := newImportTest(t)
+	ctx := context.Background()
+	if rec := ts.do("GET", playerAPI+"me", ""); !strings.Contains(rec.Body.String(), `"canImport":true`) {
+		t.Fatalf("me: %s", rec.Body)
+	}
+
+	rec := ts.do("POST", playerAPI+"netease/songs/701/import", "")
+	got := decodeBody[importAnswer](t, rec)
+	if got.Status != "created" || got.Track.Album == nil || got.Track.Album.Title != "Al" || !got.Track.HasLyrics || got.Track.Cover == nil {
+		t.Fatalf("import: %s", rec.Body)
+	}
+
+	// The file carries the metadata, not what the CDN's file had.
+	audio, err := ts.store.OpenAudio(ctx, got.Track.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer audio.Close()
+	stat, _ := audio.Stat()
+	info, err := media.Probe(audio, stat.Size())
+	if err != nil {
+		t.Fatal(err)
+	}
+	tags := info.Tags
+	if tags.Title != "song701" || !slices.Equal(tags.Artists, []string{"A", "B/C"}) || !slices.Equal(tags.AlbumArtists, []string{"A", "B/C"}) ||
+		tags.Album != "Al" || tags.Year != 2017 || tags.Track != 0 || tags.Disc != 0 || tags.Picture == nil {
+		t.Fatalf("tags: %+v", tags)
+	}
+
+	detail, err := ts.store.Track(ctx, got.Track.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(detail.Lyrics, "<tt ") || !strings.Contains(detail.Lyrics, "x-translation") || detail.LyricsFormat != store.TTML {
+		t.Fatalf("lyrics: %q %q", detail.LyricsFormat, detail.Lyrics)
+	}
+	album, err := ts.store.Album(ctx, got.Track.Album.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !album.Single || album.Cover == nil || album.Cover.Name != got.Track.Cover.Name || album.Year != 2017 {
+		t.Fatalf("album: %+v", album)
+	}
+
+	// Importing again finds the track and downloads nothing.
+	f.downloads = nil
+	rec = ts.do("POST", playerAPI+"netease/songs/701/import", "")
+	again := decodeBody[importAnswer](t, rec)
+	if again.Status != "duplicate" || again.Track.ID != got.Track.ID || len(f.downloads) != 0 {
+		t.Fatalf("again: %s %v", rec.Body, f.downloads)
+	}
+
+	// Another song of the same album and artists still gets its own album.
+	rec = ts.do("POST", playerAPI+"netease/songs/702/import", "")
+	second := decodeBody[importAnswer](t, rec)
+	if second.Status != "created" || second.Track.Album.ID == got.Track.Album.ID || second.Track.Album.Title != "Al" {
+		t.Fatalf("second: %s", rec.Body)
+	}
+	// A song without word timings keeps LRC.
+	if d, err := ts.store.Track(ctx, second.Track.ID); err != nil || d.LyricsFormat != store.LRC {
+		t.Fatalf("second lyrics: %v %+v", err, d.LyricsFormat)
+	}
+
+	// An imported album can be edited although its title and artists repeat.
+	year := 2001
+	updated, err := ts.store.UpdateAlbum(ctx, got.Track.Album.ID, store.AlbumInput{Title: "Al", Artists: []string{"A", "B/C"}, Year: year})
+	if err != nil || updated.Year != year {
+		t.Fatalf("edit imported album: %v %+v", err, updated)
+	}
+
+	// Liked on both sides, the mixed list shows the local one.
+	f.liked = []map[string]int64{{"id": 701, "at": 1}}
+	if rec := ts.do("PUT", playerAPI+"likes/"+strconv.FormatInt(got.Track.ID, 10), ""); rec.Code != http.StatusNoContent {
+		t.Fatalf("like: %d %s", rec.Code, rec.Body)
+	}
+	rec = ts.do("GET", playerAPI+"likes/mixed", "")
+	if strings.Contains(rec.Body.String(), `"source":"online"`) {
+		t.Fatalf("mixed: %s", rec.Body)
+	}
+}
+
+func TestNeteaseImportRefusals(t *testing.T) {
+	ts, _ := newImportTest(t)
+	for path, want := range map[string]int{
+		"790": http.StatusUnsupportedMediaType, // FLAC
+		"3":   http.StatusNotFound,             // no address
+		"2":   http.StatusNotFound,             // trial only
+		"999": http.StatusNotFound,             // gone from NetEase
+	} {
+		rec := ts.do("POST", playerAPI+"netease/songs/"+path+"/import", "")
+		if rec.Code != want {
+			t.Errorf("%s: %d %s", path, rec.Code, rec.Body)
+		}
 	}
 }

@@ -98,6 +98,8 @@ export interface IPlaybackEngine extends TypedEventTarget<AudioEventMap> {
   /** 设置音量 (0.0 - 1.0) */
   setVolume(value: number): void;
   getVolume(): number;
+  /** 设置播放速率。换歌后保持 */
+  setRate(rate: number): void;
   /** 设置输出设备 */
   setSinkId(deviceId: string): Promise<void>;
   /**

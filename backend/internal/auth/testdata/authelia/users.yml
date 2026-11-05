@@ -5,6 +5,8 @@ users:
     displayname: Alice Test
     password: '$pbkdf2-sha512$310000$q2Ru2qSYeICMGD4kQV1woA$QiSfn0Sz.5qKuRlrR6RFz3GTgG99cp2UdHkMaGZjXw7aXZksTMLnr8X28wiFlkWI6YTg43VpIbyrT3fuoverEA'
     email: alice@example.com
+    groups:
+      - sonora-import
   bob:
     disabled: false
     displayname: Bob Test

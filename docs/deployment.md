@@ -54,6 +54,7 @@ oidc:
   client_id: "sonora"
 netease:
   api_url: "http://netease-api:3000" # 可选
+  import_group: "sonora-import" # 可选，见“导入歌曲”
 ```
 
 反向代理把整个域名转发到 `sonora:14560`，不要加 forward_auth：播放端自己走 OIDC，管理后台有自己的登录（密码 bcrypt，失败全局每分钟至多 10 次）。Sonora 本身不压缩响应，建议在反向代理上开启压缩（Caddy 为 `encode zstd gzip`），播放端的 JS 与 CSS 约 1.6 MB，压缩后约 0.5 MB；缓存头由 Sonora 设置，反向代理不必改。
@@ -70,6 +71,7 @@ netease:
 | `public_url`                                          | 浏览器访问的 origin，例如 `https://music.example.com`；写请求必须来自该 origin，OIDC 回调地址为 `<public_url>/auth/callback`      |
 | `oidc.issuer`、`oidc.client_id`、`oidc.client_secret` | 播放端登录用的 Authelia；三项必填（开发模式除外），secret 建议用环境变量 `SONORA_OIDC_CLIENT_SECRET` 提供，它会覆盖配置文件中的值 |
 | `netease.api_url`                                     | 网易云接口服务的地址，可选；不填时网易云功能关闭，播放端不显示相关入口                                                            |
+| `netease.import_group`                                | 可以把在线歌曲导入曲库的 Authelia 组，可选；不填时没有人可以导入，也不向 Authelia 请求 `groups`。见“导入歌曲”                     |
 
 两个目录必须不同，并分别挂载持久卷；备份时两者都要包含。
 
@@ -135,6 +137,19 @@ docker logs sonora 2>&1 | grep -A5 'Sonora 初始化'
 - 初始化只能成功一次；成功后 token 立即作废，之后启动不再打印。
 - token 错误时拒绝，并限制每分钟 5 次失败尝试。
 - token 是 Sonora 唯一写入日志的凭据。密码以 bcrypt 保存，不写入日志。
+
+### 导入歌曲
+
+组内成员可以把在线歌曲导入曲库，文件由 Sonora 直接从网易云下载，存入媒体卷。步骤：
+
+1. 在 Authelia 中建组（建议 `sonora-import`），把可以导入的用户加进去。
+2. 在 Authelia 的 `sonora` 客户端 `scopes` 中加入 `groups`：`scopes: [openid, profile, email, groups]`。
+3. 在 Sonora 的配置中写 `netease.import_group`，重启。
+4. 相关用户在播放端退出并重新登录。
+
+**第 2 步必须在第 3 步之前**：配置了组名后，Sonora 会请求 `groups`，而 Authelia 拒绝客户端未获准的 scope，所有人都会登录失败。只升级 Sonora、不写组名时不受影响。
+
+组成员关系在登录时读取并保存，所以加入或移出组要等该用户下次登录才生效；要立即收回权限，可以把组名从配置中去掉再重启。
 
 ## 升级与恢复
 

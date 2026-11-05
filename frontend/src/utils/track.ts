@@ -6,6 +6,35 @@ type TrackIdentity = Pick<Track, "id" | "source">;
 export const isOnline = (track: { source?: string }): boolean =>
   track.source === "online";
 
+/** 在线歌曲是否可以播放。本地歌曲没有这个字段，总是可以。 */
+export const isPlayable = (track: { playable?: boolean }): boolean =>
+  track.playable !== false;
+
+/** 是否显示“导入到曲库”：可以播放的在线歌曲，且用户有导入权限。 */
+export const canImportSong = (
+  track: { source?: string; playable?: boolean },
+  user: { canImport: boolean } | null,
+): boolean => !!user?.canImport && isOnline(track) && isPlayable(track);
+
+/**
+ * 列表的来源标记（见 music store 的 playPlaylistId）。在线列表的 ID 可能与本地的相同，
+ * 所以带前缀，与在线详情页一致。
+ */
+export const listKey = (
+  type: "playlist" | "album" | "artist",
+  item: { id: number; source?: string },
+): string =>
+  isOnline(item) ? `online-${type}-${item.id}` : `${type}-${item.id}`;
+
+/** 歌单或专辑的详情页。 */
+export const listRoute = (
+  type: "playlist" | "album",
+  item: { id: number; source?: string },
+) =>
+  isOnline(item)
+    ? { name: "online-list", query: { type, id: item.id } }
+    : { name: type, query: { id: item.id } };
+
 /**
  * 歌曲的身份。本地与网易云的 ID 都是整数，可能相同，比较歌曲时不能只比较 `id`。
  */
@@ -40,6 +69,12 @@ export function sortTracks(
   };
   return [...list].sort((a, b) => sign * compare[field](a, b));
 }
+
+/** 歌曲的艺术家的详情页。 */
+export const artistRoute = (song: Track, id: number) =>
+  isOnline(song)
+    ? { name: "online-list", query: { type: "artist", id } }
+    : { name: "artist", query: { id } };
 
 /** 歌曲所属专辑的详情页。 */
 export const albumRoute = (song: Track) =>

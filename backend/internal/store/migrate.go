@@ -296,6 +296,12 @@ var migrations = []migration{
 	ALTER TABLE tracks ADD COLUMN netease_id INTEGER;
 	CREATE UNIQUE INDEX tracks_netease_id ON tracks (netease_id) WHERE netease_id IS NOT NULL;
 	`),
+
+	// users.idp_groups holds the identity provider groups as JSON, refreshed
+	// at each login; they decide who may import songs.
+	execSQL(`
+	ALTER TABLE users ADD COLUMN idp_groups TEXT NOT NULL DEFAULT '[]';
+	`),
 }
 
 func migrate(db *sql.DB) error {

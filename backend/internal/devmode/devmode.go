@@ -14,5 +14,8 @@ const (
 	Username = "listener"
 )
 
+// Groups are the identity provider groups of the development listener.
+var Groups = []string{"sonora-import"}
+
 // Available reports whether this binary was built with -tags dev.
 const Available = available

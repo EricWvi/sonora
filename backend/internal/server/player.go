@@ -137,7 +137,11 @@ func mapPage[T, U any](p store.Page[T], f func(T) U) store.Page[U] {
 }
 
 func (s *server) getMe(w http.ResponseWriter, r *http.Request) {
-	respond(w, r, auth.User(r.Context()), nil)
+	user := auth.User(r.Context())
+	respond(w, r, struct {
+		store.User
+		CanImport bool `json:"canImport"`
+	}{user, s.canImport(user)}, nil)
 }
 
 func (s *server) listPlayerTracks(w http.ResponseWriter, r *http.Request) {

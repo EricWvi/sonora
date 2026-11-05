@@ -69,7 +69,20 @@ const morning = (() => {
 
 // The settings the reference states start from (splayer-player.mjs),
 // under Sonora's setting store.
-const baseSettings = { themeMode: "light", autoHidePlayerMeta: false };
+//
+// The home page behind the player leaves out "最近添加的歌曲": those titles draw
+// their characters first and shift the translation line's font fallback, the
+// same effect as the greeting above. SPlayer has no such section to compare
+// with, and the home page itself is not part of the comparison (2026-11-05).
+const baseSettings = {
+  themeMode: "light",
+  autoHidePlayerMeta: false,
+  homePageSections: [
+    { key: "song", name: "最近添加的歌曲", visible: false, order: 0 },
+    { key: "album", name: "最近添加的专辑", visible: true, order: 1 },
+    { key: "history", name: "最近播放", visible: true, order: 2 },
+  ],
+};
 
 // The fixture's player state for a baseline state.
 function playerOf(state) {
@@ -131,30 +144,6 @@ async function prepareState(context, state) {
   return { page, errors };
 }
 
-// Areas compare.mjs leaves out, in screenshot pixels: the equalizer button
-// that replaced SPlayer's one-item "其他控制" menu (Eric, 2026-10-27).
-async function masksOf(page, clip) {
-  const [ox, oy, w, h] = clip
-    ? [clip.x, clip.y, clip.width, clip.height]
-    : [0, 0, width, height];
-  const rects = await page
-    .locator(".right-menu .menu-icon[title='均衡器']")
-    .evaluateAll((els) =>
-      els
-        .map((el) => el.getBoundingClientRect())
-        .filter((r) => r.width && r.height)
-        .map((r) => [r.left, r.top, r.right, r.bottom]),
-    );
-  return rects
-    .map(([x0, y0, x1, y1]) => [
-      Math.max(0, Math.floor(x0 - ox) - 1),
-      Math.max(0, Math.floor(y0 - oy) - 1),
-      Math.min(w - 1, Math.ceil(x1 - ox)),
-      Math.min(h - 1, Math.ceil(y1 - oy)),
-    ])
-    .filter(([x0, y0, x1, y1]) => x0 <= x1 && y0 <= y1);
-}
-
 const browser = await chromium.launch({ headless: true });
 const manifest = {
   run: args.run,
@@ -181,7 +170,6 @@ try {
       ctx = await openState(browser, state);
       const file = `${state.id}.png`;
       const clip = await clipFor(ctx.page, state);
-      entry.masks = await masksOf(ctx.page, clip);
       await ctx.page.screenshot({
         path: join(out, file),
         clip,

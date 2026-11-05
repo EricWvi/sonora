@@ -49,6 +49,8 @@ interface UpdateFormType {
 const props = defineProps<{
   id: number;
   data: { name: string; description?: string };
+  /** 网易云上的歌单。与 SPlayer 不同：不编辑标签，也不会清除已有的标签 */
+  online?: boolean;
 }>();
 
 const emit = defineEmits<{ success: [] }>();
@@ -74,10 +76,13 @@ const toUpdatePlaylist = debounce(
       return;
     }
     try {
-      await source.updatePlaylist(props.id, {
+      const input = {
         name: updateFormData.value.name.trim(),
         description: (updateFormData.value.desc ?? "").trim(),
-      });
+      };
+      await (props.online
+        ? source.updateOnlinePlaylist(props.id, input)
+        : source.updatePlaylist(props.id, input));
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         location.assign(loginUrl);
@@ -90,7 +95,9 @@ const toUpdatePlaylist = debounce(
     }
     emit("success");
     window.$message.success("歌单编辑成功");
-    await userStore.loadPlaylists();
+    await (props.online
+      ? userStore.loadOnlinePlaylists()
+      : userStore.loadPlaylists());
   },
   300,
   { leading: true, trailing: false },

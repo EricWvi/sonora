@@ -55,6 +55,27 @@ identity_providers:
           - openid
           - profile
           - email
+          - groups
+        grant_types:
+          - authorization_code
+        response_types:
+          - code
+        token_endpoint_auth_method: client_secret_basic
+      - client_id: sonora-no-groups
+        client_name: Sonora Contract Test without groups
+        # sonora-test-client-secret
+        client_secret: '$pbkdf2-sha512$310000$dcgEruYot5zqa00KGnst8Q$M3G9piPYqiWjKZRWGkuDlLzpPpXH8lPfNZalXWZQ0jMT6Z8LOUhyrRVKaSggxE7tZzywKUmO3rLef6z.T1qDsg'
+        public: false
+        authorization_policy: one_factor
+        consent_mode: implicit
+        require_pkce: true
+        pkce_challenge_method: S256
+        redirect_uris:
+          - https://sonora.test/auth/callback
+        scopes:
+          - openid
+          - profile
+          - email
         grant_types:
           - authorization_code
         response_types:

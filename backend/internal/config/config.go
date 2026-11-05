@@ -56,6 +56,9 @@ type Netease struct {
 	// APIURL is the base URL of the API service container, reachable only
 	// from Sonora. Empty turns NetEase off.
 	APIURL string `yaml:"api_url"`
+	// ImportGroup is the identity provider group whose members may import
+	// songs into the library. Empty lets nobody import.
+	ImportGroup string `yaml:"import_group"`
 }
 
 // Default returns the configuration used when no file is present.

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 
 	"sonora/internal/admin"
 	"sonora/internal/auth"
@@ -31,11 +32,16 @@ type Options struct {
 	Version string
 	// Netease is the API service client; nil turns NetEase off.
 	Netease *netease.Client
+	// ImportGroup is the group whose members may import songs; empty lets
+	// nobody import.
+	ImportGroup string
 }
 
 type server struct {
 	store *store.Store
 	opts  Options
+	// importing runs song imports one at a time, see importNeteaseSong.
+	importing sync.Mutex
 }
 
 // New returns the HTTP handler for the admin API and the admin console

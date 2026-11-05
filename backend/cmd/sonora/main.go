@@ -76,16 +76,19 @@ func run(configPath string) error {
 	}
 
 	listeners := auth.New(st, auth.Config{
-		PublicURL:    cfg.PublicURL,
-		Issuer:       cfg.OIDC.Issuer,
-		ClientID:     cfg.OIDC.ClientID,
-		ClientSecret: cfg.OIDC.ClientSecret,
-		DevUser:      devUser(cfg),
+		PublicURL:     cfg.PublicURL,
+		Issuer:        cfg.OIDC.Issuer,
+		ClientID:      cfg.OIDC.ClientID,
+		ClientSecret:  cfg.OIDC.ClientSecret,
+		DevUser:       devUser(cfg),
+		RequestGroups: cfg.Netease.ImportGroup != "",
+		DevGroups:     devmode.Groups,
 	})
 
 	opts := server.Options{Version: version}
 	if cfg.Netease.APIURL != "" {
 		opts.Netease = netease.New(cfg.Netease.APIURL)
+		opts.ImportGroup = cfg.Netease.ImportGroup
 	}
 	handler, err := server.New(st, authn, listeners, sonora.Player(), sonora.Admin(), opts)
 	if err != nil {

@@ -39,6 +39,11 @@ class FakeEngine
   /** 下一次 resume 抛出的错误 */
   resumeError: Error | null = null;
   volume = 1;
+  rate = 1;
+
+  setRate(rate: number) {
+    this.rate = rate;
+  }
 
   async play(url?: string, options: PlayOptions = {}) {
     if (url) {
@@ -401,6 +406,145 @@ describe("队列编辑", () => {
     expect(player.playbackState).toBe("idle");
     expect(useDataStore().playList).toEqual([]);
     expect(storage.queue).toBeNull();
+  });
+});
+
+describe("不可播放的歌曲", () => {
+  const online = (id: number, playable: boolean): Track => ({
+    ...track(id),
+    source: "online",
+    playable,
+  });
+
+  async function start(tracks: Track[], song?: Track) {
+    const player = newPlayer();
+    void player.updatePlayList(tracks, song);
+    await settle();
+    engine.ready();
+    await settle();
+    return player;
+  }
+
+  it("不进入队列，从第一首可播放的歌开始", async () => {
+    await start([
+      online(1, false),
+      online(2, true),
+      online(3, false),
+      online(4, true),
+    ]);
+    expect(ids()).toEqual([2, 4]);
+    expect(useMusicStore().playSong.id).toBe(2);
+  });
+
+  it("双击不可播放的歌只提示，不改变队列", async () => {
+    const player = await start([track(1), track(2)]);
+    const bad = online(9, false);
+    await player.updatePlayList([bad, online(3, true)], bad);
+    expect(deps.message.warning).toHaveBeenCalledTimes(1);
+    expect(ids()).toEqual([1, 2]);
+  });
+
+  it("整个列表都不可播放时只提示", async () => {
+    const player = await start([track(1)]);
+    await player.updatePlayList([online(8, false), online(9, false)]);
+    expect(deps.message.warning).toHaveBeenCalledTimes(1);
+    expect(ids()).toEqual([1]);
+  });
+
+  it("下一首播放只加入可播放的歌", async () => {
+    const player = await start([track(1)]);
+    await player.addNextSong(online(9, false));
+    player.addNextSongs([online(8, false), online(7, true)]);
+    expect(ids()).toEqual([1, 7]);
+    expect(deps.message.success).toHaveBeenLastCalledWith(
+      "已添加 1 首至下一首播放",
+    );
+  });
+});
+
+describe("播放速度、AB 循环与自动关闭", () => {
+  async function playing(tracks: Track[]) {
+    const player = newPlayer();
+    void player.updatePlayList(tracks);
+    await settle();
+    engine.ready();
+    await settle();
+    return player;
+  }
+
+  it("播放速度限制在范围内，换歌后保持", async () => {
+    const player = await playing([track(1), track(2)]);
+    player.setRate(5);
+    expect(useStatusStore().playRate).toBe(2);
+    expect(engine.rate).toBe(2);
+    player.setRate(1.5);
+    engine.rate = 1;
+    void player.nextOrPrev("next");
+    await settle();
+    expect(engine.rate).toBe(1.5);
+  });
+
+  it("到达 B 点时回到 A 点，换歌后清除", async () => {
+    const player = await playing([track(1), track(2)]);
+    useStatusStore().abLoop = { enable: true, pointA: 10, pointB: 20 };
+    engine.length = 200;
+    engine.time = 19;
+    engine.dispatch("timeupdate");
+    await vi.advanceTimersByTimeAsync(300);
+    expect(engine.time).toBe(19);
+    engine.time = 20.1;
+    engine.dispatch("timeupdate");
+    await vi.advanceTimersByTimeAsync(300);
+    expect(engine.time).toBe(10);
+    void player.nextOrPrev("next");
+    await settle();
+    expect(useStatusStore().abLoop).toEqual({
+      enable: false,
+      pointA: null,
+      pointB: null,
+    });
+  });
+
+  it("B 点不大于 A 点时不循环", async () => {
+    await playing([track(1)]);
+    useStatusStore().abLoop = { enable: true, pointA: 20, pointB: 20 };
+    engine.length = 200;
+    engine.time = 50;
+    engine.dispatch("timeupdate");
+    await vi.advanceTimersByTimeAsync(300);
+    expect(engine.time).toBe(50);
+  });
+
+  it("不等歌曲结束时，时间到就暂停", async () => {
+    const player = await playing([track(1), track(2)]);
+    useStatusStore().autoClose.waitSongEnd = false;
+    player.startAutoCloseTimer(1, 2);
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(player.playbackState).toBe("paused");
+    expect(useStatusStore().autoClose.enable).toBe(false);
+  });
+
+  it("等歌曲结束时，播完这首才停，不切到下一首", async () => {
+    const player = await playing([track(1), track(2)]);
+    useStatusStore().autoClose.waitSongEnd = true;
+    player.startAutoCloseTimer(1, 2);
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(player.playbackState).toBe("playing");
+    engine.dispatch("ended");
+    await settle();
+    expect(useMusicStore().playSong.id).toBe(1);
+    expect(player.playbackState).toBe("ended");
+    expect(useStatusStore().autoClose.enable).toBe(false);
+  });
+
+  it("关闭自动关闭后不再暂停（与 SPlayer 不同）", async () => {
+    const player = await playing([track(1)]);
+    useStatusStore().autoClose.waitSongEnd = false;
+    player.startAutoCloseTimer(1, 60);
+    player.stopAutoCloseTimer();
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(player.playbackState).toBe("playing");
+    expect(useStatusStore().autoClose.remainTime).toBe(60);
   });
 });
 

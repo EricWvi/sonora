@@ -116,22 +116,34 @@ export const clearHistory = async (): Promise<boolean> => {
 /**
  * 删除歌单（照搬 SPlayer 的确认与提示），成功后调用 `callback`
  * @param id 歌单 ID
+ * @param callback 成功后调用
+ * @param online 是否为网易云上的歌单
  */
-export const deletePlaylist = async (id: number, callback?: () => void) => {
+export const deletePlaylist = async (
+  id: number,
+  callback?: () => void,
+  online: boolean = false,
+) => {
   window.$dialog.warning({
     title: "删除歌单",
-    content: "确认删除这个歌单？该操作无法撤销！",
+    content: online
+      ? "确认从网易云账号中删除这个歌单？该操作无法撤销！"
+      : "确认删除这个歌单？该操作无法撤销！",
     positiveText: "删除",
     negativeText: "取消",
     onPositiveClick: async () => {
       try {
-        await source.deletePlaylist(id);
+        await (online
+          ? source.deleteOnlinePlaylist(id)
+          : source.deletePlaylist(id));
       } catch (error) {
         reportWriteError(error, "删除歌单失败，请重试");
         return;
       }
       window.$message.success("歌单删除成功");
-      await useUserStore().loadPlaylists();
+      await (online
+        ? useUserStore().loadOnlinePlaylists()
+        : useUserStore().loadPlaylists());
       if (isFunction(callback)) callback();
     },
   });
@@ -165,4 +177,24 @@ export const savePlaylistOrder = (
   });
   orderSaving = saving;
   return saving;
+};
+
+/**
+ * 把在线歌曲导入曲库。文件由服务端下载，不经过浏览器，这里只等结果。
+ * 导入后就是本地歌曲；正在播放的在线歌曲不受影响。
+ * @param song 在线歌曲
+ */
+export const importSong = async (song: Track) => {
+  const loading = window.$message.loading(`正在导入 ${song.title}`, {
+    duration: 0,
+  });
+  try {
+    const { status } = await source.importOnlineSong(song.id);
+    if (status === "duplicate") window.$message.info("这首歌已经在曲库中");
+    else window.$message.success("已导入到曲库");
+  } catch (error) {
+    reportWriteError(error, "导入失败，请重试");
+  } finally {
+    loading.destroy();
+  }
 };
