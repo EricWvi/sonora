@@ -40,8 +40,6 @@ services:
   netease-api:
     image: moefurina/ncm-api:4.41.1
     restart: unless-stopped
-    volumes:
-      - ./netease-api:/tmp
 ```
 
 `config.yaml`：
@@ -106,7 +104,7 @@ Sonora 首次有人登录时才去发现 issuer，Authelia 不可用时服务照
 
 - **不要暴露这个服务**：它没有鉴权。只放在 compose 内部网络，不映射端口，不经反向代理，由 Sonora 用 `http://netease-api:3000` 访问。
 - **镜像**：使用接口包 README 指向的 `moefurina/ncm-api`，写明版本号，不用 `latest`。升级版本时核对 Sonora 用到的接口，并确认下一条仍然成立；开发环境的版本在 [Taskfile.yml](../Taskfile.yml) 的 `NETEASE_API_IMAGE`，两处保持一致。
-- **持久化**：容器以 `node`（1000）运行，启动时把匿名令牌与接口密钥写到 `/tmp`，挂载后重建容器时保持不变；目录在宿主机上须属于 `1000:1000`（rootless Docker 下改为 `chmod 777`，容器用户映射到别的 UID）。这些文件不含用户的 Cookie。
+- **不需要挂载卷**：服务启动时重新生成匿名令牌与接口密钥，容器重建后不丢失任何数据。用户的 Cookie 在 Sonora 的 `sonora.db` 中。
 - **不开启解锁**：不要设置 `ENABLE_GENERAL_UNBLOCK`。设为 `true` 时，服务会到第三方音源替换试听或没有地址的歌曲，Sonora 不做灰色歌曲解锁。4.41.1 的镜像没有设置这个变量，不设置就是关闭（其 README 写的默认值是 `true`，与代码不符）。
 - **响应缓存**：该服务默认缓存响应 2 分钟，缓存键不含 POST 正文中的 Cookie。Sonora 的每个请求都带 `x-apicache-bypass` 并使用不同的 URL，避免用户之间串数据；不要让其他程序共用这个服务。
 - **会话**：用户的网易云 Cookie 以明文保存在 `sonora.db` 的 `netease_sessions` 中，不进入浏览器，也不写入日志。数据卷与备份要按凭据保管。用户退出网易云时只删除 Sonora 保存的会话，不让网易云一侧的登录失效，这个 Cookie 可能还在别的客户端使用。
