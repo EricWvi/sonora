@@ -958,6 +958,14 @@ func TestNeteaseImport(t *testing.T) {
 		}
 	}
 
+	// The player sees the links as onlineId, to open the online pages.
+	if body := ts.do("GET", playerAPI+"albums/"+strconv.FormatInt(got.Track.Album.ID, 10), "").Body.String(); !strings.Contains(body, `"onlineId":6`) {
+		t.Fatalf("player album: %s", body)
+	}
+	if body := ts.do("GET", playerAPI+"artists/"+strconv.FormatInt(detail.Artists[0].ID, 10), "").Body.String(); !strings.Contains(body, `"onlineId":5`) {
+		t.Fatalf("player artist: %s", body)
+	}
+
 	// Importing again finds the track and downloads nothing.
 	f.downloads = nil
 	rec = ts.do("POST", playerAPI+"netease/songs/701/import", "")

@@ -93,6 +93,9 @@ type playerAlbum struct {
 	Description string `json:"description"`
 	TrackCount  int    `json:"trackCount"`
 	DurationMs  int64  `json:"durationMs"`
+	// OnlineID is the NetEase album the admin or an import linked; nil when
+	// none is. The player opens the online album page from it.
+	OnlineID *int64 `json:"onlineId"`
 }
 
 type playerArtist struct {
@@ -103,6 +106,8 @@ type playerArtist struct {
 	Description string `json:"description"`
 	TrackCount  int    `json:"trackCount"`
 	AlbumCount  int    `json:"albumCount"`
+	// OnlineID is the NetEase artist linked to this one, see playerAlbum.
+	OnlineID *int64 `json:"onlineId"`
 }
 
 // toPlayerTrack resolves the cover the track shows: its own art, or else
@@ -124,12 +129,15 @@ func toPlayerTrack(t store.Track) playerTrack {
 func toPlayerAlbum(a store.Album) playerAlbum {
 	return playerAlbum{
 		ID: a.ID, Title: a.Title, Artists: a.Artists, Year: a.Year, Cover: a.Cover, Description: a.Description,
-		TrackCount: a.TrackCount, DurationMs: a.DurationMs,
+		TrackCount: a.TrackCount, DurationMs: a.DurationMs, OnlineID: a.NeteaseID,
 	}
 }
 
 func toPlayerArtist(a store.Artist) playerArtist {
-	return playerArtist{ID: a.ID, Name: a.Name, Image: a.Image, Description: a.Description, TrackCount: a.TrackCount, AlbumCount: a.AlbumCount}
+	return playerArtist{
+		ID: a.ID, Name: a.Name, Image: a.Image, Description: a.Description, TrackCount: a.TrackCount, AlbumCount: a.AlbumCount,
+		OnlineID: a.NeteaseID,
+	}
 }
 
 func mapPage[T, U any](p store.Page[T], f func(T) U) store.Page[U] {

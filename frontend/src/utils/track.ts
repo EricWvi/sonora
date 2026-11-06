@@ -36,6 +36,14 @@ export const listRoute = (
     : { name: type, query: { id: item.id } };
 
 /**
+ * 在线歌单、专辑或艺术家的详情页，用于从关联了在线 ID 的本地专辑与艺术家前往（Sonora 新增）。
+ */
+export const onlinePageRoute = (
+  type: "playlist" | "album" | "artist",
+  id: number,
+) => ({ name: "online-list", query: { type, id } });
+
+/**
  * 歌曲的身份。本地与网易云的 ID 都是整数，可能相同，比较歌曲时不能只比较 `id`。
  */
 export const trackKey = (track: TrackIdentity): string =>

@@ -100,7 +100,7 @@
               </n-button>
               <!-- 更多操作 -->
               <n-dropdown
-                v-if="artistType === 'artist-songs'"
+                v-if="moreOptions.some((option) => option.show !== false)"
                 :options="moreOptions"
                 trigger="click"
                 placement="bottom-start"
@@ -182,6 +182,7 @@ import { listSortQuery } from "@/utils/meta";
 import { source } from "@/api/source";
 import { useLoadError } from "@/composables/List/useLoadError";
 import { coverLoaded, downloadImage, renderIcon } from "@/utils/helper";
+import { onlinePageRoute } from "@/utils/track";
 import { renderDownloadToolbar } from "@/utils/meta";
 import { removeBrackets } from "@/utils/format";
 import { coverUrl, defaultCovers } from "@/utils/cover";
@@ -278,14 +279,30 @@ const openBatch = async () => {
 };
 
 // 更多操作
-const moreOptions = computed<DropdownOption[]>(() => [
-  {
-    label: "批量操作",
-    key: "batch",
-    props: { onClick: openBatch },
-    icon: renderIcon("Batch"),
-  },
-]);
+// 照搬 SPlayer，批量操作只在歌曲标签下。与 SPlayer 不同：关联了在线艺术家时多“查看在线艺术家”，
+// 两个标签下都有，所以有它时专辑标签下也显示“更多”
+const moreOptions = computed<DropdownOption[]>(() => {
+  const onlineId = artistDetailData.value?.onlineId;
+  return [
+    {
+      label: "查看在线艺术家",
+      key: "open-online",
+      show: !!onlineId,
+      props: {
+        onClick: () =>
+          onlineId && router.push(onlinePageRoute("artist", onlineId)),
+      },
+      icon: renderIcon("Cloud"),
+    },
+    {
+      label: "批量操作",
+      key: "batch",
+      show: artistType.value === "artist-songs",
+      props: { onClick: openBatch },
+      icon: renderIcon("Batch"),
+    },
+  ];
+});
 
 // 列表滚动
 const listScroll = (e: Event) => {

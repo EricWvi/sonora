@@ -93,16 +93,16 @@
 
 全部需要播放端会话。播放端看不到只与管理有关的字段：原文件名、文件大小、入库时间、歌词正文（另有接口）都不出现在列表与详情中。列表的分页、`q` 搜索和[排序](#通用约定)与管理 API 相同：歌曲默认新入库在前，按专辑筛选时按碟号与音轨号；专辑默认按标题；艺术家按名称。
 
-| 方法与路径                        | 说明                                                                                                                                                                                             |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `GET me`                          | 当前用户 `{name, email, canImport}`；`canImport` 表示可以导入歌曲                                                                                                                                |
-| `GET tracks`                      | `q`（匹配标题、专辑名、艺术家名）、`albumId`、`artistId`、`sort`、`order`；默认新入库在前，首页“最近添加的歌曲”取前 6 首                                                                         |
-| `GET tracks/{id}`                 | 歌曲详情                                                                                                                                                                                         |
-| `GET tracks/{id}/lyrics`          | `{format, lyrics}`：`format` 为 `lrc` 或 `ttml`，`lyrics` 为原文；没有歌词时都是空字符串。解析由播放端完成                                                                                       |
-| `GET tracks/{id}/audio`           | 音频流，支持 Range                                                                                                                                                                               |
-| `GET albums`、`GET albums/{id}`   | 列表（`q`、`artistId`、`sort`、`order`、`hideSingles`）/ 详情；`hideSingles=true` 时不含标记为单曲的专辑，专辑页与首页使用；首页“最近添加的专辑”用 `sort=createTime&order=desc&hideSingles=true` |
-| `GET artists`、`GET artists/{id}` | 列表（`q`）/ 详情；艺术家的歌曲与专辑用 `tracks?artistId=`、`albums?artistId=` 获取                                                                                                              |
-| `GET covers/{name}`               | 封面与艺术家图片，与管理 API 相同，支持同样的 `?size=`。播放端按 SPlayer 的封面尺寸取 `100`（小图：底部栏、背景与取色）、`300`、`1024`（全屏播放器的大封面），2026-10-25 增加 `100` 与 `1024`    |
+| 方法与路径                        | 说明                                                                                                                                                                                                                                                                                      |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET me`                          | 当前用户 `{name, email, canImport}`；`canImport` 表示可以导入歌曲                                                                                                                                                                                                                         |
+| `GET tracks`                      | `q`（匹配标题、专辑名、艺术家名）、`albumId`、`artistId`、`sort`、`order`；默认新入库在前，首页“最近添加的歌曲”取前 6 首                                                                                                                                                                  |
+| `GET tracks/{id}`                 | 歌曲详情                                                                                                                                                                                                                                                                                  |
+| `GET tracks/{id}/lyrics`          | `{format, lyrics}`：`format` 为 `lrc` 或 `ttml`，`lyrics` 为原文；没有歌词时都是空字符串。解析由播放端完成                                                                                                                                                                                |
+| `GET tracks/{id}/audio`           | 音频流，支持 Range                                                                                                                                                                                                                                                                        |
+| `GET albums`、`GET albums/{id}`   | 列表（`q`、`artistId`、`sort`、`order`、`hideSingles`）/ 详情；`hideSingles=true` 时不含标记为单曲的专辑，专辑页与首页使用；首页“最近添加的专辑”用 `sort=createTime&order=desc&hideSingles=true`；专辑另有 `onlineId`：关联的在线专辑（导入或管理后台填写的网易云 ID），没有时为 `null`。 |
+| `GET artists`、`GET artists/{id}` | 列表（`q`）/ 详情；艺术家的歌曲与专辑用 `tracks?artistId=`、`albums?artistId=` 获取；艺术家另有 `onlineId`，含义同专辑。                                                                                                                                                                  |
+| `GET covers/{name}`               | 封面与艺术家图片，与管理 API 相同，支持同样的 `?size=`。播放端按 SPlayer 的封面尺寸取 `100`（小图：底部栏、背景与取色）、`300`、`1024`（全屏播放器的大封面），2026-10-25 增加 `100` 与 `1024`                                                                                             |
 
 数据形态：
 

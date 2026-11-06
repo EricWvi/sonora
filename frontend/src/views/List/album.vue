@@ -53,6 +53,7 @@ import { useLoadError } from "@/composables/List/useLoadError";
 import { fetchAll } from "@/api/pages";
 import { useStatusStore } from "@/stores";
 import { renderIcon } from "@/utils/helper";
+import { onlinePageRoute } from "@/utils/track";
 import { listSortQuery } from "@/utils/meta";
 import { openBatchList, openPlaylistAdd } from "@/utils/modal";
 import { useListDetail } from "@/composables/List/useListDetail";
@@ -120,8 +121,21 @@ const playButtonText = computed(() => {
   return "播放";
 });
 
-// 更多操作
+// 关联的在线专辑（导入或管理后台填写），没有时为 null
+const onlineId = ref<number | null>(null);
+
+// 更多操作。与 SPlayer 不同：关联了在线专辑时多“查看在线专辑”
 const moreOptions = computed<DropdownOption[]>(() => [
+  {
+    label: "查看在线专辑",
+    key: "open-online",
+    show: !!onlineId.value,
+    props: {
+      onClick: () =>
+        onlineId.value && router.push(onlinePageRoute("album", onlineId.value)),
+    },
+    icon: renderIcon("Cloud"),
+  },
   {
     label: "添加到歌单",
     key: "playlist-add",
@@ -159,7 +173,10 @@ const getAlbumDetail = async (id: number) => {
   setLoading(true);
   clearSearch();
   clearError();
-  if (detailData.value?.id !== id) resetData(true);
+  if (detailData.value?.id !== id) {
+    resetData(true);
+    onlineId.value = null;
+  }
   try {
     const [album, songs] = await Promise.all([
       source.album(id),
@@ -178,6 +195,7 @@ const getAlbumDetail = async (id: number) => {
       durationMs: album.durationMs,
     });
     setListData(songs);
+    onlineId.value = album.onlineId ?? null;
   } catch (e) {
     if (currentRequestId.value !== id) return;
     setError(e);

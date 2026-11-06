@@ -1,6 +1,6 @@
 <!-- 专辑、歌单卡片的右键菜单。照搬 SPlayer components/Menu/CoverMenu.vue：查看详情、播放或暂停、
 复制名称与 ID，在线专辑与歌单的分享链接；本地的没有分享（没有公开链接），不迁入视频与电台。与 SPlayer 不同：在线专辑多“导入专辑到曲库”，
-只有可以导入的用户才有。 -->
+只有可以导入的用户才有；关联了在线专辑的本地专辑多“查看在线专辑”。 -->
 <template>
   <n-dropdown
     :x="dropdownX"
@@ -17,7 +17,7 @@
 
 <script setup lang="ts">
 import type { DropdownOption } from "naive-ui";
-import { listKey, listRoute } from "@/utils/track";
+import { listKey, listRoute, onlinePageRoute } from "@/utils/track";
 import type { Album, Playlist } from "@/api/types";
 import { renderIcon, copyData } from "@/utils/helper";
 import { useMusicStore, useStatusStore } from "@/stores";
@@ -66,6 +66,19 @@ const openDropdown = (
             onClick: () => router.push(listRoute(type, item)),
           },
           icon: renderIcon("Eye"),
+        },
+        {
+          key: "open-online",
+          label: "查看在线专辑",
+          // Sonora 新增：本地专辑关联了在线专辑时才有
+          show: type === "album" && "onlineId" in item && !!item.onlineId,
+          props: {
+            onClick: () =>
+              "onlineId" in item &&
+              item.onlineId &&
+              router.push(onlinePageRoute("album", item.onlineId)),
+          },
+          icon: renderIcon("Cloud"),
         },
         {
           key: "play",

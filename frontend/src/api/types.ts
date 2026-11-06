@@ -1,4 +1,5 @@
-// 播放端 API 的数据形态，见 docs/api.md。字段与服务端响应一致，不含文件路径，也不含网易字段。
+// 播放端 API 的数据形态，见 docs/api.md。字段与服务端响应一致，不含文件路径，也不含网易字段
+// （本地专辑与艺术家关联的在线 ID 叫 `onlineId`）。
 
 export type User = {
   name: string;
@@ -65,6 +66,8 @@ export type Album = {
   trackCount: number;
   durationMs: number;
   source?: Source;
+  /** 本地专辑关联的在线专辑（导入或管理后台填写），没有时为 null；在线专辑没有这个字段 */
+  onlineId?: number | null;
 };
 
 export type Artist = {
@@ -77,6 +80,8 @@ export type Artist = {
   trackCount: number;
   albumCount: number;
   source?: Source;
+  /** 本地艺术家关联的在线艺术家，没有时为 null；在线艺术家没有这个字段 */
+  onlineId?: number | null;
 };
 
 export type Playlist = {

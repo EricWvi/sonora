@@ -108,7 +108,7 @@ func TestPlayerCatalog(t *testing.T) {
 	}
 
 	album := decodeBody[playerAlbum](t, ts.do("GET", playerAPI+"albums/"+itoa(tr.Album.ID), ""))
-	if album.TrackCount != 1 || album.Cover == nil || album.Title != tr.Album.Title || album.Description != "专辑简介" {
+	if album.TrackCount != 1 || album.Cover == nil || album.Title != tr.Album.Title || album.Description != "专辑简介" || album.OnlineID != nil {
 		t.Fatalf("album = %+v", album)
 	}
 	albums := decodeBody[store.Page[playerAlbum]](t, ts.do("GET", playerAPI+"albums?artistId="+itoa(tr.Artists[0].ID), ""))
@@ -117,7 +117,7 @@ func TestPlayerCatalog(t *testing.T) {
 	}
 	artist := decodeBody[playerArtist](t, ts.do("GET", playerAPI+"artists/"+itoa(tr.Artists[0].ID), ""))
 	artists := decodeBody[store.Page[playerArtist]](t, ts.do("GET", playerAPI+"artists", ""))
-	if artist.TrackCount != 1 || artist.AlbumCount != 1 || artist.Image == nil || artist.Description != "歌手简介" || artists.Total != 1 ||
+	if artist.TrackCount != 1 || artist.AlbumCount != 1 || artist.Image == nil || artist.Description != "歌手简介" || artist.OnlineID != nil || artists.Total != 1 ||
 		artists.Items[0].Image == nil {
 		t.Fatalf("artist = %+v, artists = %+v", artist, artists)
 	}
