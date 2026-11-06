@@ -1,5 +1,8 @@
-<!-- 艺术家详情。照搬 SPlayer views/Artist/layout.vue：圆形图片、名称、歌曲数与专辑数，
+<!-- 艺术家详情。照搬 SPlayer views/Artist/layout.vue：图片、名称、歌曲数与专辑数，
 “歌曲 / 专辑”标签页。图片是管理后台上传的艺术家图片，没有时为 SPlayer 的默认图片。
+与 SPlayer 的圆形图片不同（Eric 要求，2026-11-06）：图片样式与在线艺术家页的 ListDetail 一致，
+圆角 8px，头部底部内边距 24px，所以边长是 204px；非正方形的图片居中裁切。
+列表里的艺术家卡片仍是圆形。
 不迁入别名、身份、视频、关注、分享与源页面。“更多 → 批量操作”（阶段 7，Eric 确认 2026-11-04）
 照搬 SPlayer 只在“歌曲”标签下显示；与 SPlayer 不同，点开时按当前排序取这位艺术家的全部歌曲，
 而不是只用已载入的部分。
@@ -11,6 +14,7 @@
         <div v-if="!settingStore.hiddenCovers.artistDetail" class="cover">
           <n-image
             :src="coverSrc"
+            object-fit="cover"
             :previewed-img-props="{ style: { borderRadius: '8px' } }"
             :preview-src="previewSrc"
             :preview-disabled="!artistDetailData.image"
@@ -30,7 +34,12 @@
             </template>
           </n-image>
           <!-- 封面背板 -->
-          <n-image class="cover-shadow" preview-disabled :src="coverSrc" />
+          <n-image
+            class="cover-shadow"
+            preview-disabled
+            object-fit="cover"
+            :src="coverSrc"
+          />
         </div>
         <div class="data">
           <div class="name text-hidden">
@@ -313,7 +322,7 @@ watch(
     display: flex;
     height: 240px;
     width: 100%;
-    padding: 12px 0 30px 0;
+    padding: 12px 0 24px 0;
     will-change: height, opacity;
     z-index: 1;
     transition:
@@ -326,7 +335,7 @@ watch(
       height: 100%;
       aspect-ratio: 1 / 1;
       margin-right: 20px;
-      border-radius: 50%;
+      border-radius: 8px;
       transition:
         opacity 0.3s,
         margin 0.3s,
@@ -338,7 +347,7 @@ watch(
         transition: opacity 0.35s ease-in-out;
       }
       .cover-img {
-        border-radius: 50%;
+        border-radius: 8px;
         overflow: hidden;
         z-index: 1;
         transition:
@@ -348,10 +357,9 @@ watch(
       }
       .cover-shadow {
         position: absolute;
-        top: 8px;
+        top: 6px;
         height: 100%;
         width: 100%;
-        border-radius: 50%;
         filter: blur(12px) opacity(0.6);
         transform: scale(0.92, 0.96);
         z-index: 0;

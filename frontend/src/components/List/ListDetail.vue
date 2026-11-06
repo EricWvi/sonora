@@ -1,6 +1,7 @@
 <!-- 通用列表详情。照搬 SPlayer components/List/ListDetail.vue，内容按阶段 2 的“详情页头部”表：
 不迁入播放量、隐私标记、标签与评论标签页；专辑的年份与总时长、歌单的创建与更新时间是
-Sonora 增加的信息项，样式沿用其他信息项。 -->
+Sonora 增加的信息项，样式沿用其他信息项。与 SPlayer 不同：本地缩略图保持原比例，
+n-image 默认的 object-fit: fill 会把长方形封面压成正方形，所以传 cover，居中裁切。 -->
 <template>
   <div :class="['list-detail', { small: listScrolling }]">
     <Transition name="fade">
@@ -8,6 +9,7 @@ Sonora 增加的信息项，样式沿用其他信息项。 -->
         <div class="cover" v-if="!settingStore.hiddenCovers.list">
           <n-image
             :src="coverSrc"
+            object-fit="cover"
             :previewed-img-props="{ style: { borderRadius: '8px' } }"
             :preview-src="previewSrc"
             :preview-disabled="!detailData.cover"
@@ -27,7 +29,12 @@ Sonora 增加的信息项，样式沿用其他信息项。 -->
             </template>
           </n-image>
           <!-- 封面背板 -->
-          <n-image class="cover-shadow" preview-disabled :src="coverSrc" />
+          <n-image
+            class="cover-shadow"
+            preview-disabled
+            object-fit="cover"
+            :src="coverSrc"
+          />
         </div>
         <div class="data">
           <n-h2 class="name text-hidden">
