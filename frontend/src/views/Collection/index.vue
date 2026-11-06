@@ -7,14 +7,6 @@
     </div>
     <ListError v-if="error" :error="error" @retry="load" />
     <n-tabs v-else v-model:value="tab" type="segment" animated>
-      <n-tab-pane name="playlists" tab="歌单">
-        <CoverList
-          :data="playlists"
-          type="playlist"
-          :loading="loading"
-          empty-description="还没有收藏歌单"
-        />
-      </n-tab-pane>
       <n-tab-pane name="albums" tab="专辑">
         <CoverList
           :data="albums"
@@ -30,6 +22,14 @@
           empty-description="还没有收藏歌手"
         />
       </n-tab-pane>
+      <n-tab-pane name="playlists" tab="歌单">
+        <CoverList
+          :data="playlists"
+          type="playlist"
+          :loading="loading"
+          empty-description="还没有收藏歌单"
+        />
+      </n-tab-pane>
     </n-tabs>
   </div>
 </template>
@@ -43,7 +43,7 @@ import ArtistList from "@/components/List/ArtistList.vue";
 import ListError from "@/components/List/ListError.vue";
 
 const userStore = useUserStore();
-const tab = ref("playlists");
+const tab = ref("albums");
 const playlists = computed<Playlist[]>(
   () => userStore.onlinePlaylists.collected,
 );
