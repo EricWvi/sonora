@@ -1,6 +1,6 @@
 import { ApiError, loginUrl, source } from "@/api/source";
 import { isOnline } from "@/utils/track";
-import type { Track } from "@/api/types";
+import type { OnlineListType, Track } from "@/api/types";
 import { useDataStore, useUserStore } from "@/stores";
 import { debounce, isFunction, type DebouncedFunc } from "lodash-es";
 
@@ -198,3 +198,33 @@ export const importSong = async (song: Track) => {
     loading.destroy();
   }
 };
+
+/**
+ * 在网易云上收藏或取消收藏歌单、专辑，关注或取消关注艺术家（照搬 SPlayer 的 toLikePlaylist、
+ * toLikeAlbum、toLikeArtist，提示文字相同）。服务端确认后才更新按钮状态；歌单重新读取，
+ * 侧边栏“我的收藏”随之更新。
+ */
+export const toSubscribeOnline: DebouncedFunc<
+  (type: OnlineListType, id: number, on: boolean) => Promise<void>
+> = debounce(
+  async (type: OnlineListType, id: number, on: boolean) => {
+    const thing = { playlist: "歌单", album: "专辑", artist: "歌手" }[type];
+    try {
+      await source.setOnlineSubscription(type, id, on);
+    } catch (error) {
+      reportWriteError(error, `${on ? "" : "取消"}收藏${thing}失败，请重试`);
+      return;
+    }
+    const userStore = useUserStore();
+    if (type === "playlist") {
+      await userStore.loadOnlinePlaylists();
+    } else {
+      const key = type === "album" ? "albums" : "artists";
+      const ids = userStore.onlineCollected[key].filter((item) => item !== id);
+      userStore.onlineCollected[key] = on ? [id, ...ids] : ids;
+    }
+    window.$message.success(`${on ? "" : "取消"}收藏${thing}成功`);
+  },
+  300,
+  { leading: true, trailing: false },
+);

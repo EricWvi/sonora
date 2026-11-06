@@ -614,3 +614,38 @@ func (s *server) setNeteaseLike(w http.ResponseWriter, r *http.Request) {
 	}
 	respondEmpty(w, r, nil)
 }
+
+// subscribeNeteaseAlbum collects (PUT) or uncollects (DELETE) an album on
+// NetEase, like SPlayer's album page.
+func (s *server) subscribeNeteaseAlbum(w http.ResponseWriter, r *http.Request) {
+	s.setNeteaseSubscription(w, r, s.opts.Netease.SubscribeAlbum)
+}
+
+// subscribeNeteasePlaylist collects (PUT) or uncollects (DELETE) someone
+// else's playlist on NetEase, like SPlayer's playlist page.
+func (s *server) subscribeNeteasePlaylist(w http.ResponseWriter, r *http.Request) {
+	s.setNeteaseSubscription(w, r, s.opts.Netease.SubscribePlaylist)
+}
+
+// followNeteaseArtist follows (PUT) or unfollows (DELETE) an artist on
+// NetEase, like SPlayer's artist page.
+func (s *server) followNeteaseArtist(w http.ResponseWriter, r *http.Request) {
+	s.setNeteaseSubscription(w, r, s.opts.Netease.FollowArtist)
+}
+
+func (s *server) setNeteaseSubscription(w http.ResponseWriter, r *http.Request,
+	set func(ctx context.Context, cookie string, id int64, on bool) error) {
+	id, ok := onlineID(w, r)
+	if !ok {
+		return
+	}
+	session, ok := s.neteaseSession(w, r)
+	if !ok {
+		return
+	}
+	if err := set(r.Context(), session.Cookie, id, r.Method == http.MethodPut); err != nil {
+		writeNeteaseError(w, r, err)
+		return
+	}
+	respondEmpty(w, r, nil)
+}

@@ -79,6 +79,12 @@ export interface DataSource {
   importOnlineAlbum(id: number): Promise<ImportJob>;
   importJobs(): Promise<ImportJob[]>;
   onlineLikeIds(): Promise<number[]>;
+  /** 在网易云上收藏或取消收藏歌单、专辑，关注或取消关注艺术家 */
+  setOnlineSubscription(
+    type: OnlineListType,
+    id: number,
+    on: boolean,
+  ): Promise<void>;
   onlineLike(id: number): Promise<void>;
   onlineUnlike(id: number): Promise<void>;
   tracks(query?: TrackQuery): Promise<Page<Track>>;
@@ -249,6 +255,8 @@ const httpSource: DataSource = {
   onlineLikeIds: async () =>
     (await get<{ ids: number[] }>("netease/likes/ids")).ids,
   onlineLike: (id) => send("PUT", `netease/likes/${id}`),
+  setOnlineSubscription: (type, id, on) =>
+    send(on ? "PUT" : "DELETE", `netease/${type}s/${id}/subscription`),
   onlineUnlike: (id) => send("DELETE", `netease/likes/${id}`),
   tracks: (query) => get("tracks", query),
   track: (id) => get(`tracks/${id}`),

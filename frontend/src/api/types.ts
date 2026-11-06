@@ -152,7 +152,12 @@ export interface NeteaseProfile {
 export interface NeteaseStatus {
   state: "disabled" | "signedOut" | "signedIn" | "expired" | "unavailable";
   profile: NeteaseProfile | null;
+  /** 网易云网页上歌曲、专辑、艺术家与歌单的地址模板，`{id}` 换成 ID；服务器没有配置网易云时没有 */
+  links?: Partial<Record<OnlineLinkType, string>>;
 }
+
+/** 有网页地址的在线内容。 */
+export type OnlineLinkType = "song" | "album" | "artist" | "playlist";
 
 /** 二维码登录的进度，`code` 为 800 过期、801 等待扫码、802 待确认、803 成功。 */
 export interface NeteaseQRState {

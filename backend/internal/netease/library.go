@@ -826,3 +826,39 @@ func (c *Client) AddToPlaylist(ctx context.Context, cookie string, id int64, son
 	}
 	return out.check()
 }
+
+// SubscribeAlbum collects or uncollects the album on the account.
+func (c *Client) SubscribeAlbum(ctx context.Context, cookie string, id int64, on bool) error {
+	return c.write(ctx, "/album/sub", cookie, url.Values{"id": {strconv.FormatInt(id, 10)}, "t": {subscribeFlag(on)}})
+}
+
+// FollowArtist follows or unfollows the artist on the account.
+func (c *Client) FollowArtist(ctx context.Context, cookie string, id int64, on bool) error {
+	return c.write(ctx, "/artist/sub", cookie, url.Values{"id": {strconv.FormatInt(id, 10)}, "t": {subscribeFlag(on)}})
+}
+
+// SubscribePlaylist collects or uncollects someone else's playlist on the
+// account.
+func (c *Client) SubscribePlaylist(ctx context.Context, cookie string, id int64, on bool) error {
+	return c.write(ctx, "/playlist/subscribe", cookie, url.Values{"id": {strconv.FormatInt(id, 10)}, "t": {subscribeFlag(on)}})
+}
+
+// subscribeFlag is the t of /album/sub, /artist/sub and /playlist/subscribe: 1 subscribes, any
+// other value unsubscribes, as SPlayer sends it.
+func subscribeFlag(on bool) string {
+	if on {
+		return "1"
+	}
+	return "0"
+}
+
+// Links are where NetEase shows a song, album, artist or playlist on the web,
+// with "{id}" for its ID. The player has no NetEase addresses of its own, so
+// it builds the share links and source pages from these. SPlayer's default
+// "web" format; its "mobile" format is not offered.
+var Links = map[string]string{
+	"song":     "https://music.163.com/#/song?id={id}",
+	"album":    "https://music.163.com/#/album?id={id}",
+	"artist":   "https://music.163.com/#/artist?id={id}",
+	"playlist": "https://music.163.com/#/playlist?id={id}",
+}

@@ -19,6 +19,11 @@ export const useUserStore = defineStore("sonora-user", () => {
     collected: [],
   });
   const onlineSignedIn = computed(() => netease.value.state === "signedIn");
+  /** 网易云上收藏的专辑与关注的艺术家，决定在线专辑页与艺术家页按钮的状态（同 SPlayer 的 userLikeData） */
+  const onlineCollected = ref<{ albums: number[]; artists: number[] }>({
+    albums: [],
+    artists: [],
+  });
 
   // 会话已失效：回到登录页。本浏览器已退出时停在退出页，否则 Authelia 会立即重新登录。
   function toLogin() {
@@ -43,13 +48,31 @@ export const useUserStore = defineStore("sonora-user", () => {
       ]);
       onlinePlaylists.value = lists;
       useDataStore().userLikeData.onlineSongs = likeIds;
+      void loadOnlineCollected();
     } catch (error) {
       if (!unauthorized(error)) console.error("❌ 读取网易云账号失败:", error);
     }
   }
 
+  /** 读取收藏的专辑与关注的艺术家。要翻页，所以不拖慢账号的载入。 */
+  async function loadOnlineCollected(): Promise<void> {
+    try {
+      const [albums, artists] = await Promise.all([
+        source.onlineAlbums(),
+        source.onlineArtists(),
+      ]);
+      onlineCollected.value = {
+        albums: albums.items.map((item) => item.id),
+        artists: artists.items.map((item) => item.id),
+      };
+    } catch (error) {
+      if (!unauthorized(error)) console.error("❌ 读取网易云收藏失败:", error);
+    }
+  }
+
   function clearOnline(): void {
     onlinePlaylists.value = { created: [], collected: [] };
+    onlineCollected.value = { albums: [], artists: [] };
     useDataStore().userLikeData.onlineSongs = [];
   }
 
@@ -111,6 +134,7 @@ export const useUserStore = defineStore("sonora-user", () => {
     netease,
     onlinePlaylists,
     onlineSignedIn,
+    onlineCollected,
     load,
     loadPlaylists,
     loadOnlinePlaylists,

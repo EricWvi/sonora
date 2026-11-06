@@ -1,5 +1,5 @@
 <!-- 专辑、歌单卡片的右键菜单。照搬 SPlayer components/Menu/CoverMenu.vue：查看详情、播放或暂停、
-复制名称与 ID；不迁入分享（Sonora 没有公开链接）、视频与电台。与 SPlayer 不同：在线专辑多“导入专辑到曲库”，
+复制名称与 ID，在线专辑与歌单的分享链接；本地的没有分享（没有公开链接），不迁入视频与电台。与 SPlayer 不同：在线专辑多“导入专辑到曲库”，
 只有可以导入的用户才有。 -->
 <template>
   <n-dropdown
@@ -23,6 +23,7 @@ import { renderIcon, copyData } from "@/utils/helper";
 import { useMusicStore, useStatusStore } from "@/stores";
 import { useUserStore } from "@/stores/user";
 import { importAlbum } from "@/utils/albumImport";
+import { copyShareLink } from "@/utils/onlineLink";
 
 const emit = defineEmits<{
   // 播放或暂停
@@ -102,6 +103,14 @@ const openDropdown = (
           label: `复制${typeName} ID`,
           props: { onClick: () => copyData(item.id) },
           icon: renderIcon("Copy", { size: 18 }),
+        },
+        {
+          key: "share",
+          label: `分享${typeName}链接`,
+          // 照搬 SPlayer；本地专辑、歌单没有公开链接
+          show: item.source === "online",
+          props: { onClick: () => copyShareLink(type, item.id) },
+          icon: renderIcon("Share", { size: 18 }),
         },
       ];
       // 显示菜单

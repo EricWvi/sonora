@@ -251,11 +251,13 @@ import { useTimeFormat } from "@/composables/useTimeFormat";
 import { useSwipe } from "@vueuse/core";
 import { copyData, coverLoaded, renderIcon } from "@/utils/helper";
 import {
+  openCopySongInfo,
   openAutoClose,
   openChangeRate,
   openJumpArtist,
   openPlaylistAdd,
 } from "@/utils/modal";
+import { copyShareLink } from "@/utils/onlineLink";
 import { removeBrackets } from "@/utils/format";
 import { useUserStore } from "@/stores/user";
 import { canImportSong, isOnline } from "@/utils/track";
@@ -319,6 +321,25 @@ const songMoreOptions = computed<DropdownOption[]>(() => {
             onClick: () => copyData(song.id),
           },
           icon: renderIcon("Copy", { size: 18 }),
+        },
+        {
+          key: "copy-song-info",
+          label: "复制更多信息",
+          show: isOnline(song),
+          props: {
+            onClick: () => openCopySongInfo(song),
+          },
+          icon: renderIcon("FormatList", { size: 18 }),
+        },
+        {
+          key: "share",
+          label: "分享歌曲链接",
+          show: isOnline(song),
+          props: {
+            onClick: () =>
+              copyShareLink("song", song.id, "已复制分享链接到剪切板"),
+          },
+          icon: renderIcon("Share", { size: 18 }),
         },
       ],
     },

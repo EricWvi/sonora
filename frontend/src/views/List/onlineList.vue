@@ -1,5 +1,5 @@
 <!-- 在线歌单、专辑与艺术家的详情，共用一页：视觉与本地的详情页相同，都是 ListDetail 加 SongList，
-数据来自网易云。与 SPlayer 不同：不迁入评论、收藏与分享；在线专辑的“更多”是“导入专辑到曲库”（可以导入的用户才有）；艺术家页是“歌曲（热门）/ 专辑”两个标签，
+数据来自网易云。与 SPlayer 不同：不迁入评论、收藏与分享；头部按钮与“更多”照搬 SPlayer 的歌单、专辑与艺术家页（专辑另有“导入专辑到曲库”）；艺术家页是“歌曲（热门）/ 专辑”两个标签，
 没有视频标签与全部歌曲（SPlayer 的“全部歌曲”另有页面）。 -->
 <template>
   <div :class="['online-list', { 'with-tabs': isArtist && !error }]">
@@ -16,7 +16,37 @@
       :more-options="moreOptions"
       @update:search-value="handleSearchUpdate"
       @play-all="playAllSongs"
-    />
+    >
+      <!-- 照搬 SPlayer：自己创建的歌单是“编辑歌单”，其他歌单是“收藏歌单”；专辑页“收藏专辑”，艺术家页“关注歌手” -->
+      <template #action-buttons>
+        <n-button
+          v-if="ownPlaylist"
+          :focusable="false"
+          strong
+          secondary
+          round
+          @click="editPlaylist"
+        >
+          <template #icon>
+            <SvgIcon name="EditNote" />
+          </template>
+          编辑歌单
+        </n-button>
+        <n-button
+          v-else
+          :focusable="false"
+          strong
+          secondary
+          round
+          @click="toSubscribeOnline(listType, listIdNumber, !subscribed)"
+        >
+          <template #icon>
+            <SvgIcon :name="subscribed ? 'Favorite' : 'FavoriteBorder'" />
+          </template>
+          {{ subscribeText }}
+        </n-button>
+      </template>
+    </ListDetail>
     <ListError v-if="error" :error="error" @retry="load" />
     <!-- 标签照搬本地艺术家页 -->
     <n-tabs
@@ -89,6 +119,9 @@ import { useUserStore } from "@/stores/user";
 import { listKey } from "@/utils/track";
 import { renderIcon } from "@/utils/helper";
 import { importAlbum } from "@/utils/albumImport";
+import { copyShareLink, openSourcePage } from "@/utils/onlineLink";
+import { openBatchList, openUpdatePlaylist } from "@/utils/modal";
+import { deletePlaylist, toSubscribeOnline } from "@/utils/auth";
 import type { DropdownOption } from "naive-ui";
 import CoverList from "@/components/List/CoverList.vue";
 import ListDetail from "@/components/List/ListDetail.vue";
@@ -131,19 +164,90 @@ const listConfig = {
   searchAlign: "center" as const,
 };
 
-// 在线专辑的“更多”只有导入（Sonora 新增，SPlayer 没有），组外成员没有这个按钮
-const moreOptions = computed<DropdownOption[]>(() =>
-  listType.value === "album" && userStore.user?.canImport
-    ? [
-        {
-          label: "导入专辑到曲库",
-          key: "import-album",
-          props: { onClick: () => importAlbum(Number(route.query.id)) },
-          icon: renderIcon("Download"),
-        },
-      ]
-    : [],
+// 收藏与关注写入网易云；状态按收藏的歌单、专辑与关注的艺术家判断（同 SPlayer）
+const listIdNumber = computed(() => Number(route.query.id));
+const ownPlaylist = computed(
+  () =>
+    listType.value === "playlist" &&
+    userStore.onlinePlaylists.created.some(
+      (item) => item.id === listIdNumber.value,
+    ),
 );
+const subscribed = computed(() => {
+  const id = listIdNumber.value;
+  switch (listType.value) {
+    case "album":
+      return userStore.onlineCollected.albums.includes(id);
+    case "artist":
+      return userStore.onlineCollected.artists.includes(id);
+    default:
+      return userStore.onlinePlaylists.collected.some((item) => item.id === id);
+  }
+});
+const subscribeText = computed(() => {
+  if (listType.value === "artist")
+    return subscribed.value ? "取消关注" : "关注歌手";
+  if (subscribed.value) return "取消收藏";
+  return listType.value === "album" ? "收藏专辑" : "收藏歌单";
+});
+
+// 编辑与删除复用侧边栏的弹窗与确认；编辑后头部按刷新后的歌单列表更新（见下面的 watch）
+const editPlaylist = () => {
+  const detail = detailData.value;
+  if (!detail) return;
+  void openUpdatePlaylist(
+    detail.id,
+    { name: detail.name, description: detail.description },
+    async () => {},
+    true,
+  );
+};
+
+// “更多”照搬 SPlayer：删除歌单（自己创建的）、批量操作、复制分享链接、打开源页面。
+// 不做“刷新缓存”（在线列表不缓存）与“公开隐私歌单”；批量操作没有“删除选中的歌曲”
+// （Sonora 不从网易云歌单中删歌）。艺术家页的批量操作只在歌曲标签下。
+// 专辑另有“导入专辑到曲库”（Sonora 新增，可以导入的用户才有）。
+const moreOptions = computed<DropdownOption[]>(() => {
+  const type = listType.value;
+  const id = listIdNumber.value;
+  return [
+    {
+      label: "删除歌单",
+      key: "delete",
+      show: ownPlaylist.value,
+      props: {
+        onClick: () => deletePlaylist(id, () => router.back(), true),
+      },
+      icon: renderIcon("Delete"),
+    },
+    {
+      label: "批量操作",
+      key: "batch",
+      show: type !== "artist" || artistTab.value === "songs",
+      props: { onClick: () => openBatchList(displayData.value) },
+      icon: renderIcon("Batch"),
+    },
+    {
+      label: "复制分享链接",
+      key: "copy",
+      props: { onClick: () => copyShareLink(type, id) },
+      icon: renderIcon("Share"),
+    },
+    {
+      label: "打开源页面",
+      key: "open",
+      props: { onClick: () => openSourcePage(type, id) },
+      icon: renderIcon("Link"),
+    },
+    {
+      label: "导入专辑到曲库",
+      key: "import-album",
+      show: type === "album" && !!userStore.user?.canImport,
+      props: { onClick: () => importAlbum(id) },
+      icon: renderIcon("Download"),
+    },
+  ];
+});
 
 const listType = computed(
   () => (route.query.type as OnlineListType | undefined) ?? "playlist",

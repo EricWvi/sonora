@@ -164,6 +164,23 @@ export const openOnlineLogin = async () => {
 };
 
 /**
+ * 歌曲详情复制（照搬 SPlayer 的 openCopySongInfo），只用于在线歌曲
+ * @param song 在线歌曲
+ */
+export const openCopySongInfo = async (song: Track) => {
+  const { default: CopySongInfo } =
+    await import("@/components/Modal/CopySongInfo.vue");
+  window.$modal.create({
+    preset: "card",
+    transformOrigin: "center",
+    autoFocus: false,
+    style: { width: "500px" },
+    title: "歌曲详情复制",
+    content: () => h(CopySongInfo, { song }),
+  });
+};
+
+/**
  * 开启批量操作（照搬 SPlayer 的 openBatchList；参数按 Sonora 的操作调整，见 BatchList.vue）
  * @param data 歌曲列表
  * @param options.playlistId 用户歌单 ID，提供“删除选中的歌曲”

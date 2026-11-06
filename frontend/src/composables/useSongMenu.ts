@@ -10,7 +10,12 @@ import type { Track } from "@/api/types";
 import { useMusicStore, useSettingStore, useUserStore } from "@/stores";
 import { usePlayerController } from "@/core/player/PlayerController";
 import { renderIcon, copyData } from "@/utils/helper";
-import { openJumpArtist, openPlaylistAdd } from "@/utils/modal";
+import {
+  openCopySongInfo,
+  openJumpArtist,
+  openPlaylistAdd,
+} from "@/utils/modal";
+import { copyShareLink } from "@/utils/onlineLink";
 import { deleteSongs, importSong } from "@/utils/auth";
 
 /**
@@ -102,6 +107,35 @@ export const useSongMenu = () => {
               onClick: () => copyData(song.title),
             },
             icon: renderIcon("Copy", { size: 18 }),
+          },
+          // 在线歌曲按 SPlayer 补齐（Eric，2026-11-06）；本地歌曲的 ID 对听众没有用，保持现状
+          {
+            key: "code-id",
+            label: "复制歌曲 ID",
+            show: isOnline(song),
+            props: {
+              onClick: () => copyData(song.id),
+            },
+            icon: renderIcon("Copy", { size: 18 }),
+          },
+          {
+            key: "copy-song-info",
+            label: "复制更多信息",
+            show: isOnline(song),
+            props: {
+              onClick: () => openCopySongInfo(song),
+            },
+            icon: renderIcon("FormatList", { size: 18 }),
+          },
+          {
+            key: "share",
+            label: "分享歌曲链接",
+            show: isOnline(song),
+            props: {
+              onClick: () =>
+                copyShareLink("song", song.id, "已复制分享链接到剪切板"),
+            },
+            icon: renderIcon("Share", { size: 18 }),
           },
         ],
       },

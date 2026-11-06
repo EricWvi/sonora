@@ -35,6 +35,8 @@ const (
 type neteaseStatus struct {
 	State   string           `json:"state"`
 	Profile *netease.Profile `json:"profile"`
+	// Links are netease.Links whenever NetEase is configured.
+	Links map[string]string `json:"links"`
 }
 
 func (s *server) registerNetease(private *http.ServeMux) {
@@ -58,6 +60,12 @@ func (s *server) registerNetease(private *http.ServeMux) {
 	private.HandleFunc("GET "+p+"artists", s.listNeteaseArtists)
 	private.HandleFunc("GET "+p+"artists/{id}", s.getNeteaseArtist)
 	private.HandleFunc("GET "+p+"artists/{id}/albums", s.listNeteaseArtistAlbums)
+	private.HandleFunc("PUT "+p+"albums/{id}/subscription", s.subscribeNeteaseAlbum)
+	private.HandleFunc("DELETE "+p+"albums/{id}/subscription", s.subscribeNeteaseAlbum)
+	private.HandleFunc("PUT "+p+"playlists/{id}/subscription", s.subscribeNeteasePlaylist)
+	private.HandleFunc("DELETE "+p+"playlists/{id}/subscription", s.subscribeNeteasePlaylist)
+	private.HandleFunc("PUT "+p+"artists/{id}/subscription", s.followNeteaseArtist)
+	private.HandleFunc("DELETE "+p+"artists/{id}/subscription", s.followNeteaseArtist)
 	private.HandleFunc("GET "+p+"recommend/songs", s.listNeteaseDailySongs)
 	private.HandleFunc("GET "+p+"songs/{id}/url", s.getNeteaseSongURL)
 	private.HandleFunc("GET "+p+"songs/{id}/lyrics", s.getNeteaseLyrics)
@@ -123,6 +131,9 @@ func (s *server) neteaseSession(w http.ResponseWriter, r *http.Request) (store.N
 
 func (s *server) getNeteaseStatus(w http.ResponseWriter, r *http.Request) {
 	status, err := s.neteaseStatus(r.Context(), auth.User(r.Context()).ID)
+	if status.State != neteaseDisabled {
+		status.Links = netease.Links
+	}
 	respond(w, r, status, err)
 }
 

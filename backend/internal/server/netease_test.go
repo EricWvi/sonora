@@ -153,6 +153,13 @@ func newFakeNetease(t *testing.T) *fakeNetease {
 				return
 			}
 			w.Write([]byte(`{"code":200,"id":103,"playlist":{"id":103,"name":"` + r.PostForm.Get("name") + `","trackCount":0}}`))
+		case "/album/sub", "/artist/sub", "/playlist/subscribe":
+			f.writes = append(f.writes, r.URL.Path+" "+r.PostForm.Get("id")+" "+r.PostForm.Get("t"))
+			if r.PostForm.Get("id") == "500" {
+				w.Write([]byte(`{"code":400,"message":"操作失败"}`))
+				return
+			}
+			w.Write([]byte(`{"code":200}`))
 		case "/playlist/name/update":
 			f.writes = append(f.writes, "name "+r.PostForm.Get("id")+" "+r.PostForm.Get("name"))
 			w.Write([]byte(`{"code":200}`))
@@ -991,5 +998,42 @@ func TestNeteaseImportRefusals(t *testing.T) {
 		if rec.Code != want {
 			t.Errorf("%s: %d %s", path, rec.Code, rec.Body)
 		}
+	}
+}
+
+func TestNeteaseSubscriptions(t *testing.T) {
+	ts, f, _ := mixedFixture(t)
+	if rec := ts.do("PUT", playerAPI+"netease/albums/7/subscription", ""); rec.Code != http.StatusForbidden {
+		t.Fatalf("signed out: %d %s", rec.Code, rec.Body)
+	}
+	signInNetease(t, ts, f)
+	for _, req := range [][2]string{
+		{"PUT", "albums/7"}, {"DELETE", "albums/7"}, {"PUT", "artists/5"}, {"DELETE", "artists/5"},
+		{"PUT", "playlists/102"}, {"DELETE", "playlists/102"},
+	} {
+		if rec := ts.do(req[0], playerAPI+"netease/"+req[1]+"/subscription", ""); rec.Code != http.StatusNoContent {
+			t.Fatalf("%s %s: %d %s", req[0], req[1], rec.Code, rec.Body)
+		}
+	}
+	want := []string{"/album/sub 7 1", "/album/sub 7 0", "/artist/sub 5 1", "/artist/sub 5 0",
+		"/playlist/subscribe 102 1", "/playlist/subscribe 102 0"}
+	if !slices.Equal(f.writes, want) {
+		t.Fatalf("writes: %q", f.writes)
+	}
+	rec := ts.do("PUT", playerAPI+"netease/albums/500/subscription", "")
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "操作失败") {
+		t.Fatalf("refused: %d %s", rec.Code, rec.Body)
+	}
+	status := neteaseState(t, ts)
+	if status.Links["album"] != "https://music.163.com/#/album?id={id}" || len(status.Links) != 4 {
+		t.Fatalf("links: %v", status.Links)
+	}
+}
+
+func TestNeteaseDisabledHasNoLinks(t *testing.T) {
+	ts := newTest(t)
+	ts.signIn("alice", "Alice")
+	if rec := ts.do("GET", playerAPI+"netease/status", ""); rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), "music.163.com") {
+		t.Fatalf("status: %s", rec.Body)
 	}
 }

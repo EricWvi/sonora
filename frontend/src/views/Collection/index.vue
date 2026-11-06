@@ -62,6 +62,11 @@ const load = async () => {
     ]);
     albums.value = albumPage.items;
     artists.value = artistPage.items;
+    // 顺带更新专辑页与艺术家页按钮的状态
+    userStore.onlineCollected = {
+      albums: albumPage.items.map((item) => item.id),
+      artists: artistPage.items.map((item) => item.id),
+    };
   } catch (e) {
     error.value = e instanceof ApiError ? e.message : "加载失败";
   } finally {

@@ -453,6 +453,7 @@ function librarySource(lib: Library): DataSource {
     importOnlineAlbum: () => Promise.reject(new ApiError(503, "没有配置")),
     importJobs: () => reply(() => []),
     onlineLikeIds: () => reply(() => []),
+    setOnlineSubscription: () => Promise.reject(new ApiError(503, "没有配置")),
     onlineLike: () => reply(() => undefined),
     onlineUnlike: () => reply(() => undefined),
     tracks: (query = {}) =>
