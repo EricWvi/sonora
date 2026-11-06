@@ -86,7 +86,11 @@
       </div>
     </div>
     <!-- 空列表 -->
-    <n-empty v-else description="空空如也，怎么什么都没有啊" size="large" />
+    <n-empty
+      v-else
+      :description="emptyDescription || '空空如也，怎么什么都没有啊'"
+      size="large"
+    />
   </Transition>
 </template>
 
@@ -103,6 +107,7 @@ const props = defineProps<{
   loading?: boolean;
   loadingText?: string;
   hiddenCover?: boolean;
+  emptyDescription?: string;
 }>();
 
 const emit = defineEmits<{

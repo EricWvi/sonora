@@ -24,12 +24,10 @@
         />
       </n-tab-pane>
       <n-tab-pane name="artists" tab="歌手">
-        <ArtistList :data="artists" :loading="loading" />
-        <n-empty
-          v-if="!loading && !artists.length"
-          description="还没有收藏歌手"
-          style="margin-top: 60px"
-          size="large"
+        <ArtistList
+          :data="artists"
+          :loading="loading"
+          empty-description="还没有收藏歌手"
         />
       </n-tab-pane>
     </n-tabs>
