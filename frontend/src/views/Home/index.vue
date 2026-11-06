@@ -1,8 +1,9 @@
 <!-- 首页。问候语照搬 SPlayer views/Home/index.vue；快捷入口沿用 SPlayer 首页的 SongListCard，
-栏目沿用 HomeOnline 的标题与列表。内容按阶段 2：快捷入口（我喜欢的音乐、歌曲）、
+栏目沿用 HomeOnline 的标题与列表。内容：快捷入口（每日推荐、我喜欢的音乐）、
 “最近添加的歌曲”、“最近添加的专辑”、“最近播放”；栏目的显示与顺序由 homePageSections
-设置决定。登录网易云后快捷入口是每日推荐与我喜欢的音乐，“每日推荐”卡片照搬 HomeOnline；
-与 SPlayer 不同：两张卡片左右并排（SPlayer 上下叠放，右边是私人 FM）。 -->
+设置决定。“每日推荐”卡片照搬 HomeOnline；与 SPlayer 不同：两张卡片左右并排（SPlayer
+上下叠放，右边是私人 FM）；卡片固定显示，账号是页面载入后才读到的，按登录状态切换卡片会闪动，
+没有歌曲时用默认封面，没有登录网易云时点开每日推荐，在该页提示登录。 -->
 <template>
   <div class="home">
     <div v-if="settingStore.showHomeGreeting" class="welcome">
@@ -13,8 +14,8 @@
     <div class="main-rec">
       <div class="main-rec-grid">
         <SongListCard
-          v-if="userStore.onlineSignedIn"
           :data="dailySongs"
+          :cover="dailySongs.length ? undefined : defaultCovers.song"
           :title="dailySongsTitle"
           :height="90"
           description="根据你的音乐口味 · 每日更新"
@@ -24,22 +25,13 @@
         />
         <SongListCard
           :data="likedSongs"
+          :cover="likedSongs.length ? undefined : defaultCovers.song"
           :height="90"
           title="我喜欢的音乐"
           description="发现你独特的音乐品味"
           size="small"
           :hiddenCover="settingStore.hiddenCovers.home"
           @click="router.push({ name: 'like-songs' })"
-        />
-        <SongListCard
-          v-if="!userStore.onlineSignedIn"
-          :data="librarySongs"
-          :height="90"
-          title="歌曲"
-          :description="`曲库中的 ${libraryTotal} 首歌曲`"
-          size="small"
-          :hiddenCover="settingStore.hiddenCovers.home"
-          @click="router.push({ name: 'songs' })"
         />
       </div>
     </div>
@@ -88,6 +80,7 @@
 import type { Album, Track } from "@/api/types";
 import { ApiError, source } from "@/api/source";
 import { useSettingStore, useUserStore } from "@/stores";
+import { defaultCovers } from "@/utils/cover";
 import { getGreeting } from "@/utils/time";
 import SvgIcon from "@/components/Global/SvgIcon.vue";
 import { NText } from "naive-ui";
@@ -137,8 +130,6 @@ watch(() => userStore.onlineSignedIn, getDailySongs);
 
 // 首页数据
 const likedSongs = shallowRef<Track[]>([]);
-const librarySongs = shallowRef<Track[]>([]);
-const libraryTotal = ref<number>(0);
 const newSongs = shallowRef<Track[]>([]);
 const recentAlbums = shallowRef<Album[]>([]);
 const recentSongs = shallowRef<Track[]>([]);
@@ -167,8 +158,8 @@ const getHomeData = async () => {
   try {
     const [likes, songs, albums, history] = await Promise.all([
       source.mixedLikes({ limit: 50 }),
-      // 默认新入库在前，“最近添加的歌曲”取前 12 首
-      source.tracks({ limit: 50 }),
+      // 默认新入库在前
+      source.tracks({ limit: 12 }),
       // 与 SPlayer 不同：最近添加的专辑不含标记为单曲的专辑
       source.albums({
         sort: "createTime",
@@ -179,9 +170,7 @@ const getHomeData = async () => {
       source.mixedHistory({ limit: 10 }),
     ]);
     likedSongs.value = likes.items;
-    librarySongs.value = songs.items;
-    libraryTotal.value = songs.total;
-    newSongs.value = songs.items.slice(0, 12);
+    newSongs.value = songs.items;
     recentAlbums.value = albums.items;
     recentSongs.value = history.items.map((entry) => entry.track);
   } catch (e) {
