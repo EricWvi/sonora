@@ -107,6 +107,16 @@ func newFakeNetease(t *testing.T) *fakeNetease {
 				privileges = append(privileges, `{"id":`+id+`,"st":`+st+`}`)
 			}
 			w.Write([]byte(`{"code":200,"songs":[` + strings.Join(songs, ",") + `],"privileges":[` + strings.Join(privileges, ",") + `]}`))
+		case "/recommend/songs":
+			if f.expired {
+				w.Write([]byte(`{"code":301,"msg":"需要登录"}`))
+				return
+			}
+			w.Write([]byte(`{"code":200,"data":{"dailySongs":[
+				{"id":11,"name":"daily","ar":[{"id":5,"name":"A"}],"dt":1000,
+				 "al":{"id":6,"name":"Al","picUrl":"http://p1/11.jpg"},"privilege":{"st":0}},
+				{"id":12,"name":"blocked","ar":[{"id":5,"name":"A"}],"dt":1000,
+				 "al":{"id":6,"name":"Al","picUrl":"http://p1/12.jpg"},"privilege":{"st":-200}}]}}`))
 		case "/song/url/v1":
 			switch id := r.PostForm.Get("id"); {
 			case f.cdn != nil && id == "790":
@@ -421,6 +431,32 @@ func TestNeteaseCollections(t *testing.T) {
 	f.expired = true
 	rec = ts.do("GET", playerAPI+"netease/playlists", "")
 	if rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), "netease_expired") {
+		t.Fatalf("expired: %d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestNeteaseDailySongs(t *testing.T) {
+	ts, f, _ := mixedFixture(t)
+	path := playerAPI + "netease/recommend/songs"
+	if rec := ts.do("GET", path, ""); rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), "netease_signed_out") {
+		t.Fatalf("signed out: %d %s", rec.Code, rec.Body)
+	}
+	signInNetease(t, ts, f)
+
+	rec := ts.do("GET", path, "")
+	page := decodeBody[struct {
+		Items []netease.Song `json:"items"`
+		Total int            `json:"total"`
+	}](t, rec)
+	if page.Total != 2 || len(page.Items) != 2 || page.Items[0].Title != "daily" || page.Items[0].Cover.URL != "https://p1/11.jpg" {
+		t.Fatalf("daily songs: %s", rec.Body)
+	}
+	if !page.Items[0].Playable || page.Items[1].Playable {
+		t.Fatalf("playable: %s", rec.Body)
+	}
+
+	f.expired = true
+	if rec := ts.do("GET", path, ""); rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), "netease_expired") {
 		t.Fatalf("expired: %d %s", rec.Code, rec.Body)
 	}
 }

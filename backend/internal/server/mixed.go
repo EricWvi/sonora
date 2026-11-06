@@ -520,6 +520,19 @@ func (s *server) listNeteaseAlbums(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, map[string]any{"items": albums, "total": len(albums)}, nil)
 }
 
+func (s *server) listNeteaseDailySongs(w http.ResponseWriter, r *http.Request) {
+	session, ok := s.neteaseSession(w, r)
+	if !ok {
+		return
+	}
+	songs, err := s.opts.Netease.DailySongs(r.Context(), session.Cookie)
+	if err != nil {
+		writeNeteaseError(w, r, err)
+		return
+	}
+	respond(w, r, map[string]any{"items": songs, "total": len(songs)}, nil)
+}
+
 func (s *server) listNeteaseArtists(w http.ResponseWriter, r *http.Request) {
 	session, ok := s.neteaseSession(w, r)
 	if !ok {

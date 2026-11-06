@@ -588,6 +588,24 @@ func (c *Client) ArtistSongs(ctx context.Context, cookie string, id int64) (Play
 }
 
 // ArtistAlbums returns a page of the artist's albums and how many there are.
+// DailySongs returns the account's daily recommendations; NetEase renews them
+// at 6:00.
+func (c *Client) DailySongs(ctx context.Context, cookie string) ([]Song, error) {
+	var out struct {
+		Data struct {
+			DailySongs []apiSong `json:"dailySongs"`
+		} `json:"data"`
+	}
+	if err := c.call(ctx, "/recommend/songs", cookie, url.Values{}, &out); err != nil {
+		return nil, err
+	}
+	songs := make([]Song, 0, len(out.Data.DailySongs))
+	for _, s := range out.Data.DailySongs {
+		songs = append(songs, s.listed())
+	}
+	return songs, nil
+}
+
 func (c *Client) ArtistAlbums(ctx context.Context, cookie string, id int64, offset, limit int) ([]Album, int, error) {
 	var out struct {
 		Artist *struct {

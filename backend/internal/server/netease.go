@@ -55,6 +55,7 @@ func (s *server) registerNetease(private *http.ServeMux) {
 	private.HandleFunc("GET "+p+"artists", s.listNeteaseArtists)
 	private.HandleFunc("GET "+p+"artists/{id}", s.getNeteaseArtist)
 	private.HandleFunc("GET "+p+"artists/{id}/albums", s.listNeteaseArtistAlbums)
+	private.HandleFunc("GET "+p+"recommend/songs", s.listNeteaseDailySongs)
 	private.HandleFunc("GET "+p+"songs/{id}/url", s.getNeteaseSongURL)
 	private.HandleFunc("GET "+p+"songs/{id}/lyrics", s.getNeteaseLyrics)
 	private.HandleFunc("POST "+p+"songs/{id}/import", s.importNeteaseSong)

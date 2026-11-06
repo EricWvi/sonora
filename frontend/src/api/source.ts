@@ -53,6 +53,7 @@ export interface DataSource {
   onlinePlaylists(): Promise<{ created: Playlist[]; collected: Playlist[] }>;
   onlineAlbums(): Promise<Page<Album>>;
   onlineArtists(): Promise<Page<Artist>>;
+  onlineDailySongs(): Promise<Page<Track>>;
   onlineList(type: OnlineListType, id: number): Promise<OnlineList>;
   onlineArtistAlbums(
     id: number,
@@ -223,6 +224,7 @@ const httpSource: DataSource = {
   onlinePlaylists: () => get("netease/playlists"),
   onlineAlbums: () => get("netease/albums"),
   onlineArtists: () => get("netease/artists"),
+  onlineDailySongs: () => get("netease/recommend/songs"),
   onlineList: (type, id) => get(`netease/${type}s/${id}`),
   onlineArtistAlbums: (id, query) => get(`netease/artists/${id}/albums`, query),
   createOnlinePlaylist: (input) => write("POST", "netease/playlists", input),

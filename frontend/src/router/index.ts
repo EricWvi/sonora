@@ -64,6 +64,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: "我喜欢的音乐" },
   },
   {
+    path: "/daily-songs",
+    name: "daily-songs",
+    component: () => import("@/views/DailySongs.vue"),
+    meta: { title: "每日推荐" },
+  },
+  {
     path: "/collection",
     name: "collection",
     component: () => import("@/views/Collection/index.vue"),

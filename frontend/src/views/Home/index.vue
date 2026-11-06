@@ -1,7 +1,8 @@
 <!-- 首页。问候语照搬 SPlayer views/Home/index.vue；快捷入口沿用 SPlayer 首页的 SongListCard，
 栏目沿用 HomeOnline 的标题与列表。内容按阶段 2：快捷入口（我喜欢的音乐、歌曲）、
 “最近添加的歌曲”、“最近添加的专辑”、“最近播放”；栏目的显示与顺序由 homePageSections
-设置决定。 -->
+设置决定。登录网易云后快捷入口是每日推荐与我喜欢的音乐，“每日推荐”卡片照搬 HomeOnline；
+与 SPlayer 不同：两张卡片左右并排（SPlayer 上下叠放，右边是私人 FM）。 -->
 <template>
   <div class="home">
     <div v-if="settingStore.showHomeGreeting" class="welcome">
@@ -12,6 +13,16 @@
     <div class="main-rec">
       <div class="main-rec-grid">
         <SongListCard
+          v-if="userStore.onlineSignedIn"
+          :data="dailySongs"
+          :title="dailySongsTitle"
+          :height="90"
+          description="根据你的音乐口味 · 每日更新"
+          size="small"
+          :hiddenCover="settingStore.hiddenCovers.home"
+          @click="router.push({ name: 'daily-songs' })"
+        />
+        <SongListCard
           :data="likedSongs"
           :height="90"
           title="我喜欢的音乐"
@@ -21,6 +32,7 @@
           @click="router.push({ name: 'like-songs' })"
         />
         <SongListCard
+          v-if="!userStore.onlineSignedIn"
           :data="librarySongs"
           :height="90"
           title="歌曲"
@@ -77,6 +89,8 @@ import type { Album, Track } from "@/api/types";
 import { ApiError, source } from "@/api/source";
 import { useSettingStore, useUserStore } from "@/stores";
 import { getGreeting } from "@/utils/time";
+import SvgIcon from "@/components/Global/SvgIcon.vue";
+import { NText } from "naive-ui";
 import SongListCard from "@/components/Card/SongListCard.vue";
 import CoverList from "@/components/List/CoverList.vue";
 import SongList from "@/components/List/SongList.vue";
@@ -92,6 +106,34 @@ const greetings = computed(() => {
   const name = userStore.user?.name ?? "";
   return name ? `${greeting}，${name}` : greeting;
 });
+
+// 日推标题：照搬 SPlayer HomeOnline，日历图标里是今天的日期
+const dailySongsTitle = computed(() => {
+  if (settingStore.hiddenCovers.home) return "每日推荐";
+  return h("div", { class: "date" }, [
+    h("div", { class: "date-icon" }, [
+      h(SvgIcon, { name: "Calendar-Empty", size: 30, depth: 2 }),
+      h(NText, null, () => new Date().getDate()),
+    ]),
+    h(NText, { class: "name text-hidden" }, () => "每日推荐"),
+  ]);
+});
+
+// 每日推荐：单独读取，接口服务慢或失败时不影响首页其他内容，卡片只是没有封面
+const dailySongs = shallowRef<Track[]>([]);
+const getDailySongs = async () => {
+  if (!userStore.onlineSignedIn) {
+    dailySongs.value = [];
+    return;
+  }
+  try {
+    dailySongs.value = (await source.onlineDailySongs()).items;
+  } catch (e) {
+    console.error("获取每日推荐失败：", e);
+  }
+};
+// 网易云账号是页面载入后才读到的
+watch(() => userStore.onlineSignedIn, getDailySongs);
 
 // 首页数据
 const likedSongs = shallowRef<Track[]>([]);
@@ -152,10 +194,16 @@ const getHomeData = async () => {
 // 每次进入都重新读取；keep-alive 首次激活与挂载同时发生，跳过
 const isActivated = ref<boolean>(false);
 onActivated(() => {
-  if (isActivated.value) getHomeData();
+  if (isActivated.value) {
+    getHomeData();
+    getDailySongs();
+  }
   isActivated.value = true;
 });
-onMounted(getHomeData);
+onMounted(() => {
+  getHomeData();
+  getDailySongs();
+});
 </script>
 
 <style lang="scss" scoped>
@@ -177,6 +225,31 @@ onMounted(getHomeData);
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 20px;
+  }
+  // 卡片标题由渲染函数生成，要用 :deep
+  :deep(.date) {
+    display: flex;
+    align-items: center;
+    margin-bottom: 4px;
+    .date-icon {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 4px;
+      .n-text {
+        position: absolute;
+        font-size: 12px;
+        color: var(--primary-hex);
+        line-height: normal;
+        margin-top: 4px;
+        transform: scale(0.8);
+      }
+    }
+    .name {
+      font-size: 18px;
+      font-weight: bold;
+    }
   }
 }
 .title {

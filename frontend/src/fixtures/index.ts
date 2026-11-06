@@ -439,6 +439,7 @@ function librarySource(lib: Library): DataSource {
     onlinePlaylists: () => reply(() => ({ created: [], collected: [] })),
     onlineAlbums: () => reply(() => ({ items: [], total: 0 })),
     onlineArtists: () => reply(() => ({ items: [], total: 0 })),
+    onlineDailySongs: () => reply(() => ({ items: [], total: 0 })),
     onlineList: () => Promise.reject(new ApiError(503, "没有配置")),
     onlineArtistAlbums: () => reply(() => ({ items: [], total: 0 })),
     createOnlinePlaylist: () => Promise.reject(new ApiError(503, "没有配置")),
