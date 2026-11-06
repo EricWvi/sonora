@@ -100,6 +100,10 @@ func writeNeteaseError(w http.ResponseWriter, r *http.Request, err error) {
 		slog.Warn("netease api", "path", r.URL.Path, "err", err)
 		admin.WriteError(w, http.StatusBadGateway, "netease_unavailable", "网易云接口服务不可用，请稍后重试")
 		return
+	case errors.Is(err, netease.ErrThrottled):
+		slog.Warn("netease api", "path", r.URL.Path, "err", err)
+		admin.WriteError(w, http.StatusTooManyRequests, "netease_throttled", "网易云请求过于频繁，请稍后再试")
+		return
 	case errors.Is(err, netease.ErrExpired):
 		admin.WriteError(w, http.StatusForbidden, "netease_expired", "网易云登录已失效，请重新登录")
 		return

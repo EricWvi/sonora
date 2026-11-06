@@ -161,3 +161,25 @@ func TestAlbumForImport(t *testing.T) {
 		}
 	}
 }
+
+// The service passes NetEase's code on as the HTTP status, and -460, which is
+// no HTTP status, as 400.
+func TestThrottledCodes(t *testing.T) {
+	for _, tt := range []struct {
+		status int
+		body   string
+	}{
+		{405, `{"code":405,"message":"操作频繁，请稍候再试"}`},
+		{400, `{"code":-460,"message":"Cheating"}`},
+	} {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(tt.status)
+			w.Write([]byte(tt.body))
+		}))
+		_, err := New(srv.URL).SongFile(context.Background(), "MUSIC_U=x", 1)
+		srv.Close()
+		if !errors.Is(err, ErrThrottled) {
+			t.Errorf("%s: %v", tt.body, err)
+		}
+	}
+}

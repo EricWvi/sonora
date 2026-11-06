@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"sonora/internal/admin"
 	"sonora/internal/auth"
@@ -30,6 +31,12 @@ const (
 	// session expired; Error says why.
 	importFailed = "failed"
 )
+
+// albumImportGap is the least time between two songs an album import fetches
+// from NetEase (Eric, 2026-11-07). It counts from the last fetch, so songs
+// that fetch nothing, being in the library already or not playable, wait at
+// most once after one that did. Tests shorten it.
+var albumImportGap = 5 * time.Second
 
 // keepFinishedImports is how many finished jobs the server remembers, so that
 // a listener who reloads the page still learns how theirs went.
@@ -69,6 +76,9 @@ type importQueue struct {
 	jobs    []*importJob
 	lastID  int64
 	running bool
+	// lastFetch is when the worker last fetched a song from NetEase. Only
+	// the worker uses it, and workers run one after another.
+	lastFetch time.Time
 }
 
 // add queues an import of album for user, or returns the one of theirs
@@ -336,6 +346,8 @@ func (s *server) importAlbumSong(user int64, in songImport) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// Wait outside the lock, so that a single import is not held up.
+	time.Sleep(time.Until(s.imports.lastFetch.Add(albumImportGap)))
 	s.importing.Lock()
 	defer s.importing.Unlock()
 	places, err := s.store.ImportedPlacements(ctx, []int64{in.song.ID})
@@ -356,6 +368,7 @@ func (s *server) importAlbumSong(user int64, in songImport) (string, error) {
 		return songUnplayable, nil
 	}
 	res, err := s.downloadSong(ctx, session.Cookie, in)
+	s.imports.lastFetch = time.Now()
 	if err != nil {
 		return "", err
 	}
@@ -365,9 +378,10 @@ func (s *server) importAlbumSong(user int64, in songImport) (string, error) {
 	return songCreated, nil
 }
 
-// abortsImport tells the failures that would fail every song after this one.
+// abortsImport tells the failures that would fail every song after this one,
+// NetEase limiting the account among them.
 func abortsImport(err error) bool {
-	return errors.Is(err, errSignedOut) || errors.Is(err, netease.ErrExpired) ||
+	return errors.Is(err, errSignedOut) || errors.Is(err, netease.ErrExpired) || errors.Is(err, netease.ErrThrottled) ||
 		(errors.Is(err, netease.ErrUnavailable) && !errors.Is(err, errDownload))
 }
 
@@ -377,6 +391,9 @@ func abortReason(err error) string {
 		return "已退出网易云"
 	case errors.Is(err, netease.ErrExpired):
 		return "网易云登录已失效，请重新登录"
+	case errors.Is(err, netease.ErrThrottled):
+		// Each song again would be refused as well, and press NetEase more.
+		return "网易云请求过于频繁，请稍后再导入"
 	}
 	return "网易云接口服务不可用，请稍后重试"
 }

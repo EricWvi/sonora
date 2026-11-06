@@ -37,6 +37,10 @@ var ErrNotFound = errors.New("netease: not found")
 // ErrExpired means NetEase refused the session.
 var ErrExpired = errors.New("netease: session expired")
 
+// ErrThrottled means NetEase turned the request away for coming too often:
+// trying again right away will not help.
+var ErrThrottled = errors.New("netease: too many requests")
+
 // ErrInvalidCookie means a cookie cannot sign anyone in.
 var ErrInvalidCookie = errors.New("netease: cookie has no MUSIC_U")
 
@@ -50,6 +54,12 @@ const (
 
 // needLogin is the code NetEase answers with when a call needs a session.
 const needLogin = 301
+
+// throttledCodes are the codes NetEase answers with when it limits an account
+// or an address: 405 "操作频繁，请稍候再试" and -460 "Cheating". The service
+// passes them on as the HTTP status, -460 as 400. They come from what is
+// known of NetEase's API, not from a response seen here (2026-11-07).
+var throttledCodes = map[int]bool{405: true, -460: true}
 
 // Client calls the API service.
 type Client struct {
@@ -139,6 +149,9 @@ func (c *Client) call(ctx context.Context, path, cookie string, params url.Value
 	}
 	if head.Code == needLogin {
 		return fmt.Errorf("%w: %s", ErrExpired, path)
+	}
+	if throttledCodes[head.Code] {
+		return fmt.Errorf("%w: %s: code %d", ErrThrottled, path, head.Code)
 	}
 	if err := json.Unmarshal(raw, out); err != nil {
 		return fmt.Errorf("%w: %s: unreadable response", ErrUnavailable, path)

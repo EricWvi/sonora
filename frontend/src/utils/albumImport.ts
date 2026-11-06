@@ -228,7 +228,7 @@ export const importAlbum = async (id: number) => {
     text.push(
       `曲库中另有 ${preview.sameTitle} 张同名专辑，导入后不会自动合并，需要时在管理后台合并。`,
     );
-  text.push("文件由服务器下载，导入期间可以继续使用。");
+  text.push("文件由服务器下载，每首歌间隔 5 秒，导入期间可以继续使用。");
   window.$dialog.info({
     title: "导入专辑到曲库",
     content: lines(text),

@@ -69,7 +69,8 @@
   - **已上传的同名专辑**：并存，不按歌名自动匹配，确认框提示同名专辑的数量，由管理后台合并。导入的文件写了标签，哈希不会与上传的相同，所以同一首歌可能有两份。
   - **音轨号与碟号**写入 ID3（`TRCK`、`TPOS`）与数据库，专辑页的碟号分组与曲目序号直接生效。网易云的碟号有 `"01"`、`"1"`、`"02 [Target Deluxe Edition]"` 等写法，只取开头的数字；`/album` 的歌曲没有发行时间，年份取专辑的。
   - **进度与并发**：服务端后台任务，所有用户一次一张、逐首下载，单曲导入可以插在两首之间；任务只在内存中，服务重启后丢失，已入库的歌保留，再导入一次即可补齐。确认框先显示“将导入、已在曲库（其中移入）、无法播放”的数量；进度用现有的 `$message` 加载提示（`正在导入《专辑》 3/32`），结果用提示或现有对话框，不新增视觉样式；刷新页面后接着显示未完成的导入。
-  - **部分失败**：不可播放、没有完整版本、不是 MP3、下载失败的歌跳过并列出原因；登录失效、退出网易云或接口服务不可用时中止，已导入的保留。
+  - **部分失败**：不可播放、没有完整版本、不是 MP3、下载失败的歌跳过并列出原因；登录失效、退出网易云、网易云限制请求频率或接口服务不可用时中止，已导入的保留。
+  - **请求间隔与限流**（Eric，2026-11-07）：专辑导入向网易云取歌（播放地址、歌词与文件）的间隔至少 5 秒，从上一次取歌算起，所以已在曲库、移入或不可播放的歌最多在一次取歌之后等一次；等待在导入锁之外，单曲导入不受影响；确认框写明“每首歌间隔 5 秒”。真实导入 8 张、73 首时没有间隔，也没有遇到限流，这个间隔是预防，没有证据说明它必要。网易云返回 405（操作频繁）或 -460（Cheating）时，接口服务把 405 作为 HTTP 状态、-460 作为 400 照原样转来（核对了镜像 4.41.1 的 `util/request.js`），原来 Sonora 把它们当成普通结果，取播放地址时会误报为“账号没有完整版本”并继续下一首；现在识别为限流：专辑导入中止并提示“网易云请求过于频繁，请稍后再导入”，其他接口返回 429 `netease_throttled`。这两个错误码来自对网易云接口的了解，没有真实触发过。证据：Go 测试 `TestThrottledCodes`、`TestNeteaseAlbumImportStopsWhenThrottled`（限流后不再请求后面的歌）、`TestAlbumImportWaitsBetweenSongs`（两次下载之间至少两个间隔，总时长不超过 3.5 个间隔）、`TestNeteaseImportRefusals`（单曲 429）；其他测试把间隔设为 0，不等待。
   - 批量导入（歌单）这次不做。
 
   实现：[netease/library.go](../../backend/internal/netease/library.go) 的 `AlbumForImport`、[server/albumimport.go](../../backend/internal/server/albumimport.go)、[server/import.go](../../backend/internal/server/import.go)、[store/albumimport.go](../../backend/internal/store/albumimport.go)、[media/write.go](../../backend/internal/media/write.go)、[albumImport.ts](../../frontend/src/utils/albumImport.ts)；接口见[接口说明](../api.md)。没有新迁移。

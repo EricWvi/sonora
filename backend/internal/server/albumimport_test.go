@@ -32,6 +32,12 @@ func newAlbumImportTest(t *testing.T) (*testServer, *fakeNetease) {
 			importAlbumSong("790", "4", "01", "B", "0"),
 			importAlbumSong("773", "1", "02 [Bonus]", "C", "0"),
 		}, ",") + `]}`,
+		// NetEase limits the account at 779.
+		"79": `{"code":200,"album":{"name":"Busy","artists":[{"id":5,"name":"A"}]},"songs":[` + strings.Join([]string{
+			importAlbumSong("791", "1", "1", "A", "0"),
+			importAlbumSong("779", "2", "1", "A", "0"),
+			importAlbumSong("792", "3", "1", "A", "0"),
+		}, ",") + `]}`,
 		// The session expires at 778.
 		"78": `{"code":200,"album":{"name":"Stop","artists":[{"id":5,"name":"A"}]},"songs":[` + strings.Join([]string{
 			importAlbumSong("781", "1", "1", "A", "0"),
@@ -180,5 +186,47 @@ func TestImportQueueKeepsOneJobPerAlbum(t *testing.T) {
 	}
 	if got := q.of(1); len(got) != 1 || got[0].ID != first.ID {
 		t.Fatalf("of: %+v", got)
+	}
+}
+
+func TestNeteaseAlbumImportStopsWhenThrottled(t *testing.T) {
+	ts, f := newAlbumImportTest(t)
+	job := waitImport(t, ts, decodeBody[importJob](t, ts.do("POST", playerAPI+"netease/albums/79/import", "")).ID)
+	if job.State != importFailed || job.Done != 1 || job.Created != 1 || len(job.Failed) != 0 || !strings.Contains(job.Error, "频繁") {
+		t.Fatalf("job: %+v", job)
+	}
+	// Nothing after the refusal was asked for.
+	for _, d := range f.downloads {
+		if strings.Contains(d, "792") {
+			t.Fatalf("downloads: %v", f.downloads)
+		}
+	}
+}
+
+// Songs fetched from NetEase are albumImportGap apart, counted from the last
+// fetch, so songs that fetch nothing add no time of their own (Eric,
+// 2026-11-07).
+func TestAlbumImportWaitsBetweenSongs(t *testing.T) {
+	ts, f := newAlbumImportTest(t)
+	albumImportGap = 500 * time.Millisecond
+	decodeBody[importAnswer](t, ts.do("POST", playerAPI+"netease/songs/701/import", ""))
+	f.downloads, f.downloadedAt = nil, nil
+	start := time.Now()
+	waitImport(t, ts, decodeBody[importJob](t, ts.do("POST", playerAPI+"netease/albums/77/import", "")).ID)
+	elapsed := time.Since(start)
+	// 701 moves and 772 is grey; 771, 790 (refused as FLAC) and 773 are
+	// fetched, so two waits.
+	var audio []time.Time
+	for i, d := range f.downloads {
+		if strings.HasSuffix(d, ".mp3") {
+			audio = append(audio, f.downloadedAt[i])
+		}
+	}
+	if len(audio) != 2 || audio[1].Sub(audio[0]) < 2*albumImportGap {
+		t.Fatalf("audio downloads %v at %v", f.downloads, audio)
+	}
+	// Waiting a full gap before every song would take five gaps.
+	if elapsed > 3*albumImportGap+albumImportGap/2 {
+		t.Fatalf("took %v", elapsed)
 	}
 }

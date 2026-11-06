@@ -37,6 +37,7 @@ type fakeNetease struct {
 	calls      map[string]int
 	// importAlbums answer /album by ID; CDN stands for the CDN's address.
 	importAlbums map[string]string
+	downloadedAt []time.Time // when each of downloads was asked for
 }
 
 func newFakeNetease(t *testing.T) *fakeNetease {
@@ -123,6 +124,9 @@ func newFakeNetease(t *testing.T) *fakeNetease {
 			switch id := r.PostForm.Get("id"); {
 			case id == "778":
 				w.Write([]byte(`{"code":301,"msg":"需要登录"}`))
+			case id == "779":
+				w.WriteHeader(405)
+				w.Write([]byte(`{"code":405,"message":"操作频繁，请稍候再试"}`))
 			case f.cdn != nil && id == "790":
 				w.Write([]byte(`{"code":200,"data":[{"url":"` + f.cdn.URL + `/790.flac","type":"flac"}]}`))
 			case f.cdn != nil && strings.HasPrefix(id, "7"):
@@ -821,6 +825,7 @@ func newImportTest(t *testing.T) (*testServer, *fakeNetease) {
 	}
 	f.cdn = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		f.downloads = append(f.downloads, r.URL.Path)
+		f.downloadedAt = append(f.downloadedAt, time.Now())
 		if r.Header.Get("Cookie") != "" {
 			t.Errorf("cookie sent to the CDN")
 		}
@@ -833,6 +838,10 @@ func newImportTest(t *testing.T) (*testServer, *fakeNetease) {
 		w.Write(append(slices.Clone(mp3), []byte(r.URL.Path)...))
 	}))
 	t.Cleanup(f.cdn.Close)
+	// Album imports do not wait between songs, see TestAlbumImportWaitsBetweenSongs.
+	gap := albumImportGap
+	albumImportGap = 0
+	t.Cleanup(func() { albumImportGap = gap })
 	ts := newTest(t)
 	client := netease.New(f.srv.URL)
 	client.Downloads = f.cdn.Client()
@@ -990,6 +999,7 @@ func TestNeteaseImportRefusals(t *testing.T) {
 	ts, _ := newImportTest(t)
 	for path, want := range map[string]int{
 		"790": http.StatusUnsupportedMediaType, // FLAC
+		"779": http.StatusTooManyRequests,      // NetEase limits the account
 		"3":   http.StatusNotFound,             // no address
 		"2":   http.StatusNotFound,             // trial only
 		"999": http.StatusNotFound,             // gone from NetEase
