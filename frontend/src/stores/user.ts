@@ -19,6 +19,8 @@ export const useUserStore = defineStore("sonora-user", () => {
     collected: [],
   });
   const onlineSignedIn = computed(() => netease.value.state === "signedIn");
+  /** 已经读过一次网易云账号状态（成功或失败）。在这之前 `netease` 只是初始值 */
+  const neteaseChecked = ref(false);
   /** 网易云上收藏的专辑与关注的艺术家，决定在线专辑页与艺术家页按钮的状态（同 SPlayer 的 userLikeData） */
   const onlineCollected = ref<{ albums: number[]; artists: number[] }>({
     albums: [],
@@ -40,7 +42,11 @@ export const useUserStore = defineStore("sonora-user", () => {
   // 单独读取：接口服务慢或不可用时，不耽误页面载入。
   async function loadNetease(): Promise<void> {
     try {
-      netease.value = await source.neteaseStatus();
+      try {
+        netease.value = await source.neteaseStatus();
+      } finally {
+        neteaseChecked.value = true;
+      }
       if (!onlineSignedIn.value) return clearOnline();
       const [lists, likeIds] = await Promise.all([
         source.onlinePlaylists(),
@@ -134,6 +140,7 @@ export const useUserStore = defineStore("sonora-user", () => {
     netease,
     onlinePlaylists,
     onlineSignedIn,
+    neteaseChecked,
     onlineCollected,
     load,
     loadPlaylists,

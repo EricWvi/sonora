@@ -93,10 +93,15 @@ const router = useRouter();
 const settingStore = useSettingStore();
 const userStore = useUserStore();
 
-// 问候语
+// 问候语。与 SPlayer 不同（Eric，2026-11-07）：登录了网易云时用网易云的昵称，否则用 Sonora 的名字。
+// 网易云的账号状态比用户信息读得晚，读到之前不显示名字，免得名字先出现再被换掉。
 const greetings = computed(() => {
   const greeting = getGreeting();
-  const name = userStore.user?.name ?? "";
+  if (!userStore.neteaseChecked) return greeting;
+  const name =
+    (userStore.onlineSignedIn && userStore.netease.profile?.nickname) ||
+    userStore.user?.name ||
+    "";
   return name ? `${greeting}，${name}` : greeting;
 });
 
