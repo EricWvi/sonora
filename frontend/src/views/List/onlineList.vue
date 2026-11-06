@@ -1,5 +1,5 @@
 <!-- 在线歌单、专辑与艺术家的详情，共用一页：视觉与本地的详情页相同，都是 ListDetail 加 SongList，
-数据来自网易云。与 SPlayer 不同：不迁入评论、收藏与分享；艺术家页是“歌曲（热门）/ 专辑”两个标签，
+数据来自网易云。与 SPlayer 不同：不迁入评论、收藏与分享；在线专辑的“更多”是“导入专辑到曲库”（可以导入的用户才有）；艺术家页是“歌曲（热门）/ 专辑”两个标签，
 没有视频标签与全部歌曲（SPlayer 的“全部歌曲”另有页面）。 -->
 <template>
   <div :class="['online-list', { 'with-tabs': isArtist && !error }]">
@@ -13,6 +13,7 @@
       :config="listConfig"
       :play-button-text="showLoading ? '加载中...' : '播放'"
       :title-text="detailData?.name ?? ''"
+      :more-options="moreOptions"
       @update:search-value="handleSearchUpdate"
       @play-all="playAllSongs"
     />
@@ -86,6 +87,9 @@ import { usePagedList } from "@/composables/List/usePagedList";
 import { useSettingStore } from "@/stores";
 import { useUserStore } from "@/stores/user";
 import { listKey } from "@/utils/track";
+import { renderIcon } from "@/utils/helper";
+import { importAlbum } from "@/utils/albumImport";
+import type { DropdownOption } from "naive-ui";
 import CoverList from "@/components/List/CoverList.vue";
 import ListDetail from "@/components/List/ListDetail.vue";
 import ListError from "@/components/List/ListError.vue";
@@ -126,6 +130,20 @@ const listConfig = {
   showCount: true,
   searchAlign: "center" as const,
 };
+
+// 在线专辑的“更多”只有导入（Sonora 新增，SPlayer 没有），组外成员没有这个按钮
+const moreOptions = computed<DropdownOption[]>(() =>
+  listType.value === "album" && userStore.user?.canImport
+    ? [
+        {
+          label: "导入专辑到曲库",
+          key: "import-album",
+          props: { onClick: () => importAlbum(Number(route.query.id)) },
+          icon: renderIcon("Download"),
+        },
+      ]
+    : [],
+);
 
 const listType = computed(
   () => (route.query.type as OnlineListType | undefined) ?? "playlist",

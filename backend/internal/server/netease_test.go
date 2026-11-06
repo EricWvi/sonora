@@ -35,6 +35,8 @@ type fakeNetease struct {
 	likes      []string
 	liked      []map[string]int64 // trackIds of the liked playlist
 	calls      map[string]int
+	// importAlbums answer /album by ID; CDN stands for the CDN's address.
+	importAlbums map[string]string
 }
 
 func newFakeNetease(t *testing.T) *fakeNetease {
@@ -119,6 +121,8 @@ func newFakeNetease(t *testing.T) *fakeNetease {
 				 "al":{"id":6,"name":"Al","picUrl":"http://p1/12.jpg"},"privilege":{"st":-200}}]}}`))
 		case "/song/url/v1":
 			switch id := r.PostForm.Get("id"); {
+			case id == "778":
+				w.Write([]byte(`{"code":301,"msg":"需要登录"}`))
 			case f.cdn != nil && id == "790":
 				w.Write([]byte(`{"code":200,"data":[{"url":"` + f.cdn.URL + `/790.flac","type":"flac"}]}`))
 			case f.cdn != nil && strings.HasPrefix(id, "7"):
@@ -166,6 +170,10 @@ func newFakeNetease(t *testing.T) *fakeNetease {
 			}
 			w.Write([]byte(`{"status":200,"body":{"code":200},"cookie":["MUSIC_U=leak"]}`))
 		case "/album":
+			if album, ok := f.importAlbums[r.PostForm.Get("id")]; ok {
+				w.Write([]byte(strings.ReplaceAll(album, "CDN", f.cdn.URL)))
+				return
+			}
 			w.Write([]byte(`{"code":200,"album":{"name":"Al","picUrl":"http://p1/a.jpg"},"songs":[
 				{"id":1,"name":"ok","ar":[],"privilege":{"st":0}},
 				{"id":2,"name":"gone","ar":[],"privilege":{"st":-200}}]}`))

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"slices"
@@ -65,7 +66,15 @@ func (s *server) importNeteaseSong(w http.ResponseWriter, r *http.Request) {
 		writeStoreError(w, r, err)
 		return
 	}
-	detail, err := s.downloadSong(ctx, session.Cookie, id)
+	songs, err := s.opts.Netease.Songs(ctx, session.Cookie, []int64{id})
+	if err == nil && len(songs) == 0 {
+		err = netease.ErrNotFound
+	}
+	if err != nil {
+		writeImportError(w, r, err)
+		return
+	}
+	detail, err := s.downloadSong(ctx, session.Cookie, songImport{song: songs[0]})
 	if err != nil {
 		writeImportError(w, r, err)
 		return
@@ -77,10 +86,13 @@ func importResult(status store.IngestStatus, track store.TrackDetail) map[string
 	return map[string]any{"status": status, "track": toPlayerTrack(track.Track)}
 }
 
-// errNoFile and errNotMP3 are songs that cannot be imported for this account.
+// errNoFile and errNotMP3 are songs that cannot be imported for this account;
+// errDownload is a file that could not be fetched from NetEase's CDN, which
+// says nothing about the API service.
 var (
-	errNoFile = errors.New("no full version available")
-	errNotMP3 = errors.New("not an MP3")
+	errNoFile   = errors.New("no full version available")
+	errNotMP3   = errors.New("not an MP3")
+	errDownload = errors.New("download failed")
 )
 
 func writeImportError(w http.ResponseWriter, r *http.Request, err error) {
@@ -94,17 +106,23 @@ func writeImportError(w http.ResponseWriter, r *http.Request, err error) {
 	}
 }
 
-func (s *server) downloadSong(ctx context.Context, cookie string, id int64) (store.IngestResult, error) {
+// songImport is one song to download into the library.
+type songImport struct {
+	song netease.Song
+	// album is set by an album import; nil imports a single.
+	album *store.AlbumImport
+	// albumArtists are the NetEase IDs of the album's artists by name.
+	albumArtists    map[string]int64
+	trackNo, discNo int
+	// covers keeps the covers an album import downloaded, by address: the
+	// songs of an album mostly share one.
+	covers map[string][]byte
+}
+
+func (s *server) downloadSong(ctx context.Context, cookie string, in songImport) (store.IngestResult, error) {
 	client := s.opts.Netease
-	songs, err := client.Songs(ctx, cookie, []int64{id})
-	if err != nil {
-		return store.IngestResult{}, err
-	}
-	if len(songs) == 0 {
-		return store.IngestResult{}, netease.ErrNotFound
-	}
-	song := songs[0]
-	file, err := client.SongFile(ctx, cookie, id)
+	song := in.song
+	file, err := client.SongFile(ctx, cookie, song.ID)
 	if err != nil {
 		return store.IngestResult{}, err
 	}
@@ -114,30 +132,48 @@ func (s *server) downloadSong(ctx context.Context, cookie string, id int64) (sto
 	if file.Type != "mp3" {
 		return store.IngestResult{}, errNotMP3
 	}
-	lyrics, err := client.Lyrics(ctx, cookie, id)
+	lyrics, err := client.Lyrics(ctx, cookie, song.ID)
 	if err != nil {
 		return store.IngestResult{}, err
 	}
-	meta := media.Meta{Title: song.Title, Year: song.Year}
-	ids := store.NeteaseIDs{Song: id, Artists: map[string]int64{}}
+	meta := media.Meta{Title: song.Title, Year: song.Year, TrackNo: in.trackNo, DiscNo: in.discNo}
+	ids := store.NeteaseIDs{Song: song.ID, Artists: map[string]int64{}, FromAlbum: in.album}
 	for _, a := range song.Artists {
 		meta.Artists = append(meta.Artists, a.Name)
 		// The library trims the names it reads back from the tags.
 		ids.Artists[strings.TrimSpace(a.Name)] = a.ID
 	}
-	// The album artists are the song's artists rather than NetEase's album
-	// artists (Eric, 2026-11-05).
-	meta.AlbumArtists = meta.Artists
-	if song.Album != nil {
-		meta.Album = song.Album.Title
-		ids.Album = song.Album.ID
+	if in.album != nil {
+		meta.Album = in.album.Title
+		meta.AlbumArtists = in.album.Artists
+		ids.Album = in.album.NeteaseID
+		for name, id := range in.albumArtists {
+			if _, ok := ids.Artists[name]; !ok {
+				ids.Artists[name] = id
+			}
+		}
+	} else {
+		// The album artists of a single are the song's artists rather than
+		// NetEase's album artists (Eric, 2026-11-05).
+		meta.AlbumArtists = meta.Artists
+		if song.Album != nil {
+			meta.Album = song.Album.Title
+			ids.Album = song.Album.ID
+		}
 	}
 	if song.Cover != nil {
-		var cover bytes.Buffer
-		if err := client.Download(ctx, song.Cover.URL, &cover, maxImportCover); err != nil {
-			return store.IngestResult{}, err
+		picture, ok := in.covers[song.Cover.URL]
+		if !ok {
+			var cover bytes.Buffer
+			if err := client.Download(ctx, song.Cover.URL, &cover, maxImportCover); err != nil {
+				return store.IngestResult{}, fmt.Errorf("%w: cover: %w", errDownload, err)
+			}
+			picture = cover.Bytes()
+			if in.covers != nil {
+				in.covers[song.Cover.URL] = picture
+			}
 		}
-		meta.Picture = cover.Bytes()
+		meta.Picture = picture
 	}
 
 	tmp, err := s.store.IncomingFile()
@@ -147,7 +183,11 @@ func (s *server) downloadSong(ctx context.Context, cookie string, id int64) (sto
 	defer os.Remove(tmp.Name())
 	defer tmp.Close()
 	if err := client.Download(ctx, file.URL, tmp, maxImportAudio); err != nil {
-		return store.IngestResult{}, err
+		var rejected *netease.RejectedError
+		if errors.As(err, &rejected) {
+			return store.IngestResult{}, err
+		}
+		return store.IngestResult{}, fmt.Errorf("%w: %w", errDownload, err)
 	}
 	if err := tmp.Close(); err != nil {
 		return store.IngestResult{}, err

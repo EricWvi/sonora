@@ -3,10 +3,12 @@ import { connection } from "./connection";
 import { onlineImage } from "@/utils/onlineImage";
 import type {
   Album,
+  AlbumImportPreview,
   AlbumQuery,
   Artist,
   Cover,
   HistoryEntry,
+  ImportJob,
   ListQuery,
   Lyrics,
   MixedPage,
@@ -73,6 +75,9 @@ export interface DataSource {
   importOnlineSong(
     id: number,
   ): Promise<{ status: "created" | "duplicate"; track: Track }>;
+  previewAlbumImport(id: number): Promise<AlbumImportPreview>;
+  importOnlineAlbum(id: number): Promise<ImportJob>;
+  importJobs(): Promise<ImportJob[]>;
   onlineLikeIds(): Promise<number[]>;
   onlineLike(id: number): Promise<void>;
   onlineUnlike(id: number): Promise<void>;
@@ -237,6 +242,10 @@ const httpSource: DataSource = {
     (await get<{ url: string }>(`netease/songs/${id}/url`)).url,
   onlineLyrics: (id) => get(`netease/songs/${id}/lyrics`),
   importOnlineSong: (id) => write("POST", `netease/songs/${id}/import`),
+  previewAlbumImport: (id) => get(`netease/albums/${id}/import`),
+  importOnlineAlbum: (id) => write("POST", `netease/albums/${id}/import`),
+  importJobs: async () =>
+    (await get<{ items: ImportJob[] }>("netease/imports")).items,
   onlineLikeIds: async () =>
     (await get<{ ids: number[] }>("netease/likes/ids")).ids,
   onlineLike: (id) => send("PUT", `netease/likes/${id}`),

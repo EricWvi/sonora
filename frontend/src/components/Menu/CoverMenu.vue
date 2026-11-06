@@ -1,5 +1,6 @@
 <!-- 专辑、歌单卡片的右键菜单。照搬 SPlayer components/Menu/CoverMenu.vue：查看详情、播放或暂停、
-复制名称与 ID；不迁入分享（Sonora 没有公开链接）、视频与电台。 -->
+复制名称与 ID；不迁入分享（Sonora 没有公开链接）、视频与电台。与 SPlayer 不同：在线专辑多“导入专辑到曲库”，
+只有可以导入的用户才有。 -->
 <template>
   <n-dropdown
     :x="dropdownX"
@@ -20,6 +21,8 @@ import { listKey, listRoute } from "@/utils/track";
 import type { Album, Playlist } from "@/api/types";
 import { renderIcon, copyData } from "@/utils/helper";
 import { useMusicStore, useStatusStore } from "@/stores";
+import { useUserStore } from "@/stores/user";
+import { importAlbum } from "@/utils/albumImport";
 
 const emit = defineEmits<{
   // 播放或暂停
@@ -29,6 +32,7 @@ const emit = defineEmits<{
 const router = useRouter();
 const musicStore = useMusicStore();
 const statusStore = useStatusStore();
+const userStore = useUserStore();
 
 // 右键菜单数据
 const dropdownX = ref<number>(0);
@@ -75,6 +79,16 @@ const openDropdown = (
           show: playing,
           props: { onClick: () => emit("toPlay", item) },
           icon: renderIcon("Pause"),
+        },
+        {
+          key: "import-album",
+          label: "导入专辑到曲库",
+          show:
+            type === "album" &&
+            item.source === "online" &&
+            !!userStore.user?.canImport,
+          props: { onClick: () => importAlbum(item.id) },
+          icon: renderIcon("Download", { size: 18 }),
         },
         { key: "line", type: "divider" },
         {

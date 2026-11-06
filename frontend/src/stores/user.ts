@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ApiError, loginUrl, source } from "@/api/source";
 import { connection } from "@/api/connection";
 import { useDataStore } from "@/stores/data";
+import { resumeAlbumImports } from "@/utils/albumImport";
 import type { NeteaseStatus, Playlist, User } from "@/api/types";
 
 /** 当前登录用户与其歌单。 */
@@ -64,6 +65,7 @@ export const useUserStore = defineStore("sonora-user", () => {
       const [me, list] = await Promise.all([source.me(), source.playlists()]);
       user.value = me;
       playlists.value = list.items;
+      if (me.canImport) void resumeAlbumImports();
     } catch (error) {
       if (!unauthorized(error)) throw error;
     }

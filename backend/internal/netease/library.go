@@ -560,6 +560,91 @@ func (c *Client) AlbumSongs(ctx context.Context, cookie string, id int64) (Playl
 	return list, songs, nil
 }
 
+// ImportAlbum is a NetEase album as an album import needs it.
+type ImportAlbum struct {
+	ID    int64
+	Title string
+	// Artists are NetEase's album artists, such as "群星" for a compilation.
+	Artists     []Ref
+	Year        int
+	Description string
+	Tracks      []AlbumTrack
+}
+
+// AlbumTrack is a song of an album with its place on it. Song.TrackNo and
+// Song.DiscNo stay 0, as everywhere the player shows online songs.
+type AlbumTrack struct {
+	Song    Song
+	TrackNo int
+	DiscNo  int
+}
+
+// leadingNumber reads a NetEase track or disc number, which comes as a number
+// or as a string such as "01" or "02 [Target Deluxe Edition]"; 0 when it has
+// none.
+type leadingNumber int
+
+func (n *leadingNumber) UnmarshalJSON(b []byte) error {
+	s := strings.Trim(string(b), `"`)
+	end := 0
+	for end < len(s) && s[end] >= '0' && s[end] <= '9' {
+		end++
+	}
+	v, _ := strconv.Atoi(s[:min(end, 6)])
+	*n = leadingNumber(v)
+	return nil
+}
+
+// AlbumForImport returns the album with what importing it writes: album
+// artists, year, description and each song's track and disc number.
+func (c *Client) AlbumForImport(ctx context.Context, cookie string, id int64) (ImportAlbum, error) {
+	var out struct {
+		Album *struct {
+			Name        string  `json:"name"`
+			PicURL      string  `json:"picUrl"`
+			Description *string `json:"description"`
+			PublishTime int64   `json:"publishTime"`
+			Artists     []Ref   `json:"artists"`
+			Artist      *Ref    `json:"artist"`
+		} `json:"album"`
+		Songs []struct {
+			apiSong
+			No leadingNumber `json:"no"`
+			Cd leadingNumber `json:"cd"`
+		} `json:"songs"`
+	}
+	params := url.Values{"id": {strconv.FormatInt(id, 10)}}
+	if err := c.call(ctx, "/album", cookie, params, &out); err != nil {
+		return ImportAlbum{}, err
+	}
+	if out.Album == nil {
+		return ImportAlbum{}, ErrNotFound
+	}
+	a := ImportAlbum{ID: id, Title: out.Album.Name, Artists: refs(out.Album.Artists)}
+	if len(a.Artists) == 0 && out.Album.Artist != nil && out.Album.Artist.Name != "" {
+		a.Artists = []Ref{*out.Album.Artist}
+	}
+	if out.Album.Description != nil {
+		a.Description = *out.Album.Description
+	}
+	if out.Album.PublishTime > 0 {
+		a.Year = time.UnixMilli(out.Album.PublishTime).UTC().Year()
+	}
+	albumCover := cover(out.Album.PicURL)
+	for _, s := range out.Songs {
+		song := s.listed()
+		if song.Cover == nil {
+			song.Cover = albumCover
+		}
+		// The songs of /album carry no publishTime of their own.
+		if song.Year == 0 {
+			song.Year = a.Year
+		}
+		a.Tracks = append(a.Tracks, AlbumTrack{Song: song, TrackNo: int(s.No), DiscNo: int(s.Cd)})
+	}
+	return a, nil
+}
+
 // ArtistSongs returns an artist in the playlist shape, with their top songs.
 func (c *Client) ArtistSongs(ctx context.Context, cookie string, id int64) (Playlist, []Song, error) {
 	var out struct {

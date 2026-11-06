@@ -42,6 +42,8 @@ type server struct {
 	opts  Options
 	// importing runs song imports one at a time, see importNeteaseSong.
 	importing sync.Mutex
+	// imports are the album imports, see albumimport.go.
+	imports importQueue
 }
 
 // New returns the HTTP handler for the admin API and the admin console

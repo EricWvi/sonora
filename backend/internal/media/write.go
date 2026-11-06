@@ -17,7 +17,10 @@ type Meta struct {
 	// AlbumArtists is written to TPE2.
 	AlbumArtists []string
 	Year         int
-	Picture      []byte
+	// TrackNo and DiscNo are left out when 0.
+	TrackNo int
+	DiscNo  int
+	Picture []byte
 }
 
 // id3Separator keeps the values of an ID3v2.4 text frame apart, which is what
@@ -42,6 +45,12 @@ func WriteTags(path string, m Meta) error {
 	}
 	if m.Year > 0 {
 		tag.SetYear(strconv.Itoa(m.Year))
+	}
+	if m.TrackNo > 0 {
+		tag.AddTextFrame("TRCK", id3v2.EncodingUTF8, strconv.Itoa(m.TrackNo))
+	}
+	if m.DiscNo > 0 {
+		tag.AddTextFrame("TPOS", id3v2.EncodingUTF8, strconv.Itoa(m.DiscNo))
 	}
 	if len(m.Picture) > 0 {
 		tag.AddAttachedPicture(id3v2.PictureFrame{

@@ -131,3 +131,33 @@ func TestUnavailableErrorsHideTheBody(t *testing.T) {
 		t.Fatalf("closed server: %v", err)
 	}
 }
+
+// The disc numbers are the forms seen on real albums (2026-11-06).
+func TestAlbumForImport(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"code":200,"album":{"name":"Al","picUrl":"http://p/a.jpg","description":"d",
+			"publishTime":1500000000000,"artists":[{"id":9,"name":"群星"}]},"songs":[
+			{"id":1,"name":"a","ar":[{"id":5,"name":"A"}],"no":1,"cd":"01","al":{"id":3,"name":"Al","picUrl":"http://p/1.jpg"},"privilege":{"st":0}},
+			{"id":2,"name":"b","ar":[{"id":6,"name":"B"}],"no":"2","cd":"02 [Target Deluxe Edition]","al":{"id":3,"name":"Al"},"privilege":{"st":-200}},
+			{"id":3,"name":"c","ar":[],"no":3,"cd":null,"al":{"id":3,"name":"Al"}}]}`))
+	}))
+	defer srv.Close()
+	a, err := New(srv.URL).AlbumForImport(context.Background(), "MUSIC_U=x", 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.Title != "Al" || a.Year != 2017 || a.Description != "d" || len(a.Artists) != 1 || a.Artists[0].Name != "群星" || len(a.Tracks) != 3 {
+		t.Fatalf("album: %+v", a)
+	}
+	for i, want := range []struct {
+		no, cd   int
+		playable bool
+		cover    string
+	}{{1, 1, true, "https://p/1.jpg"}, {2, 2, false, "https://p/a.jpg"}, {3, 0, true, "https://p/a.jpg"}} {
+		tr := a.Tracks[i]
+		if tr.TrackNo != want.no || tr.DiscNo != want.cd || tr.Song.Playable != want.playable ||
+			tr.Song.Cover == nil || tr.Song.Cover.URL != want.cover || tr.Song.Year != 2017 || tr.Song.TrackNo != 0 {
+			t.Errorf("track %d: %+v", i, tr)
+		}
+	}
+}

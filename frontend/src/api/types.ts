@@ -175,3 +175,35 @@ export type OnlineList = {
   playlist: Playlist;
   tracks: Track[];
 };
+
+/** 导入在线专辑前的预览，见 docs/api.md。 */
+export type AlbumImportPreview = {
+  title: string;
+  total: number;
+  /** 可以播放、曲库中还没有的歌曲 */
+  toImport: number;
+  /** 已导入过的歌曲；其中 `moving` 首还在单曲导入时的专辑里，会移入这张专辑 */
+  inLibrary: number;
+  moving: number;
+  unplayable: number;
+  /** 歌曲并入的曲库专辑；为 null 时新建 */
+  target: Album | null;
+  /** 曲库中其他同名专辑的数量，导入后不会自动合并 */
+  sameTitle: number;
+};
+
+/** 专辑导入任务。`state` 为 failed 时提前中止，`error` 说明原因。 */
+export type ImportJob = {
+  id: number;
+  albumId: number;
+  title: string;
+  state: "queued" | "running" | "done" | "failed";
+  total: number;
+  done: number;
+  created: number;
+  moved: number;
+  existing: number;
+  unplayable: number;
+  failed: { title: string; reason: string }[];
+  error: string;
+};

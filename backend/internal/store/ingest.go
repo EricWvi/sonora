@@ -82,10 +82,11 @@ func (s *Store) Ingest(ctx context.Context, u *Upload, lyrics []byte) (IngestRes
 	return s.ingest(ctx, u, lyrics, NeteaseIDs{})
 }
 
-// IngestImported adds a song imported from NetEase. Unlike an upload it always
-// gets a new album marked single, and keeps its cover as well as giving it to
-// the album, so that the song keeps it when albums are merged later.
-// ids.Song must be set.
+// IngestImported adds a song imported from NetEase. Imported on its own, unlike
+// an upload, it always gets a new album marked single, and keeps its cover as
+// well as giving it to the album, so that the song keeps it when albums are
+// merged later; with ids.FromAlbum it joins that album instead. ids.Song must
+// be set.
 func (s *Store) IngestImported(ctx context.Context, u *Upload, lyrics []byte, ids NeteaseIDs) (IngestResult, error) {
 	if ids.Song == 0 {
 		return IngestResult{}, invalid("导入的歌曲缺少网易云 ID")
@@ -100,6 +101,10 @@ type NeteaseIDs struct {
 	Song    int64
 	Album   int64
 	Artists map[string]int64
+	// FromAlbum is set when the song comes with an album import: it joins
+	// that album instead of getting one of its own, and its cover is kept
+	// only when it differs from the album's, as on upload.
+	FromAlbum *AlbumImport
 }
 
 // IncomingFile creates a temporary file in the incoming area, on the same
@@ -191,16 +196,19 @@ func (s *Store) ingest(ctx context.Context, u *Upload, lyrics []byte, ids Neteas
 		var artists []int64
 		var album sql.NullInt64
 		var err error
-		if ids.Song != 0 {
+		switch {
+		case ids.FromAlbum != nil:
+			artists, album, err = albumImportRefs(ctx, tx, in, ids)
+		case ids.Song != 0:
 			artists, album, err = newImportedAlbum(ctx, tx, in, ids, cover)
-		} else {
+		default:
 			artists, album, err = resolveTrackRefs(ctx, tx, in)
 		}
 		if err != nil {
 			return err
 		}
 		trackCover := cover
-		if ids.Song == 0 && album.Valid && cover.Valid {
+		if (ids.Song == 0 || ids.FromAlbum != nil) && album.Valid && cover.Valid {
 			// The first embedded picture of an album becomes its cover; a
 			// track keeps its own only when the picture differs.
 			var albumCover sql.NullString
@@ -247,15 +255,8 @@ func newImportedAlbum(ctx context.Context, tx *sql.Tx, in TrackInput, ids Neteas
 	if err != nil {
 		return nil, sql.NullInt64{}, err
 	}
-	// An artist found by name keeps the NetEase ID they already have: two
-	// NetEase artists can share a name, and the first import decides.
-	for _, name := range in.Artists {
-		if id := ids.Artists[name]; id != 0 {
-			if _, err := tx.ExecContext(ctx, `UPDATE artists SET netease_id = ? WHERE name = ? AND netease_id IS NULL`,
-				id, name); err != nil {
-				return nil, sql.NullInt64{}, err
-			}
-		}
+	if err := setNeteaseArtists(ctx, tx, in.Artists, ids.Artists); err != nil {
+		return nil, sql.NullInt64{}, err
 	}
 	var album sql.NullInt64
 	if in.Album == "" {
@@ -268,6 +269,20 @@ func newImportedAlbum(ctx context.Context, tx *sql.Tx, in TrackInput, ids Neteas
 		return nil, album, err
 	}
 	return artists, album, setArtists(ctx, tx, "album_artists", "album_id", album.Int64, artists)
+}
+
+// albumImportRefs resolves the artists of a song that comes with an album
+// import, and the album it joins.
+func albumImportRefs(ctx context.Context, tx *sql.Tx, in TrackInput, ids NeteaseIDs) ([]int64, sql.NullInt64, error) {
+	artists, err := artistIDs(ctx, tx, in.Artists)
+	if err != nil {
+		return nil, sql.NullInt64{}, err
+	}
+	if err := setNeteaseArtists(ctx, tx, in.Artists, ids.Artists); err != nil {
+		return nil, sql.NullInt64{}, err
+	}
+	id, err := importAlbum(ctx, tx, ids.FromAlbum.normalized(), ids.Artists)
+	return artists, sql.NullInt64{Int64: id, Valid: err == nil}, err
 }
 
 // AudioFile is an opened track file for streaming.
