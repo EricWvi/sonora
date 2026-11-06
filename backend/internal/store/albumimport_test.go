@@ -158,3 +158,47 @@ func TestAlbumImport(t *testing.T) {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+// Editing an imported track without touching its album keeps it there; the
+// album's mark used to make the lookup miss and move the track out.
+func TestEditKeepsTrackInItsAlbum(t *testing.T) {
+	st := openTest(t).Store
+	ctx := context.Background()
+	single, err := st.IngestImported(ctx, importMP3(t, st, media.Meta{Title: "single", Artists: []string{"A"}, AlbumArtists: []string{"A"}, Album: "Comp"}),
+		nil, NeteaseIDs{Song: 11})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := AlbumImport{NeteaseID: 21, Title: "Comp", Artists: []string{"群星"}}
+	whole, err := st.IngestImported(ctx, importMP3(t, st, media.Meta{Title: "whole", Artists: []string{"B"}, AlbumArtists: []string{"群星"}, Album: "Comp", TrackNo: 2}),
+		nil, NeteaseIDs{Song: 12, FromAlbum: &a})
+	if err != nil {
+		t.Fatal(err)
+	}
+	upload, err := st.Ingest(ctx, importMP3(t, st, media.Meta{Title: "up", Artists: []string{"A"}, AlbumArtists: []string{"A"}, Album: "Comp"}), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		res          IngestResult
+		albumArtists []string
+	}{{single, []string{"A"}}, {whole, []string{"群星"}}, {upload, []string{"A"}}} {
+		tr := tc.res.Track
+		// The album title differs only in ASCII case, which is the same album.
+		got, err := st.UpdateTrack(ctx, tr.ID, TrackInput{Title: tr.Title + " (edited)", Artists: []string{tr.Artists[0].Name},
+			Album: "comp", AlbumArtists: tc.albumArtists, TrackNo: tr.TrackNo})
+		if err != nil || got.Album == nil || got.Album.ID != tr.Album.ID {
+			t.Fatalf("%s: %v moved from %d to %+v", tr.Title, err, tr.Album.ID, got.Album)
+		}
+	}
+	// The album artists of the whole album's track left out means the track's
+	// own, which is another album: it moves.
+	moved, err := st.UpdateTrack(ctx, whole.Track.ID, TrackInput{Title: "whole", Artists: []string{"B"}, Album: "Comp"})
+	if err != nil || moved.Album.ID == whole.Track.Album.ID {
+		t.Fatalf("other album artists: %v %+v", err, moved.Album)
+	}
+	renamed, err := st.UpdateTrack(ctx, single.Track.ID, TrackInput{Title: "single", Artists: []string{"A"}, Album: "Other", AlbumArtists: []string{"A"}})
+	if err != nil || renamed.Album.ID == single.Track.Album.ID || renamed.Album.Title != "Other" {
+		t.Fatalf("renamed: %v %+v", err, renamed.Album)
+	}
+}

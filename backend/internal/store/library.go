@@ -466,7 +466,7 @@ func (s *Store) UpdateTrack(ctx context.Context, id int64, in TrackInput) (Track
 				return err
 			}
 		}
-		artists, album, err := resolveTrackRefs(ctx, tx, in)
+		artists, album, err := resolveEditedTrackRefs(ctx, tx, id, in)
 		if err != nil {
 			return err
 		}
@@ -494,6 +494,39 @@ func (s *Store) UpdateTrack(ctx context.Context, id int64, in TrackInput) (Track
 		s.collectCovers(ctx)
 	}
 	return d, err
+}
+
+// resolveEditedTrackRefs is resolveTrackRefs for an edit: a track whose album
+// title and album artists are unchanged stays in its album. Looking the album
+// up again would miss an imported one, whose artist_key carries a mark, and
+// move the track out of it (found 2026-11-07).
+func resolveEditedTrackRefs(ctx context.Context, tx *sql.Tx, id int64, in TrackInput) ([]int64, sql.NullInt64, error) {
+	artists, err := artistIDs(ctx, tx, in.Artists)
+	if err != nil {
+		return nil, sql.NullInt64{}, err
+	}
+	albumArtists := artists
+	if len(in.AlbumArtists) > 0 {
+		if albumArtists, err = artistIDs(ctx, tx, in.AlbumArtists); err != nil {
+			return nil, sql.NullInt64{}, err
+		}
+	}
+	if in.Album != "" {
+		var current int64
+		var key string
+		err := tx.QueryRowContext(ctx, `
+			SELECT al.id, al.artist_key FROM tracks t JOIN albums al ON al.id = t.album_id
+			WHERE t.id = ? AND al.title = ? COLLATE NOCASE`, id, in.Album).Scan(&current, &key)
+		switch {
+		case err == nil && rekey(albumArtists, key) == key:
+			_, err = tx.ExecContext(ctx, `UPDATE albums SET year = ? WHERE id = ? AND year = 0 AND ? > 0`, in.Year, current, in.Year)
+			return artists, sql.NullInt64{Int64: current, Valid: true}, err
+		case err != nil && !errors.Is(err, sql.ErrNoRows):
+			return nil, sql.NullInt64{}, err
+		}
+	}
+	album, err := albumID(ctx, tx, in.Album, albumArtists, in.Year)
+	return artists, album, err
 }
 
 // resolveTrackRefs finds or creates the artists and album the input names.
