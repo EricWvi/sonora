@@ -1,5 +1,5 @@
 <!-- 歌曲列表的一行。照搬 SPlayer components/Card/SongCard.vue，歌曲是播放端 API 的 Track；
-不迁入音质、原唱翻唱、特权、云盘、MV、脏标标签与电台、移动端分支。 -->
+不迁入音质、原唱翻唱、特权、云盘标签、MV、脏标标签与电台、移动端分支。 -->
 <template>
   <!-- 置灰不可播放的歌（Sonora 新增，SPlayer 没有这个状态）：右键菜单与链接照常可用 -->
   <div :class="['song-card', { unplayable: !isPlayable(song) }]">
@@ -54,6 +54,14 @@
                   : song?.title || "未知曲目"
               }}
             </n-ellipsis>
+            <!-- 与 SPlayer 不同：在线歌曲在标题右侧标小云图标（Eric 要求，2026-11-06） -->
+            <SvgIcon
+              v-if="isOnline(song)"
+              name="Cloud"
+              :depth="3"
+              :size="16"
+              class="online-mark"
+            />
           </div>
           <n-flex :size="4" :wrap="false" class="desc" align="center">
             <!-- 歌手 -->
@@ -292,6 +300,10 @@ const albumName = computed(() => {
         align-items: center;
         line-height: normal;
         font-size: 16px;
+        .online-mark {
+          flex-shrink: 0;
+          margin-left: 6px;
+        }
       }
       .desc {
         min-width: 0;

@@ -98,9 +98,19 @@
                 </div>
                 <!-- 信息 -->
                 <div class="data">
-                  <n-text class="name text-hidden">{{
-                    songData.title || "未知曲目"
-                  }}</n-text>
+                  <div class="title">
+                    <n-text class="name text-hidden">{{
+                      songData.title || "未知曲目"
+                    }}</n-text>
+                    <!-- 与 SPlayer 不同：在线歌曲在标题右侧标小云图标（Eric 要求，2026-11-06） -->
+                    <SvgIcon
+                      v-if="isOnline(songData)"
+                      name="Cloud"
+                      :depth="3"
+                      :size="14"
+                      class="online-mark"
+                    />
+                  </div>
                   <div class="artists">
                     <n-text
                       v-for="ar in songData.artists"
@@ -193,6 +203,7 @@ import VirtualScroll from "@/components/UI/VirtualScroll.vue";
 import { usePlayerController } from "@/core/player/PlayerController";
 import { useDataStore, useSettingStore, useStatusStore } from "@/stores";
 import { removeBrackets } from "@/utils/format";
+import { isOnline } from "@/utils/track";
 import { useDragSort } from "@/composables/List/useDragSort";
 
 // 照搬 SPlayer components/List/SongPlayList.vue。歌名取 Track 的 title；Sonora 的歌曲
@@ -363,6 +374,18 @@ const {
       width: 100%;
       height: 100%;
       padding: 8px 0;
+      .title {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+        .name {
+          min-width: 0;
+        }
+        .online-mark {
+          flex-shrink: 0;
+          margin-left: 4px;
+        }
+      }
       .artists {
         display: -webkit-box;
         line-clamp: 1;

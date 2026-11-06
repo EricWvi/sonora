@@ -168,7 +168,8 @@ const tableData = computed<DataType[]>(() =>
   songs.value.map((song, index) => ({
     key: index + 1,
     id: trackKey(song),
-    name: song.title || "未知曲目",
+    // 与 SPlayer 不同：在线歌曲标题后加云朵（Eric 要求，2026-11-06）
+    name: `${song.title || "未知曲目"}${isOnline(song) ? " ☁️" : ""}`,
     artists: song.artists.length
       ? song.artists.map((ar) => ar.name).join(" / ")
       : "未知歌手",
