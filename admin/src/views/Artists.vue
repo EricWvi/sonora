@@ -191,7 +191,7 @@ const columns: DataTableColumns<Artist> = [
     render: (a) =>
       h(RouterLink, { to: `/albums?artistId=${a.id}` }, () => a.albumCount),
   },
-  neteaseIdColumn(),
+  neteaseIdColumn("artist"),
 ];
 
 const pagination = computed(() => ({

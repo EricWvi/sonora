@@ -271,7 +271,7 @@ const columns: DataTableColumns<Album> = [
     width: 90,
     render: (a) => formatDuration(a.durationMs),
   },
-  neteaseIdColumn(),
+  neteaseIdColumn("album"),
 ];
 
 const pagination = computed(() => ({

@@ -188,7 +188,7 @@ const columns: DataTableColumns<Track> = [
         ? t.lyricsFormat.toUpperCase()
         : h(NText, { depth: 3 }, () => "—"),
   },
-  neteaseIdColumn(),
+  neteaseIdColumn("song"),
 ];
 
 const pagination = computed(() => ({
