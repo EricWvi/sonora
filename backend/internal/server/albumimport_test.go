@@ -2,7 +2,10 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -87,7 +90,7 @@ func TestNeteaseAlbumImport(t *testing.T) {
 	// The songs share one cover download.
 	covers := 0
 	for _, d := range f.downloads {
-		if strings.HasSuffix(d, ".jpg") {
+		if strings.HasSuffix(d, "/a77.jpg") {
 			covers++
 		}
 	}
@@ -228,5 +231,54 @@ func TestAlbumImportWaitsBetweenSongs(t *testing.T) {
 	// Waiting a full gap before every song would take five gaps.
 	if elapsed > 3*albumImportGap+albumImportGap/2 {
 		t.Fatalf("took %v", elapsed)
+	}
+}
+
+// Artists an import creates get their NetEase picture and introduction;
+// artists the library had stay as they were (Eric, 2026-11-07).
+func TestImportFillsNewArtists(t *testing.T) {
+	ts, f := newAlbumImportTest(t)
+	ctx := context.Background()
+	// "A" is in the library before any import, without an image.
+	path := filepath.Join(t.TempDir(), "a.mp3")
+	if err := os.WriteFile(path, sample(t, "untagged.mp3"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := media.WriteTags(path, media.Meta{Title: "up", Artists: []string{"A"}, Album: "Up"}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec := ts.upload("a.mp3", data, ""); rec.Code != http.StatusCreated && rec.Code != http.StatusOK {
+		t.Fatalf("upload: %d %s", rec.Code, rec.Body)
+	}
+	decodeBody[importAnswer](t, ts.do("POST", playerAPI+"netease/songs/701/import", ""))
+	waitImport(t, ts, decodeBody[importJob](t, ts.do("POST", playerAPI+"netease/albums/77/import", "")).ID)
+	// 701 names A and B/C; the album adds 群星 (9) as album artist, and B
+	// and C as its songs' artists, all with NetEase ID 5 in the fake.
+	if got := strings.Join(f.artistDetails, ","); got != "6,9,5,5" {
+		t.Fatalf("asked about %s", got)
+	}
+	page, err := ts.store.Artists(ctx, store.ArtistQuery{Window: store.Window{Limit: 50}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, a := range page.Items {
+		got[a.Name] = fmt.Sprintf("image=%v desc=%s", a.Image != nil, a.Description)
+	}
+	want := map[string]string{
+		"A":   "image=false desc=",
+		"B/C": "image=true desc=简介6",
+		"群星":  "image=true desc=简介9",
+		"B":   "image=true desc=简介5",
+		"C":   "image=true desc=简介5",
+	}
+	for name, w := range want {
+		if got[name] != w {
+			t.Errorf("%s: %s, want %s", name, got[name], w)
+		}
 	}
 }

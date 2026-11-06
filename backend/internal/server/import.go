@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"slices"
@@ -74,10 +75,14 @@ func (s *server) importNeteaseSong(w http.ResponseWriter, r *http.Request) {
 		writeImportError(w, r, err)
 		return
 	}
+	added := s.newArtists(ctx, songs[0].Artists)
 	detail, err := s.downloadSong(ctx, session.Cookie, songImport{song: songs[0]})
 	if err != nil {
 		writeImportError(w, r, err)
 		return
+	}
+	if detail.Status == store.Created {
+		s.fillNewArtists(ctx, session.Cookie, added)
 	}
 	respond(w, r, importResult(detail.Status, detail.Track), nil)
 }
@@ -117,6 +122,18 @@ type songImport struct {
 	// covers keeps the covers an album import downloaded, by address: the
 	// songs of an album mostly share one.
 	covers map[string][]byte
+}
+
+// albumArtistRefs are the album artists of an album import, none for a single.
+func (in songImport) albumArtistRefs() []netease.Ref {
+	refs := make([]netease.Ref, 0, len(in.albumArtists))
+	if in.album == nil {
+		return refs
+	}
+	for _, name := range in.album.Artists {
+		refs = append(refs, netease.Ref{ID: in.albumArtists[strings.TrimSpace(name)], Name: name})
+	}
+	return refs
 }
 
 func (s *server) downloadSong(ctx context.Context, cookie string, in songImport) (store.IngestResult, error) {
@@ -206,4 +223,53 @@ func (s *server) downloadSong(ctx context.Context, cookie string, in songImport)
 	}
 	text, _ := lyrics.Compose()
 	return s.store.IngestImported(ctx, upload, []byte(text), ids)
+}
+
+// newArtists returns those of the artists the library has no artist of that
+// name for yet: importing a song that names them creates them.
+func (s *server) newArtists(ctx context.Context, refs []netease.Ref) []netease.Ref {
+	names := make([]string, len(refs))
+	for i, r := range refs {
+		names[i] = r.Name
+	}
+	missing, err := s.store.MissingArtists(ctx, names)
+	if err != nil {
+		slog.Warn("import artists", "err", err)
+		return nil
+	}
+	var out []netease.Ref
+	for _, r := range refs {
+		name := strings.TrimSpace(r.Name)
+		if r.ID != 0 && slices.Contains(missing, name) && !slices.ContainsFunc(out, func(o netease.Ref) bool { return o.Name == name }) {
+			out = append(out, netease.Ref{ID: r.ID, Name: name})
+		}
+	}
+	return out
+}
+
+// fillNewArtists gives the artists an import created their picture and
+// introduction from NetEase (Eric, 2026-11-07); the import has given them
+// their NetEase ID already. It is best effort: the song is in either way,
+// and the admin can add both later.
+func (s *server) fillNewArtists(ctx context.Context, cookie string, artists []netease.Ref) {
+	client := s.opts.Netease
+	for _, a := range artists {
+		profile, err := client.ArtistProfile(ctx, cookie, a.ID)
+		if err != nil {
+			slog.Warn("import artist profile", "artist", a.ID, "err", err)
+			continue
+		}
+		var image []byte
+		if profile.ImageURL != "" {
+			var buf bytes.Buffer
+			if err := client.Download(ctx, profile.ImageURL, &buf, maxImportCover); err != nil {
+				slog.Warn("import artist image", "artist", a.ID, "err", err)
+			} else {
+				image = buf.Bytes()
+			}
+		}
+		if _, err := s.store.FillImportedArtist(ctx, a.Name, a.ID, image, profile.Description); err != nil {
+			slog.Warn("import artist profile", "artist", a.ID, "err", err)
+		}
+	}
 }

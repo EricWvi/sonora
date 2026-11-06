@@ -36,8 +36,9 @@ type fakeNetease struct {
 	liked      []map[string]int64 // trackIds of the liked playlist
 	calls      map[string]int
 	// importAlbums answer /album by ID; CDN stands for the CDN's address.
-	importAlbums map[string]string
-	downloadedAt []time.Time // when each of downloads was asked for
+	importAlbums  map[string]string
+	downloadedAt  []time.Time // when each of downloads was asked for
+	artistDetails []string    // the artists /artist/detail was asked about
 }
 
 func newFakeNetease(t *testing.T) *fakeNetease {
@@ -188,6 +189,10 @@ func newFakeNetease(t *testing.T) *fakeNetease {
 			w.Write([]byte(`{"code":200,"album":{"name":"Al","picUrl":"http://p1/a.jpg"},"songs":[
 				{"id":1,"name":"ok","ar":[],"privilege":{"st":0}},
 				{"id":2,"name":"gone","ar":[],"privilege":{"st":-200}}]}`))
+		case "/artist/detail":
+			f.artistDetails = append(f.artistDetails, r.PostForm.Get("id"))
+			w.Write([]byte(`{"code":200,"data":{"artist":{"avatar":"` + f.cdn.URL + `/artist` + r.PostForm.Get("id") +
+				`.jpg","cover":"","briefDesc":"简介` + r.PostForm.Get("id") + `"}}}`))
 		case "/artists":
 			w.Write([]byte(`{"code":200,"artist":{"name":"A"},"hotSongs":[
 				{"id":1,"name":"ok","ar":[],"privilege":{"st":0}},

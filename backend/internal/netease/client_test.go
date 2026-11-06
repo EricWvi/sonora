@@ -183,3 +183,17 @@ func TestThrottledCodes(t *testing.T) {
 		}
 	}
 }
+
+func TestArtistProfile(t *testing.T) {
+	for _, tt := range []struct{ body, image string }{
+		{`{"code":200,"data":{"artist":{"cover":"http://p/c.jpg","avatar":"http://p/a.jpg","briefDesc":"简介"}}}`, "https://p/a.jpg"},
+		{`{"code":200,"data":{"artist":{"cover":"http://p/c.jpg","avatar":"","briefDesc":"简介"}}}`, "https://p/c.jpg"},
+	} {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(tt.body)) }))
+		p, err := New(srv.URL).ArtistProfile(context.Background(), "MUSIC_U=x", 5)
+		srv.Close()
+		if err != nil || p.ImageURL != tt.image || p.Description != "简介" {
+			t.Errorf("%+v %v", p, err)
+		}
+	}
+}

@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -232,4 +234,61 @@ func (s *Store) MoveImported(ctx context.Context, trackID int64, a AlbumImport, 
 		s.collectCovers(ctx)
 	}
 	return moved, err
+}
+
+// MissingArtists returns those of the names that no artist in the library has
+// yet, as the library would store them: an import that names them creates
+// them.
+func (s *Store) MissingArtists(ctx context.Context, names []string) ([]string, error) {
+	var missing []string
+	for _, name := range names {
+		name = truncate(strings.TrimSpace(name))
+		if name == "" || slices.Contains(missing, name) {
+			continue
+		}
+		var id int64
+		err := s.db.QueryRowContext(ctx, `SELECT id FROM artists WHERE name = ?`, name).Scan(&id)
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			missing = append(missing, name)
+		case err != nil:
+			return nil, err
+		}
+	}
+	return missing, nil
+}
+
+// FillImportedArtist gives the artist an import created, found by name and
+// NetEase ID, the image and description NetEase has (Eric, 2026-11-07). An
+// image or description the artist already has is kept, so nothing the admin
+// wrote is replaced. image may be nil; one the library cannot read is left
+// out. It reports whether the artist was found.
+func (s *Store) FillImportedArtist(ctx context.Context, name string, neteaseID int64, image []byte, description string) (bool, error) {
+	name = truncate(strings.TrimSpace(name))
+	description = strings.TrimSpace(description)
+	if utf8.RuneCountInString(description) > maxAlbumDescription {
+		description = string([]rune(description)[:maxAlbumDescription])
+	}
+	s.files.Lock()
+	defer s.files.Unlock()
+	var cover sql.NullString
+	if image != nil {
+		if n, err := s.saveCover(ctx, image); err == nil {
+			cover = sql.NullString{String: n, Valid: true}
+		} else {
+			slog.Warn("ignore artist image", "artist", name, "err", err)
+		}
+	}
+	res, err := s.db.ExecContext(ctx, `
+		UPDATE artists SET image = IFNULL(image, ?),
+			description = CASE WHEN description = '' THEN ? ELSE description END
+		WHERE name = ? AND netease_id = ?`, cover, description, name, neteaseID)
+	if cover.Valid {
+		s.collectCovers(ctx)
+	}
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
 }

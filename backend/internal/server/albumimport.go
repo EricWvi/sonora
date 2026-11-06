@@ -358,16 +358,26 @@ func (s *server) importAlbumSong(user int64, in songImport) (string, error) {
 		if !p.Alone {
 			return songExisting, nil
 		}
+		// Moving creates the album, and with it album artists that may be new.
+		added := s.newArtists(ctx, in.albumArtistRefs())
 		moved, err := s.store.MoveImported(ctx, p.TrackID, *in.album, in.albumArtists, in.trackNo, in.discNo)
 		if err != nil || !moved {
 			return songExisting, err
+		}
+		if len(added) > 0 {
+			s.fillNewArtists(ctx, session.Cookie, added)
+			s.imports.lastFetch = time.Now()
 		}
 		return songMoved, nil
 	}
 	if !in.song.Playable {
 		return songUnplayable, nil
 	}
+	added := s.newArtists(ctx, append(slices.Clone(in.song.Artists), in.albumArtistRefs()...))
 	res, err := s.downloadSong(ctx, session.Cookie, in)
+	if err == nil && res.Status == store.Created {
+		s.fillNewArtists(ctx, session.Cookie, added)
+	}
 	s.imports.lastFetch = time.Now()
 	if err != nil {
 		return "", err

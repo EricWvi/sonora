@@ -202,3 +202,48 @@ func TestEditKeepsTrackInItsAlbum(t *testing.T) {
 		t.Fatalf("renamed: %v %+v", err, renamed.Album)
 	}
 }
+
+func TestFillImportedArtist(t *testing.T) {
+	st := openTest(t).Store
+	ctx := context.Background()
+	res, err := st.IngestImported(ctx, importMP3(t, st, media.Meta{Title: "s", Artists: []string{"New", "Old"}, AlbumArtists: []string{"New"}, Album: "Al"}),
+		nil, NeteaseIDs{Song: 1, Artists: map[string]int64{"New": 5, "Old": 6}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	missing, err := st.MissingArtists(ctx, []string{" New ", "Other", "Other", "old", ""})
+	if err != nil || len(missing) != 1 || missing[0] != "Other" {
+		t.Fatalf("missing: %q %v", missing, err)
+	}
+	image, err := os.ReadFile(filepath.Join("..", "media", "testdata", "cover.jpg"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The wrong NetEase ID finds nobody.
+	if found, err := st.FillImportedArtist(ctx, "New", 99, image, "x"); err != nil || found {
+		t.Fatalf("other id: %v %v", found, err)
+	}
+	if found, err := st.FillImportedArtist(ctx, " New ", 5, image, " 简介 "); err != nil || !found {
+		t.Fatalf("fill: %v %v", found, err)
+	}
+	var id int64
+	for _, a := range res.Track.Artists {
+		if a.Name == "New" {
+			id = a.ID
+		}
+	}
+	a, err := st.Artist(ctx, id)
+	if err != nil || a.Image == nil || a.Description != "简介" {
+		t.Fatalf("filled: %v %+v", err, a)
+	}
+	// What the artist has stays; an unreadable image is left out.
+	if _, err := st.UpdateArtist(ctx, id, ArtistInput{Name: "New", Description: ptr("admin")}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.FillImportedArtist(ctx, "New", 5, []byte("not an image"), "netease"); err != nil {
+		t.Fatal(err)
+	}
+	if b, err := st.Artist(ctx, id); err != nil || b.Description != "admin" || b.Image == nil || b.Image.Name != a.Image.Name {
+		t.Fatalf("kept: %v %+v", err, b)
+	}
+}

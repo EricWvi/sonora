@@ -862,3 +862,38 @@ var Links = map[string]string{
 	"artist":   "https://music.163.com/#/artist?id={id}",
 	"playlist": "https://music.163.com/#/playlist?id={id}",
 }
+
+// ArtistProfile is what an import keeps of a NetEase artist it adds.
+type ArtistProfile struct {
+	// ImageURL is the square avatar, or the wider cover when there is no
+	// avatar; "" when there is neither. The library shows artists square.
+	ImageURL string
+	// Description is the short introduction SPlayer's artist page shows.
+	Description string
+}
+
+// ArtistProfile reads an artist's picture and introduction, as SPlayer's
+// artist page does (/artist/detail).
+func (c *Client) ArtistProfile(ctx context.Context, cookie string, id int64) (ArtistProfile, error) {
+	var out struct {
+		Data struct {
+			Artist *struct {
+				Cover     string `json:"cover"`
+				Avatar    string `json:"avatar"`
+				BriefDesc string `json:"briefDesc"`
+			} `json:"artist"`
+		} `json:"data"`
+	}
+	if err := c.call(ctx, "/artist/detail", cookie, url.Values{"id": {strconv.FormatInt(id, 10)}}, &out); err != nil {
+		return ArtistProfile{}, err
+	}
+	a := out.Data.Artist
+	if a == nil {
+		return ArtistProfile{}, ErrNotFound
+	}
+	p := ArtistProfile{Description: a.BriefDesc}
+	if img := cover(cmp.Or(a.Avatar, a.Cover)); img != nil {
+		p.ImageURL = img.URL
+	}
+	return p, nil
+}
