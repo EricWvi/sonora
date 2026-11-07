@@ -1,6 +1,6 @@
 # 阶段 8：安卓客户端
 
-状态：进行中（2026-11-07 Eric 提出并开始）：参照源码已加入并在 Mac 上构建成功；7 个待决事项已全部确定，工作包已建立，第 2 项已完成。前置：阶段 7 退出（2026-11-06）。
+状态：进行中（2026-11-07 Eric 提出并开始）：参照源码已加入并在 Mac 上构建成功；7 个待决事项已全部确定，工作包已建立，第 1、2 项已完成。前置：阶段 7 退出（2026-11-06）。
 
 ## 目标
 
@@ -15,7 +15,7 @@
 - **许可证**：客户端按 GPL-3.0 发布，在 `android/LICENSE` 单独声明，保留 PixelPlayerOSS 的版权声明并更新 [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md)；仓库其余部分仍是 AGPL-3.0。
 - **代码位置**：Sonora 仓库的 `android/`。`.gitignore` 已加入对应规则。
 - **登录**：参照 asr 的原生客户端登录。客户端打开系统浏览器走同一套 OIDC，按 RFC 8252 带 S256 的 `code_challenge`，安卓用自定义 scheme 回调，服务端签发设备 token；API 同时接受 Cookie 会话与 `Authorization: Bearer`。Go 服务需要新增设备表（迁移 15 起，`scripts/synth-library.mjs` 的 `SCHEMA_VERSION` 同步）与相关接口，接口写入 [api.md](../api.md)。按 asr 的设计，回调仍是 `/auth/callback`，Authelia 不用另外登记；实现时用 Sonora 的配置核实。
-- **界面**：沿用 PixelPlayerOSS 的 Material 3 界面，包括全屏播放器，只改品牌与文字。不向 SPlayer 靠拢。与原版不同的地方写在代码注释和本文件中。
+- **界面**（2026-11-07 Eric 调整）：完全复刻 PixelPlayerOSS 的视觉风格，标准与 Web 播放端复刻 SPlayer 相同：`reference/PixelPlayerOSS` 的源码与实际渲染是权威基准，布局、配色、字体、字号、间距、尺寸、图标、圆角、阴影、动效和组件状态逐项还原，交付前在相同模拟器、主题、数据和状态下与原版截图对照。不向 SPlayer 靠拢。与原版不同的地方须 Eric 同意，并写在代码注释和本文件中。服务端为客户端渲染的设备登录确认页也按 PixelPlayerOSS 的视觉风格。
 - **歌曲缓存方式**：手动下载加播放缓存。手动下载的歌曲一直保留，只能手动删除；播放过的歌曲自动缓存，超过容量上限后删除最久没有播放的。
 - **功能清单**：曲库浏览、搜索、歌单、喜欢、最近播放、歌词，加漫游 FM。移动端不加入网易云有关的功能（Eric，2026-11-07）。喜欢与最近播放使用现有的 `likes`、`likes/ids`、`history`：它们只读 `tracks` 表，只有曲库歌曲（源码确认，`backend/internal/store/listeners.go`），不需要在客户端过滤，也不需要新增接口。不使用 `likes/mixed`、`history/mixed`，客户端也没有在线歌曲。不包含设置同步，客户端设置只保存在手机上，不写 `PUT settings`（它整体替换，内容是 Web 端的字段，写入会覆盖 Web 端设置）。
 - **缓存细节**：只缓存曲库歌曲。播放缓存默认上限 5 GB（可在设置中修改），手动下载的歌曲不计入上限。曲库歌曲的音频按 ID 不变（源码确认，2026-11-07：管理 API 只能修改元数据，没有替换音频的接口；重新上传是新歌曲，ID 不复用），所以缓存不需要校验内容，只需处理歌曲被删除（接口返回 404）；元数据以服务端为准。音频响应现在是 `private, no-cache`，不影响客户端自己管理的缓存，阶段 9 的“音频 immutable 缓存”不是前置条件。
@@ -58,7 +58,10 @@ cd android && ./gradlew :app:assembleDebug :app:testDebugUnitTest
 顺序 Eric 已确认（2026-11-07）。实际从第 2 项开始，这样不用先等后端环境；第 3 项连开发服务器时需要第 1 项已部署到那里。
 
 - [x] 把 PixelPlayerOSS 作为 submodule 加到 `reference/PixelPlayerOSS`，检出 `v0.4.0-alpha.53`，在 Mac 上构建原版（运行确认，见“参照项目的事实”）。
-- [ ] **1. Go 设备 token**：设备表（迁移 15）、设备登录流程、Bearer 认证、设备管理接口，同步 [api.md](../api.md) 和 `SCHEMA_VERSION`。验证：Go 测试，Authelia 契约测试走一遍设备登录。
+- [x] **1. Go 设备 token**：设备表（迁移 15）、设备登录流程、Bearer 认证、设备管理接口，同步 [api.md](../api.md) 和 `SCHEMA_VERSION`（提交 `2b6ba49`）。
+  - 运行确认（2026-11-07）：Mac 与开发服务器上 `go test ./...` 通过；开发服务器上 `go test -tags authelia ./internal/auth` 通过，其中 `TestAutheliaDeviceLogin` 在真实 Authelia 4.39.20 下走完设备登录、确认、换 token 并用 Bearer 访问。
+  - 与 asr 的差异：只支持安卓（回调 `sonora://auth/callback`），token 前缀 `sonora_d_`，确认页没有头像，没有推送通道；Bearer 请求的用户带 Authelia 组，`canImport` 与网页一致；设备的时间按其他 `createdAt` 字段用 RFC 3339 字符串返回。
+  - 不做（Eric，2026-11-07）：网页端的设备管理与吊销。`GET devices` 与吊销自己的 `DELETE devices/{id}` 保留，客户端退出登录时用后者。
 - [x] **2. 工程骨架**：建 `android/`，包名 `top.onlyquant.sonora`，加 `android/LICENSE`，更新 [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md)，只复制播放内核，能启动并播放一首固定的歌（debug 版打包的 30 秒测试音）。
   - 运行确认（2026-11-07，模拟器 `Medium_Phone`，API 36，无音频输出）：`dumpsys media_session` 显示点击播放后进入 `PLAYING`；切到后台后进度从 3059 ms 走到 9078 ms；媒体键暂停后两次读数都停在 9214 ms；恢复后走到 12324 ms；服务在前台并有媒体通知；logcat 没有崩溃或 `ExoPlaybackException`。
   - 运行确认（2026-11-07）：`./gradlew :app:assembleDebug :app:testDebugUnitTest` 成功，debug APK 约 41 MB，复制来的 74 个单元测试全部通过。
