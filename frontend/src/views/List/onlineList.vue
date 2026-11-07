@@ -216,8 +216,6 @@ const removeSongs = (keys: string[]) => {
   setListData(listData.value.filter((song) => !keys.includes(trackKey(song))));
   if (detailData.value)
     setDetailData({ ...detailData.value, count: listData.value.length });
-  // 搜索结果是单独保存的
-  if (searchValue.value) performSearch(searchValue.value);
 };
 
 // 歌曲右键菜单的“从歌单中删除”；这个页面的歌都是在线歌曲

@@ -31,6 +31,11 @@ export const useListSearch = (listData: Ref<Track[]>) => {
     searchData.value = result;
   }, 300);
 
+  // 与 SPlayer 不同：列表变化时重新搜索，否则删除的歌曲会留在搜索结果里
+  watch(listData, () => {
+    if (searchValue.value) performSearch(searchValue.value);
+  });
+
   /**
    * 获取显示的数据
    */
