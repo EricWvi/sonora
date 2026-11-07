@@ -1,6 +1,6 @@
 # 阶段 8：安卓客户端
 
-状态：进行中（2026-11-07 Eric 提出并开始）：参照源码已加入并在 Mac 上构建成功；7 个待决事项已全部确定，工作包待建立，尚未开始实现。前置：阶段 7 退出（2026-11-06）。
+状态：进行中（2026-11-07 Eric 提出并开始）：参照源码已加入并在 Mac 上构建成功；7 个待决事项已全部确定，工作包已建立，第 2 项已完成。前置：阶段 7 退出（2026-11-06）。
 
 ## 目标
 
@@ -37,8 +37,35 @@
 
 全部已确定，见“已确定”。
 
+## 与 PixelPlayerOSS 的差异
+
+- `DualPlayerEngine`：去掉 Navidrome、Jellyfin 流代理、云端 URI 解析与离线查找，媒体 URI 直接交给数据源。第 3、7 项会按 Sonora 的认证与缓存补上数据源。
+- `MusicService`：只保留围绕引擎的会话部分（原版 2584 行）。小组件、均衡器、统计、队列持久化、睡眠定时、自定义会话命令与自定义通知都没有复制，需要时再加。
+- 不带 FFmpeg 解码器：Sonora 只入库 MP3、FLAC、AAC、Vorbis 与 Opus，由系统解码。
+- `Transition.kt`：去掉依赖 Room 的 `TransitionRule`。
+- `MainActivity` 是临时的单按钮页面，第 4 项替换。暂时没有应用图标（新视觉方案须 Eric 同意）。
+
+## 构建
+
+```sh
+export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+export ANDROID_HOME="$HOME/Library/Android/sdk"
+cd android && ./gradlew :app:assembleDebug :app:testDebugUnitTest
+```
+
 ## 工作包
 
-工作包待建立。
+顺序 Eric 已确认（2026-11-07）。实际从第 2 项开始，这样不用先等后端环境；第 3 项连开发服务器时需要第 1 项已部署到那里。
 
 - [x] 把 PixelPlayerOSS 作为 submodule 加到 `reference/PixelPlayerOSS`，检出 `v0.4.0-alpha.53`，在 Mac 上构建原版（运行确认，见“参照项目的事实”）。
+- [ ] **1. Go 设备 token**：设备表（迁移 15）、设备登录流程、Bearer 认证、设备管理接口，同步 [api.md](../api.md) 和 `SCHEMA_VERSION`。验证：Go 测试，Authelia 契约测试走一遍设备登录。
+- [x] **2. 工程骨架**：建 `android/`，包名 `top.onlyquant.sonora`，加 `android/LICENSE`，更新 [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md)，只复制播放内核，能启动并播放一首固定的歌（debug 版打包的 30 秒测试音）。
+  - 运行确认（2026-11-07，模拟器 `Medium_Phone`，API 36，无音频输出）：`dumpsys media_session` 显示点击播放后进入 `PLAYING`；切到后台后进度从 3059 ms 走到 9078 ms；媒体键暂停后两次读数都停在 9214 ms；恢复后走到 12324 ms；服务在前台并有媒体通知；logcat 没有崩溃或 `ExoPlaybackException`。
+  - 运行确认（2026-11-07）：`./gradlew :app:assembleDebug :app:testDebugUnitTest` 成功，debug APK 约 41 MB，复制来的 74 个单元测试全部通过。
+  - 待验证：实际听感（模拟器没有音频输出）；PKB110 真机；除 MP3 外的格式实际播放（模拟器上有 AAC、FLAC、Opus、Vorbis 的系统解码器）。
+- [ ] **3. 登录与 API 层**：系统浏览器登录、自定义 scheme 回调、token 保存、API 客户端。验证：模拟器连开发服务器。
+- [ ] **4. 曲库与播放**：首页、歌曲、专辑、艺术家、搜索、播放器、队列、后台播放和媒体通知。验证：模拟器运行。
+- [ ] **5. 用户数据**：喜欢、歌单、最近播放、歌词。验证：模拟器运行，并与 Web 端核对数据。
+- [ ] **6. 漫游 FM**。验证：模拟器运行。
+- [ ] **7. 歌曲缓存**：手动下载、播放缓存（默认 5 GB，超出后删最久没播放的）、下载管理页、已删除歌曲的清理、离线播放。验证：模拟器断网测试。
+- [ ] **8. 发布**：签名密钥、`android-v*` 工作流、应用内更新。验证：PKB110 上从 Release 安装并覆盖升级，再走一遍全部功能。

@@ -72,3 +72,17 @@
 > The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 >
 > THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+# PixelPlayerOSS
+
+`android/` 是 Sonora 的安卓客户端，从 [PixelPlayerOSS](https://github.com/PixelPlayerHQ/PixelPlayerOSS) 复制部分代码二次开发，参考 tag `v0.4.0-alpha.53`（提交 `a1f8fce42e3b81a65e3a5eda005d2bda654fff67`）。`android/` 按 GPL-3.0 发布，许可证全文见 [android/LICENSE](android/LICENSE)；仓库其余部分仍是 AGPL-3.0。
+
+> PixelPlayerOSS
+> Copyright (C) 2026 Theo Vilardo
+
+复制或改编内容包括（包名都改为 `top.onlyquant.sonora`）：
+
+- `data/service/player/`：`DualPlayerEngine`（去掉云端流代理与 URI 解析）、`QueueWindowPolicy`、`AudioDecoderPolicy`、`HiFiCapabilityChecker`、`HiResSampleRateCapAudioProcessor`、`SurroundDownmixProcessor`、`UnsupportedAudioListener`，以及对应的单元测试。
+- `data/service/MusicService.kt`：按原版缩减，只保留会话部分。
+- `data/model/AudioOutputMode.kt`、`data/model/Transition.kt`（去掉 `TransitionRule`）、`utils/Envelope.kt`。
+- `android/app/build.gradle.kts`、`android/gradle/`：构建配置与依赖版本取自原版，Gradle Wrapper 复制自原版。

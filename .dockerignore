@@ -5,6 +5,7 @@
 **/dist
 memories
 reference
+android
 release
 backend/.data
 backend/config.yaml
