@@ -20,3 +20,16 @@ dist/
 /backend/web/*/*
 !/backend/web/*/.gitkeep
 /release/
+
+# Android client
+/android/.gradle/
+/android/.kotlin/
+/android/captures/
+/android/local.properties
+/android/keystore.properties
+/android/**/build/
+/android/**/.cxx/
+/android/**/*.apk
+/android/**/*.aab
+/android/**/*.jks
+/android/**/*.keystore
