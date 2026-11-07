@@ -18,7 +18,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloudQueue
-import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -48,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -64,8 +64,8 @@ import top.onlyquant.sonora.ui.theme.RoundedSans
  *   - Only the server address is asked for: the account is entered in the browser, so the
  *     username and password fields, and their hints, are left out.
  *   - It is the first screen, so the top bar has no back button.
- *   - One round badge with a placeholder icon instead of the Navidrome and Subsonic logos, until
- *     Eric approves a Sonora logo.
+ *   - One round badge with the PixelPlayer logo (pixelplayer_base_monochrome, as on the About
+ *     screen) instead of the Navidrome and Subsonic logos; Eric chose to keep PixelPlayer's icon.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -131,7 +131,7 @@ fun LoginScreen(
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        imageVector = Icons.Rounded.LibraryMusic,
+                        painter = painterResource(R.drawable.pixelplayer_base_monochrome),
                         contentDescription = stringResource(R.string.cd_sonora_logo),
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(42.dp)

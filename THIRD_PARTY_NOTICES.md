@@ -87,6 +87,7 @@
 - `data/model/AudioOutputMode.kt`、`data/model/Transition.kt`（去掉 `TransitionRule`）、`utils/Envelope.kt`。
 - `android/app/build.gradle.kts`、`android/gradle/`：构建配置与依赖版本取自原版，Gradle Wrapper 复制自原版。
 - `ui/theme/`：`Color.kt`、`Shape.kt`、`Type.kt` 照搬，`Theme.kt` 去掉 AMOLED 预设与正在播放取色的覆盖。
+- `res/mipmap-*/`、`res/drawable/new_monochrome.xml`、`pixelplayer_base_monochrome.xml`、`monochrome_player.xml`：PixelPlayer 的启动图标、标志与通知图标，照搬（Eric 决定沿用 PixelPlayer 的图标，名称仍是 Sonora）。
 - `res/font/gflex_variable.ttf`：Google Sans Flex（Copyright 2015 Google LLC，SIL Open Font License 1.1，许可证全文见 [frontend/public/fonts/OFL.txt](frontend/public/fonts/OFL.txt)），照搬。
 - `presentation/auth/LoginScreen.kt`：按原版 `presentation/navidrome/auth/NavidromeLoginActivity.kt` 的 `NavidromeLoginScreen` 改编；文案参照原版 `values-zh-rCN/strings_auth.xml`。
 

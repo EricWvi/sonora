@@ -43,9 +43,9 @@
 - `MusicService`：只保留围绕引擎的会话部分（原版 2584 行）。小组件、均衡器、统计、队列持久化、睡眠定时、自定义会话命令与自定义通知都没有复制，需要时再加。
 - 不带 FFmpeg 解码器：Sonora 只入库 MP3、FLAC、AAC、Vorbis 与 Opus，由系统解码。
 - `Transition.kt`：去掉依赖 Room 的 `TransitionRule`。
-- `MainActivity` 登录后是临时页面（用户名、测试音播放、退出登录），第 4 项替换。暂时没有应用图标（新视觉方案须 Eric 同意）。
+- `MainActivity` 登录后是临时页面（用户名、测试音播放、退出登录），第 4 项替换。应用名是 Sonora，图标照搬 PixelPlayer 的（Eric，2026-11-07）：启动图标（各密度的自适应图标与单色版）、登录页徽标用 `pixelplayer_base_monochrome`（原版“关于”页的标志），媒体通知的小图标用 `monochrome_player`。确认页上的设备名用手机型号（`Build.MODEL`），Eric 同意。
 - 主题（`ui/theme/`）：`Color`、`Shape`、`Type` 照搬，`Theme.kt` 去掉 AMOLED 预设与正在播放取色的覆盖，复制对应设置时再加；字体 `gflex_variable.ttf` 照搬。
-- 登录页按原版 `NavidromeLoginScreen` 的布局：只有服务器地址一个输入框（账号在浏览器里输入），没有返回按钮（它是第一个页面），一个圆形徽标放占位图标（Navidrome、Subsonic 两个标志的位置，等 Eric 同意 Sonora 的标志）。文案参照原版的 zh-CN 译文。
+- 登录页按原版 `NavidromeLoginScreen` 的布局：只有服务器地址一个输入框（账号在浏览器里输入），没有返回按钮（它是第一个页面），一个圆形徽标放 PixelPlayer 的标志（原版是 Navidrome、Subsonic 两个标志）。文案参照原版的 zh-CN 译文。
 - 网络：OkHttp 访问回环地址时不走系统代理，见第 3 项。
 
 ## 构建
