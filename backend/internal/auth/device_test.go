@@ -207,3 +207,25 @@ func TestDeviceConfirmLetsTheFormNameItsOrigin(t *testing.T) {
 		t.Fatalf("Referrer-Policy = %q, want same-origin", got)
 	}
 }
+
+func TestDeviceConfirmUsesClientColors(t *testing.T) {
+	_, h := newService(t, Config{DevUser: "eric"})
+	colors := "d0bcff,381e72,141218,e6e0e9,cac4d0,0f0d13,1d1b20,2b2930,4a4458,e8def8"
+	rec := serve(h, "GET", deviceLoginURL("android", AndroidRedirect, "v")+"&colors="+url.QueryEscape(colors))
+	cookie := http.Header{"Cookie": {approvalCookie + "=" + cookieOf(rec, approvalCookie)}}
+	body := request(h, "GET", "/auth/device/confirm", "", cookie).Body.String()
+	if !strings.Contains(body, "--primary:#d0bcff;") || !strings.Contains(body, "color-scheme:dark}") {
+		t.Fatalf("confirm page without the client colours: %s", body)
+	}
+	// Without colors the static scheme stays.
+	rec = serve(h, "GET", deviceLoginURL("android", AndroidRedirect, "v"))
+	cookie = http.Header{"Cookie": {approvalCookie + "=" + cookieOf(rec, approvalCookie)}}
+	if body := request(h, "GET", "/auth/device/confirm", "", cookie).Body.String(); strings.Contains(body, "color-scheme:dark}") {
+		t.Fatalf("static page got a client theme: %s", body)
+	}
+	for _, bad := range []string{"d0bcff", strings.Replace(colors, "d0bcff", "red;}x", 1), strings.Replace(colors, "d0bcff", "d0bcfg", 1)} {
+		if rec := serve(h, "GET", deviceLoginURL("android", AndroidRedirect, "v")+"&colors="+url.QueryEscape(bad)); rec.Code != http.StatusBadRequest {
+			t.Errorf("colors %q: status = %d", bad, rec.Code)
+		}
+	}
+}

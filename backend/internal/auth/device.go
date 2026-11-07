@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -53,6 +54,9 @@ type deviceRequest struct {
 	RedirectURI string `json:"r"`
 	State       string `json:"s"`
 	Challenge   string `json:"c"`
+	// Colors is the client's current colour scheme for the confirm page,
+	// see themeRoles; empty uses the static scheme.
+	Colors string `json:"k,omitempty"`
 }
 
 func parseDeviceRequest(q url.Values) (deviceRequest, bool) {
@@ -61,13 +65,15 @@ func parseDeviceRequest(q url.Values) (deviceRequest, bool) {
 		RedirectURI: q.Get("redirect_uri"),
 		State:       q.Get("state"),
 		Challenge:   q.Get("code_challenge"),
+		Colors:      q.Get("colors"),
 	}
 	name, err := store.CleanDeviceName(q.Get("name"))
 	req.Name = name
 	ok := err == nil &&
 		req.Platform == store.PlatformAndroid && req.RedirectURI == AndroidRedirect &&
 		req.State != "" && len(req.State) <= 256 &&
-		q.Get("code_challenge_method") == "S256" && validChallenge(req.Challenge)
+		q.Get("code_challenge_method") == "S256" && validChallenge(req.Challenge) &&
+		(req.Colors == "" || validColors(req.Colors))
 	return req, ok
 }
 
@@ -75,6 +81,62 @@ func parseDeviceRequest(q url.Values) (deviceRequest, bool) {
 func validChallenge(c string) bool {
 	b, err := base64.RawURLEncoding.DecodeString(c)
 	return err == nil && len(b) == sha256.Size
+}
+
+// themeRoles are the Material 3 colour roles the client sends in the colors
+// parameter, in this order, as six hex digits each separated by commas. The
+// app colours itself from the wallpaper on Android 12+ (dynamic colour), which
+// a web page cannot read, so the client passes what it uses.
+var themeRoles = []struct{ role, cssVar string }{
+	{"primary", "--primary"},
+	{"onPrimary", "--on-primary"},
+	{"background", "--bg"},
+	{"onSurface", "--on-surface"},
+	{"onSurfaceVariant", "--on-surface-variant"},
+	{"surfaceContainerLowest", "--container-lowest"},
+	{"surfaceContainerLow", "--container-low"},
+	{"surfaceContainerHigh", "--container-high"},
+	{"secondaryContainer", "--secondary-container"},
+	{"onSecondaryContainer", "--on-secondary-container"},
+}
+
+func validColors(raw string) bool {
+	parts := strings.Split(raw, ",")
+	if len(parts) != len(themeRoles) {
+		return false
+	}
+	for _, p := range parts {
+		if len(p) != 6 {
+			return false
+		}
+		if _, err := strconv.ParseUint(p, 16, 32); err != nil {
+			return false
+		}
+	}
+	return true
+}
+
+// themeCSS turns validated colors into CSS overriding the static scheme. The
+// light or dark color-scheme follows the background's luminance.
+func themeCSS(raw string) template.CSS {
+	if raw == "" || !validColors(raw) {
+		return ""
+	}
+	parts := strings.Split(strings.ToLower(raw), ",")
+	var b strings.Builder
+	b.WriteString(":root{")
+	for i, r := range themeRoles {
+		b.WriteString(r.cssVar + ":#" + parts[i] + ";")
+	}
+	bg, _ := strconv.ParseUint(parts[2], 16, 32)
+	luma := 0.2126*float64(bg>>16&0xff) + 0.7152*float64(bg>>8&0xff) + 0.0722*float64(bg&0xff)
+	if luma < 128 {
+		b.WriteString("color-scheme:dark}")
+	} else {
+		b.WriteString("color-scheme:light}")
+	}
+	// Built only from validated hex digits.
+	return template.CSS(b.String())
 }
 
 // approval waits for the user on the confirm page; issued waits for the
@@ -209,6 +271,7 @@ func (s *Service) deviceConfirm(w http.ResponseWriter, r *http.Request) {
 	}
 	s.devicePage(w, http.StatusOK, devicePageData{
 		Kind:     "ask",
+		Theme:    themeCSS(a.req.Colors),
 		Approval: c.Value,
 		Device:   a.req.Name,
 		User:     a.user.Name,
@@ -233,7 +296,7 @@ func (s *Service) deviceApprove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	back := url.Values{"state": {a.req.State}}
-	data := devicePageData{Kind: "denied"}
+	data := devicePageData{Kind: "denied", Theme: themeCSS(a.req.Colors)}
 	if r.PostFormValue("action") == "allow" {
 		back.Set("code", s.flows.addCode(issued{userID: a.user.ID, req: a.req, expires: time.Now().Add(codeLifetime)}))
 		data.Kind = "allowed"
@@ -307,6 +370,7 @@ type devicePageData struct {
 	Redirect string
 	Title    string
 	Message  string
+	Theme    template.CSS
 }
 
 // RedirectURL marks the client's address as safe for href; it was checked
@@ -342,9 +406,11 @@ func (s *Service) deviceFontFile(w http.ResponseWriter, r *http.Request) {
 // headlineSmall title, a surfaceContainerLow card with 28dp corners, 52dp
 // buttons with 18dp corners). Differences from the app, which a web page
 // cannot follow:
-//   - Colours are the static LightColorScheme and DarkColorScheme of
-//     ui/theme/Theme.kt; roles the app leaves to Material 3 use the Material
-//     3 baseline. The app itself uses the wallpaper colours on Android 12+.
+//   - Colours come from the client (colors parameter, see themeRoles), so
+//     the page matches the app's wallpaper colours on Android 12+. Without
+//     them, and on pages reached without a request, they are the static
+//     LightColorScheme and DarkColorScheme of ui/theme/Theme.kt; roles the
+//     app leaves to Material 3 use the Material 3 baseline.
 //   - AbsoluteSmoothCornerShape (squircle) is drawn as plain rounded corners.
 //   - The font is Google Sans Flex pinned at ROND 100 like RoundedSans,
 //     subset to Latin (assets/gflex.woff2); Chinese falls back to the system
@@ -383,6 +449,7 @@ button{display:block;width:100%;height:52px;border:0;border-radius:18px;font:600
 .tonal{margin-top:12px;background:var(--secondary-container);color:var(--on-secondary-container)}
 .foot{margin-top:16px;font-size:12px;line-height:16px;letter-spacing:.4px;color:var(--on-surface-variant)}
 .foot a{color:var(--primary)}
+{{.Theme}}
 </style></head><body>
 <div class="bar">设备登录</div>
 <main class="page">
