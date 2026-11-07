@@ -3,6 +3,7 @@ package auth
 import (
 	"crypto/sha256"
 	"crypto/subtle"
+	_ "embed"
 	"encoding/base64"
 	"encoding/json"
 	"html/template"
@@ -323,49 +324,93 @@ func (s *Service) devicePage(w http.ResponseWriter, status int, data devicePageD
 	}
 }
 
-// The page reuses the colours of the plain login error page (pageTmpl);
-// it is a placeholder look until Eric approves one. The card is centred by
-// its own wrapper, not by body: browser extensions append elements to body.
+//go:embed assets/gflex.woff2
+var deviceFont []byte
+
+// deviceFontPath serves the font of the confirm page.
+const deviceFontPath = "/auth/device/font.woff2"
+
+func (s *Service) deviceFontFile(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "font/woff2")
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	w.Write(deviceFont)
+}
+
+// The confirm page follows the visual language of PixelPlayerOSS, as the
+// Android client does; PixelPlayerOSS has no such page, so the layout is
+// modelled on its NavidromeLoginScreen (top app bar, round badge,
+// headlineSmall title, a surfaceContainerLow card with 28dp corners, 52dp
+// buttons with 18dp corners). Differences from the app, which a web page
+// cannot follow:
+//   - Colours are the static LightColorScheme and DarkColorScheme of
+//     ui/theme/Theme.kt; roles the app leaves to Material 3 use the Material
+//     3 baseline. The app itself uses the wallpaper colours on Android 12+.
+//   - AbsoluteSmoothCornerShape (squircle) is drawn as plain rounded corners.
+//   - The font is Google Sans Flex pinned at ROND 100 like RoundedSans,
+//     subset to Latin (assets/gflex.woff2); Chinese falls back to the system
+//     font, as it does in the app.
+//
+// The card is centred by its own wrapper, not by body: browser extensions
+// append elements to body.
 var devicePageTmpl = template.Must(template.New("device").Parse(`<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark"><title>Sonora 设备登录</title>
 <style>
-:root{--bg:#efede8;--surface:#fff;--ink:#3a3833;--ink-2:#7a776f;--line:#e2dfd8;--accent:#3a3833;--on-accent:#fff}
-@media (prefers-color-scheme:dark){:root{--bg:#1f2226;--surface:#2a2d32;--ink:#d4d6da;--ink-2:#9a9da3;--line:#3a3e44;--accent:#d4d6da;--on-accent:#1f2226}}
-*{box-sizing:border-box}html,body{height:100%;margin:0}
-body{background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,sans-serif}
-.page{min-height:100%;display:grid;place-items:center;padding:24px}
-.card{width:100%;max-width:360px;padding:24px;border-radius:16px;background:var(--surface);border:1px solid var(--line)}
-.brand{font-weight:600;font-size:17px;margin-bottom:16px}
-h1{margin:0 0 12px;font-size:18px;font-weight:600}
-.rows{border:1px solid var(--line);border-radius:12px}
-.row{padding:10px 14px}.row+.row{border-top:1px solid var(--line)}
-.sub{font-size:13px;color:var(--ink-2)}
-.actions{display:flex;gap:10px;margin-top:20px}
-button{flex:1;height:40px;border-radius:10px;font:inherit;cursor:pointer;border:1px solid var(--line);background:none;color:inherit}
-button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
-p{margin:0;color:var(--ink-2)}a{color:inherit}
+@font-face{font-family:"Rounded Sans";src:url(/auth/device/font.woff2) format("woff2");font-weight:300 700;font-display:swap}
+:root{--bg:#f7f2ff;--on-surface:#1e1237;--on-surface-variant:#4d4165;--primary:#6c4ff5;--on-primary:#fff;
+--container-lowest:#fff;--container-low:#f7f2fa;--container-high:#ece6f0;--secondary-container:rgb(240 98 146/.15);--on-secondary-container:rgb(240 98 146/.85)}
+@media (prefers-color-scheme:dark){:root{--bg:#1e1234;--on-surface:#e1bee7;--on-surface-variant:#cac4d0;--primary:#ab47bc;--on-primary:#fff;
+--container-lowest:#0f0d13;--container-low:#1d1b20;--container-high:#2b2930;--secondary-container:#4a4458;--on-secondary-container:#e8def8}}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%}
+body{background:var(--bg);color:var(--on-surface);font:400 14px/20px "Rounded Sans",system-ui,sans-serif;letter-spacing:.25px;-webkit-font-smoothing:antialiased}
+.bar{height:64px;display:flex;align-items:center;padding:0 16px;background:var(--container-high);font-size:22px;line-height:28px;font-weight:600;letter-spacing:0}
+.page{max-width:480px;margin:0 auto;padding:24px 20px 32px;display:flex;flex-direction:column;align-items:center;text-align:center}
+.badge{width:64px;height:64px;border-radius:50%;background:#fff;display:grid;place-items:center;color:var(--primary);
+box-shadow:0 1px 2px rgb(0 0 0/.3),0 2px 6px 2px rgb(0 0 0/.15)}
+svg{display:block;fill:currentColor}.badge svg{width:42px;height:42px}
+h1{margin:16px 0 0;font-size:24px;line-height:32px;font-weight:700;letter-spacing:0}
+.sub{margin:0;color:var(--on-surface-variant)}
+.card{width:100%;margin-top:24px;padding:18px;border-radius:28px;background:var(--container-low);text-align:left}
+.card h2{margin:0;font-size:18px;line-height:24px;font-weight:700;letter-spacing:.15px}
+.card .hint{margin:4px 0 18px;font-size:12px;line-height:16px;letter-spacing:.4px;color:var(--on-surface-variant)}
+.field{display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 16px 8px 12px;border-radius:18px;background:var(--container-high)}
+.field+.field{margin-top:14px}.field svg{width:24px;height:24px;flex:none;color:var(--primary)}
+.field .label{font-size:12px;line-height:16px;letter-spacing:.4px;color:var(--on-surface-variant)}
+.field .value{font-size:16px;line-height:24px;letter-spacing:.5px;overflow-wrap:anywhere}
+form{width:100%;margin:24px 0 0}
+button{display:block;width:100%;height:52px;border:0;border-radius:18px;font:600 14px/20px "Rounded Sans",system-ui,sans-serif;letter-spacing:.1px;cursor:pointer}
+.primary{background:var(--primary);color:var(--on-primary)}
+.tonal{margin-top:12px;background:var(--secondary-container);color:var(--on-secondary-container)}
+.foot{margin-top:16px;font-size:12px;line-height:16px;letter-spacing:.4px;color:var(--on-surface-variant)}
+.foot a{color:var(--primary)}
 </style></head><body>
-<div class="page"><main class="card">
-<div class="brand">Sonora</div>
+<div class="bar">设备登录</div>
+<main class="page">
+<div class="badge">{{if eq .Kind "ask"}}<svg viewBox="0 0 24 24"><path d="M16 1H8C6.34 1 5 2.34 5 4v16c0 1.66 1.34 3 3 3h8c1.66 0 3-1.34 3-3V4c0-1.66-1.34-3-3-3zm-2.5 20h-3c-.28 0-.5-.22-.5-.5s.22-.5.5-.5h3c.28 0 .5.22.5.5s-.22.5-.5.5zm3.5-3H7V4h10v14z"/></svg>{{else if eq .Kind "allowed"}}<svg viewBox="0 0 24 24"><path d="M8.8 15.9l-3.5-3.5a.984.984 0 0 0-1.4 0c-.39.39-.39 1.01 0 1.4l4.19 4.19c.39.39 1.02.39 1.41 0L20.1 7.39c.39-.39.39-1.01 0-1.4a.984.984 0 0 0-1.4 0L8.8 15.9z"/></svg>{{else}}<svg viewBox="0 0 24 24"><path d="M18.3 5.71a.996.996 0 0 0-1.41 0L12 10.59 7.11 5.7A.996.996 0 1 0 5.7 7.11L10.59 12 5.7 16.89a.996.996 0 1 0 1.41 1.41L12 13.41l4.89 4.89a.996.996 0 1 0 1.41-1.41L13.41 12l4.89-4.89c.38-.38.38-1.02 0-1.4z"/></svg>{{end}}</div>
 {{if eq .Kind "ask"}}
 <h1>允许这台设备登录？</h1>
-<div class="rows">
-<div class="row"><div>{{.Device}}</div><div class="sub">安卓客户端</div></div>
-<div class="row"><div>{{.User}}</div>{{if .Email}}<div class="sub">{{.Email}}</div>{{end}}</div>
-</div>
-<form method="post" action="/auth/device/approve" class="actions">
+<p class="sub">允许后，这台设备上的 Sonora 会以你的账号使用曲库</p>
+<section class="card">
+<h2>登录信息</h2>
+<p class="hint">确认是你自己的设备再允许</p>
+<div class="field"><svg viewBox="0 0 24 24"><path d="M16 1H8C6.34 1 5 2.34 5 4v16c0 1.66 1.34 3 3 3h8c1.66 0 3-1.34 3-3V4c0-1.66-1.34-3-3-3zm-2.5 20h-3c-.28 0-.5-.22-.5-.5s.22-.5.5-.5h3c.28 0 .5.22.5.5s-.22.5-.5.5zm3.5-3H7V4h10v14z"/></svg><div><div class="label">安卓设备</div><div class="value">{{.Device}}</div></div></div>
+<div class="field"><svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v1c0 .55.45 1 1 1h14c.55 0 1-.45 1-1v-1c0-2.66-5.33-4-8-4z"/></svg><div><div class="label">账号</div><div class="value">{{.User}}</div>{{if .Email}}<div class="label">{{.Email}}</div>{{end}}</div></div>
+</section>
+<form method="post" action="/auth/device/approve">
 <input type="hidden" name="approval" value="{{.Approval}}">
-<button name="action" value="deny">取消</button>
 <button class="primary" name="action" value="allow">允许</button>
+<button class="tonal" name="action" value="deny">取消</button>
 </form>
 {{else if eq .Kind "allowed"}}
-<h1>已允许登录</h1><p>正在返回应用，没有跳转的话<a href="{{.RedirectURL}}">点这里</a></p>
+<h1>已允许登录</h1>
+<p class="sub">正在返回应用</p>
+<p class="foot">没有跳转的话<a href="{{.RedirectURL}}">点这里</a></p>
 <script>location.replace({{.Redirect}})</script>
 {{else if eq .Kind "denied"}}
 <h1>已取消登录</h1>
 <script>location.replace({{.Redirect}})</script>
 {{else}}
-<h1>{{.Title}}</h1><p>{{.Message}}</p>
+<h1>{{.Title}}</h1>
+<p class="sub">{{.Message}}</p>
 {{end}}
-</main></div></body></html>`))
+</main></body></html>`))

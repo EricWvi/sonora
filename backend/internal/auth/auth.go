@@ -101,6 +101,7 @@ func (s *Service) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /auth/device/confirm", s.deviceConfirm)
 	mux.HandleFunc("POST /auth/device/approve", s.deviceApprove)
 	mux.HandleFunc("POST /auth/device/token", s.deviceToken)
+	mux.HandleFunc("GET "+deviceFontPath, s.deviceFontFile)
 }
 
 type userKey struct{}
