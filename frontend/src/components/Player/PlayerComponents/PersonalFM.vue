@@ -1,6 +1,6 @@
 <!-- 漫游 FM 卡片（Eric 定的名字，SPlayer 叫“私人FM”）。样式照搬 SPlayer components/Player/PlayerComponents/PersonalFM.vue。
 与 SPlayer 不同（Eric，2026-11-07）：歌曲来自自己的曲库，按专辑排（backend/internal/store/fm.go）；
-“不喜欢”改为“跳过这张专辑”，Sonora 没有垃圾桶；没在听 FM 时跳过只换卡片上的专辑，不打断
+“不喜欢”改为“跳过这张专辑”，Sonora 没有垃圾桶，图标由 ThumbDown 改为快进 FastForward（Eric 选定）；没在听 FM 时跳过只换卡片上的专辑，不打断
 正在播放的歌；没有选择分组歌单时，专辑名下面多一行提示，点开设置。 -->
 <template>
   <n-card class="personal-fm">
@@ -57,7 +57,7 @@
         <n-flex :wrap="false" class="menu" align="center">
           <!-- 跳过这张专辑 -->
           <div class="menu-icon" title="跳过这张专辑" v-debounce="skipAlbum">
-            <SvgIcon class="icon" size="18" name="ThumbDown" />
+            <SvgIcon class="icon" size="18" name="FastForward" />
           </div>
           <!-- 播放暂停 -->
           <n-button

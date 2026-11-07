@@ -161,14 +161,14 @@
           :depth="statusStore.shuffleMode === 'off' ? 3 : 1"
         />
       </div>
-      <!-- 漫游 FM：跳过这张专辑（照搬 SPlayer 的位置，SPlayer 是移到垃圾桶） -->
+      <!-- 漫游 FM：跳过这张专辑（照搬 SPlayer 的位置，SPlayer 是移到垃圾桶）；图标与 SPlayer 不同，是快进（Eric，2026-11-07） -->
       <div
         v-if="inFm"
         class="play-icon"
         title="跳过这张专辑"
         v-debounce="() => player.fmSkipAlbum()"
       >
-        <SvgIcon :size="18" name="ThumbDown" />
+        <SvgIcon :size="18" name="FastForward" />
       </div>
       <!-- 上一曲 -->
       <div
