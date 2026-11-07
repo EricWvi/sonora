@@ -20,7 +20,7 @@ func newService(t *testing.T, cfg Config) (*Service, http.Handler) {
 	svc := New(st, cfg)
 	mux := http.NewServeMux()
 	svc.Register(mux)
-	mux.Handle("GET /whoami", svc.Require(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("/whoami", svc.Require(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(User(r.Context()))
 	})))
 	return svc, mux

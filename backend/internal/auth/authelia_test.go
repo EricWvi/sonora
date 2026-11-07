@@ -200,6 +200,77 @@ func TestAutheliaCallbackRejectsForeignState(t *testing.T) {
 	}
 }
 
+// TestAutheliaDeviceLogin runs the native client login (device.go) through
+// a real Authelia, adapted from asr. The client's callback is the usual
+// /auth/callback, so the Authelia client needs no other redirect URI.
+func TestAutheliaDeviceLogin(t *testing.T) {
+	issuer, client := startAuthelia(t)
+	st, err := store.Open(t.TempDir(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { st.Close() })
+	svc := New(st, Config{
+		PublicURL: publicURL, Issuer: issuer, ClientID: "sonora",
+		ClientSecret: "sonora-test-client-secret", HTTPClient: client,
+	})
+	mux := http.NewServeMux()
+	svc.Register(mux)
+	mux.Handle("GET /whoami", svc.Require(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		d, _ := Device(r.Context())
+		json.NewEncoder(w).Encode(map[string]any{"name": User(r.Context()).Name, "device": d.Name})
+	})))
+	app := &browser{t: t, handler: mux, idp: client, issuer: issuer}
+
+	// The Android client opens the browser at the device login.
+	query, loginCookie := app.authorizeAt("alice", deviceLoginURL("android", AndroidRedirect, "android-verifier"))
+	rec := app.call("GET", "/auth/callback?"+query, loginCookie)
+	approvalID := cookieOf(rec, approvalCookie)
+	if rec.Code != http.StatusFound || rec.Header().Get("Location") != "/auth/device/confirm" || approvalID == "" {
+		t.Fatalf("callback: status = %d, location = %q", rec.Code, rec.Header().Get("Location"))
+	}
+	// The browser itself is not signed in.
+	if sessionFrom(rec) != "" {
+		t.Fatal("device login set a browser session")
+	}
+
+	cookie := approvalCookie + "=" + approvalID
+	rec = app.call("GET", "/auth/device/confirm", cookie)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "Eric 的 Pixel") {
+		t.Fatalf("confirm: status = %d, body = %s", rec.Code, rec.Body)
+	}
+	req := httptest.NewRequest("POST", publicURL+"/auth/device/approve",
+		strings.NewReader(url.Values{"approval": {approvalID}, "action": {"allow"}}.Encode()))
+	req.Header.Set("Cookie", cookie)
+	req.Header.Set("Origin", publicURL)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	m := redirectRe.FindStringSubmatch(rec.Body.String())
+	if rec.Code != http.StatusOK || m == nil {
+		t.Fatalf("approve: status = %d, body = %s", rec.Code, rec.Body)
+	}
+	var raw string
+	json.Unmarshal([]byte(`"`+m[1]+`"`), &raw)
+	back, err := url.Parse(raw)
+	if err != nil || !strings.HasPrefix(raw, AndroidRedirect+"?") || back.Query().Get("state") != "st" {
+		t.Fatalf("redirect = %q", raw)
+	}
+
+	rec = exchange(mux, back.Query().Get("code"), "android-verifier")
+	var out struct{ Token string }
+	json.Unmarshal(rec.Body.Bytes(), &out)
+	if rec.Code != http.StatusOK || out.Token == "" {
+		t.Fatalf("token: status = %d, body = %s", rec.Code, rec.Body)
+	}
+	rec = request(mux, "GET", "/whoami", "", http.Header{"Authorization": {"Bearer " + out.Token}})
+	var who map[string]any
+	json.Unmarshal(rec.Body.Bytes(), &who)
+	if rec.Code != http.StatusOK || who["device"] != "Eric 的 Pixel" || who["name"] != "Alice Test" {
+		t.Fatalf("whoami: status = %d, body = %s", rec.Code, rec.Body)
+	}
+}
+
 // browser drives the Sonora handler and Authelia like a user agent would.
 type browser struct {
 	t       *testing.T
@@ -227,7 +298,12 @@ func (b *browser) login(user string) string {
 // cookie as a Cookie header value.
 func (b *browser) startLogin() (string, string) {
 	b.t.Helper()
-	rec := b.call("GET", "/auth/login", "")
+	return b.startLoginAt("/auth/login")
+}
+
+func (b *browser) startLoginAt(path string) (string, string) {
+	b.t.Helper()
+	rec := b.call("GET", path, "")
 	if rec.Code != http.StatusFound {
 		b.t.Fatalf("login: status = %d, body = %s", rec.Code, rec.Body)
 	}
@@ -244,7 +320,12 @@ func (b *browser) startLogin() (string, string) {
 // (code and state) together with the login cookie it belongs to.
 func (b *browser) authorize(user string) (string, string) {
 	b.t.Helper()
-	authURL, loginCookie := b.startLogin()
+	return b.authorizeAt(user, "/auth/login")
+}
+
+func (b *browser) authorizeAt(user, path string) (string, string) {
+	b.t.Helper()
+	authURL, loginCookie := b.startLoginAt(path)
 
 	body, _ := json.Marshal(map[string]any{
 		"username": user, "password": password, "keepMeLoggedIn": false,

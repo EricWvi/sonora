@@ -346,6 +346,21 @@ var migrations = []migration{
 	CREATE INDEX fm_plan_album ON fm_plan (album_id);
 	CREATE INDEX fm_plan_track ON fm_plan (track_id);
 	`),
+
+	// Native clients signed in with a device token (devices.go). Only the
+	// token's hash is kept; times are Unix milliseconds.
+	execSQL(`
+	CREATE TABLE devices (
+		id           INTEGER PRIMARY KEY AUTOINCREMENT,
+		user_id      INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+		name         TEXT    NOT NULL,
+		platform     TEXT    NOT NULL,
+		token_hash   TEXT    NOT NULL UNIQUE,
+		created_at   INTEGER NOT NULL,
+		last_used_at INTEGER NOT NULL
+	);
+	CREATE INDEX devices_user ON devices (user_id);
+	`),
 }
 
 func migrate(db *sql.DB) error {

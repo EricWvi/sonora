@@ -17,6 +17,8 @@ const PlayerAPIPrefix = "/api/v1/"
 func (s *server) registerPlayer(private *http.ServeMux) {
 	p := PlayerAPIPrefix
 	private.HandleFunc("GET "+p+"me", s.getMe)
+	private.HandleFunc("GET "+p+"devices", s.listDevices)
+	private.HandleFunc("DELETE "+p+"devices/{id}", s.revokeDevice)
 	s.registerNetease(private)
 	s.registerFM(private)
 	s.registerFill(private)
