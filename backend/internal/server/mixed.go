@@ -483,7 +483,19 @@ func (s *server) deleteNeteasePlaylist(w http.ResponseWriter, r *http.Request) {
 	respondEmpty(w, r, nil)
 }
 
-func (s *server) addToNeteasePlaylist(w http.ResponseWriter, r *http.Request) {
+func (s *server) publishNeteasePlaylist(w http.ResponseWriter, r *http.Request) {
+	session, current, ok := s.ownNeteasePlaylist(w, r)
+	if !ok {
+		return
+	}
+	if err := s.opts.Netease.PublishPlaylist(r.Context(), session.Cookie, current.ID); err != nil {
+		writeNeteaseError(w, r, err)
+		return
+	}
+	respondEmpty(w, r, nil)
+}
+
+func (s *server) changeNeteasePlaylistTracks(w http.ResponseWriter, r *http.Request) {
 	session, current, ok := s.ownNeteasePlaylist(w, r)
 	if !ok {
 		return
@@ -500,7 +512,11 @@ func (s *server) addToNeteasePlaylist(w http.ResponseWriter, r *http.Request) {
 		writeNeteaseError(w, r, fmt.Errorf("%w: 没有选择歌曲", store.ErrInvalid))
 		return
 	}
-	if err := s.opts.Netease.AddToPlaylist(r.Context(), session.Cookie, current.ID, body.IDs); err != nil {
+	change := s.opts.Netease.AddToPlaylist
+	if r.Method == http.MethodDelete {
+		change = s.opts.Netease.RemoveFromPlaylist
+	}
+	if err := change(r.Context(), session.Cookie, current.ID, body.IDs); err != nil {
 		writeNeteaseError(w, r, err)
 		return
 	}

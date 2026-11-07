@@ -474,6 +474,9 @@ function librarySource(lib: Library): DataSource {
     updateOnlinePlaylist: () => Promise.reject(new ApiError(503, "没有配置")),
     deleteOnlinePlaylist: () => Promise.reject(new ApiError(503, "没有配置")),
     addToOnlinePlaylist: () => Promise.reject(new ApiError(503, "没有配置")),
+    removeFromOnlinePlaylist: () =>
+      Promise.reject(new ApiError(503, "没有配置")),
+    publishOnlinePlaylist: () => Promise.reject(new ApiError(503, "没有配置")),
     onlineSongUrl: () => Promise.reject(new ApiError(503, "没有配置")),
     onlineLyrics: () => reply(() => ({ format: "" as const, lyrics: "" })),
     importOnlineSong: () => Promise.reject(new ApiError(503, "没有配置")),

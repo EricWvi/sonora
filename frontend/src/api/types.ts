@@ -111,6 +111,8 @@ export type Playlist = {
   durationMs: number;
   createdAt: string;
   updatedAt: string;
+  /** 隐私歌单，只有在线歌单有 */
+  private?: boolean;
   source?: Source;
 };
 

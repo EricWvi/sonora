@@ -61,6 +61,8 @@ export interface ListDetailData {
   durationMs?: number;
   createTime?: string;
   updateTime?: string;
+  /** 隐私歌单 */
+  private?: boolean;
 }
 
 /** 卡片与详情头部显示的图片；为 null 时由组件换成 SPlayer 的默认图片。 */

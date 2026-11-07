@@ -184,6 +184,7 @@ export const openCopySongInfo = async (song: Track) => {
  * 开启批量操作（照搬 SPlayer 的 openBatchList；参数按 Sonora 的操作调整，见 BatchList.vue）
  * @param data 歌曲列表
  * @param options.playlistId 用户歌单 ID，提供“删除选中的歌曲”
+ * @param options.onlinePlaylist playlistId 是自己的在线歌单
  * @param options.liked 我喜欢的音乐，提供“取消喜欢”
  * @param options.onRemoved 歌曲从当前列表移除后调用
  */
@@ -191,6 +192,7 @@ export const openBatchList = async (
   data: Track[],
   options: {
     playlistId?: number;
+    onlinePlaylist?: boolean;
     liked?: boolean;
     onRemoved?: (keys: string[]) => void;
   } = {},
@@ -208,6 +210,7 @@ export const openBatchList = async (
       h(BatchList, {
         data,
         playlistId: options.playlistId,
+        onlinePlaylist: options.onlinePlaylist,
         liked: options.liked,
         onRemoved: options.onRemoved,
       }),

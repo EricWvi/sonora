@@ -117,12 +117,16 @@ import { useListActions } from "@/composables/List/useListActions";
 import { usePagedList } from "@/composables/List/usePagedList";
 import { useSettingStore } from "@/stores";
 import { useUserStore } from "@/stores/user";
-import { listKey } from "@/utils/track";
+import { listKey, trackKey } from "@/utils/track";
 import { renderIcon } from "@/utils/helper";
 import { importAlbum } from "@/utils/albumImport";
 import { copyShareLink, openSourcePage } from "@/utils/onlineLink";
 import { openBatchList, openUpdatePlaylist } from "@/utils/modal";
-import { deletePlaylist, toSubscribeOnline } from "@/utils/auth";
+import {
+  deletePlaylist,
+  publishOnlinePlaylist,
+  toSubscribeOnline,
+} from "@/utils/auth";
 import type { DropdownOption } from "naive-ui";
 import CoverList from "@/components/List/CoverList.vue";
 import ListDetail from "@/components/List/ListDetail.vue";
@@ -205,14 +209,32 @@ const editPlaylist = () => {
   );
 };
 
-// “更多”照搬 SPlayer：删除歌单（自己创建的）、批量操作、复制分享链接、打开源页面。
-// 不做“刷新缓存”（在线列表不缓存）与“公开隐私歌单”；批量操作没有“删除选中的歌曲”
-// （Sonora 不从网易云歌单中删歌）。艺术家页的批量操作只在歌曲标签下。
+// 服务端确认删除后从列表中移除，并更新头部的数量
+const removeSongs = (keys: string[]) => {
+  setListData(listData.value.filter((song) => !keys.includes(trackKey(song))));
+  if (detailData.value)
+    setDetailData({ ...detailData.value, count: listData.value.length });
+};
+
+const afterPublished = () => {
+  if (detailData.value) setDetailData({ ...detailData.value, private: false });
+};
+
+// “更多”照搬 SPlayer：公开隐私歌单、删除歌单（自己创建的）、批量操作、复制分享链接、打开源页面。
+// 不做“刷新缓存”（在线列表不缓存）。与 SPlayer 不同：歌曲右键菜单没有“从歌单中删除”。
+// 艺术家页的批量操作只在歌曲标签下。
 // 专辑另有“导入专辑到曲库”（Sonora 新增，可以导入的用户才有）。
 const moreOptions = computed<DropdownOption[]>(() => {
   const type = listType.value;
   const id = listIdNumber.value;
   return [
+    {
+      label: "公开隐私歌单",
+      key: "privacy",
+      show: ownPlaylist.value && !!detailData.value?.private,
+      props: { onClick: () => publishOnlinePlaylist(id, afterPublished) },
+      icon: renderIcon("ListLockOpen"),
+    },
     {
       label: "删除歌单",
       key: "delete",
@@ -226,7 +248,15 @@ const moreOptions = computed<DropdownOption[]>(() => {
       label: "批量操作",
       key: "batch",
       show: type !== "artist" || artistTab.value === "songs",
-      props: { onClick: () => openBatchList(displayData.value) },
+      props: {
+        onClick: () =>
+          openBatchList(
+            displayData.value,
+            ownPlaylist.value
+              ? { playlistId: id, onlinePlaylist: true, onRemoved: removeSongs }
+              : {},
+          ),
+      },
       icon: renderIcon("Batch"),
     },
     {
@@ -301,6 +331,7 @@ const load = async () => {
       cover: playlist.cover,
       description: playlist.description,
       count: tracks.length,
+      private: playlist.private,
     });
     setListData(tracks);
   } catch (e) {

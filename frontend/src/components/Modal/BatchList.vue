@@ -129,6 +129,8 @@ const props = defineProps<{
   data: Track[];
   // 用户歌单 ID：显示“删除选中的歌曲”
   playlistId?: number;
+  // playlistId 是自己的在线歌单
+  onlinePlaylist?: boolean;
   // 我喜欢的音乐：显示“取消喜欢”
   liked?: boolean;
 }>();
@@ -222,11 +224,16 @@ const afterRemoved = (ids: string[]) => {
 // 从歌单中删除（确认与提示沿用歌曲菜单的 deleteSongs）
 const handleDeleteFromPlaylist = () => {
   if (!props.playlistId) return;
-  const ids = checkSongData.value.map((song) => song.id);
-  deleteSongs(props.playlistId, ids, {
-    songName: ids.length === 1 ? checkSongData.value[0].title : undefined,
-    callback: () => afterRemoved(ids.map(String)),
-  });
+  const selected = checkSongData.value;
+  deleteSongs(
+    props.playlistId,
+    selected.map((song) => song.id),
+    {
+      songName: selected.length === 1 ? selected[0].title : undefined,
+      callback: () => afterRemoved(selected.map(trackKey)),
+      online: props.onlinePlaylist,
+    },
+  );
 };
 
 // 取消喜欢：逐首请求，中途失败时只移除已成功的

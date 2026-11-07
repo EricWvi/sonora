@@ -67,13 +67,18 @@ const reportWriteError = (error: unknown, fallback: string) => {
  * 从歌单中删除歌曲（照搬 SPlayer 的确认与提示），成功后调用 `callback`
  * @param pid 歌单 ID
  * @param ids 歌曲 ID
+ * @param options.online 在线歌单：一次请求删除全部歌曲，要么都成功要么都不变
  */
 export const deleteSongs = async (
   pid: number,
   ids: number[],
-  options: { callback?: () => void; songName?: string } = {},
+  options: {
+    callback?: () => void;
+    songName?: string;
+    online?: boolean;
+  } = {},
 ) => {
-  const { callback, songName } = options;
+  const { callback, songName, online } = options;
   window.$dialog.warning({
     title: "删除歌曲",
     content:
@@ -86,7 +91,8 @@ export const deleteSongs = async (
     negativeText: "取消",
     onPositiveClick: async () => {
       try {
-        for (const id of ids) await source.removeFromPlaylist(pid, id);
+        if (online) await source.removeFromOnlinePlaylist(pid, ids);
+        else for (const id of ids) await source.removeFromPlaylist(pid, id);
       } catch (error) {
         reportWriteError(error, "删除歌曲失败，请重试");
         return;
@@ -94,7 +100,33 @@ export const deleteSongs = async (
       if (isFunction(callback)) callback();
       window.$message.success("删除成功");
       // 歌单的封面与数量可能变化
-      await useUserStore().loadPlaylists();
+      const userStore = useUserStore();
+      await (online
+        ? userStore.loadOnlinePlaylists()
+        : userStore.loadPlaylists());
+    },
+  });
+};
+
+/**
+ * 公开隐私歌单（照搬 SPlayer playlist.vue 的 openPrivacy），成功后调用 `callback`
+ * @param id 在线歌单 ID
+ */
+export const publishOnlinePlaylist = (id: number, callback: () => void) => {
+  window.$dialog.warning({
+    title: "公开隐私歌单",
+    content: "确认公开这个歌单？该操作无法撤销！",
+    positiveText: "公开",
+    negativeText: "取消",
+    onPositiveClick: async () => {
+      try {
+        await source.publishOnlinePlaylist(id);
+      } catch (error) {
+        reportWriteError(error, "公开歌单失败，请重试");
+        return;
+      }
+      callback();
+      window.$message.success("歌单公开成功");
     },
   });
 };

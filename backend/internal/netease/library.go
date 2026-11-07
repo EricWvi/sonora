@@ -18,6 +18,8 @@ const (
 	songDetailChunk = 500
 	// likedPlaylist is the specialType of a user's "liked songs" playlist.
 	likedPlaylist = 5
+	// privatePlaylist is the privacy of a playlist only its owner can see.
+	privatePlaylist = 10
 	// sublistPage is the page size for an account's collected albums and artists.
 	sublistPage = 100
 	// maxSublistPages bounds that walk, in case hasMore never turns false.
@@ -79,6 +81,7 @@ type Playlist struct {
 	DurationMs  int64  `json:"durationMs"`
 	CreatedAt   string `json:"createdAt"`
 	UpdatedAt   string `json:"updatedAt"`
+	Private     bool   `json:"private"`
 	Source      string `json:"source"`
 }
 
@@ -219,6 +222,7 @@ type apiPlaylist struct {
 	TrackCount  int     `json:"trackCount"`
 	Subscribed  bool    `json:"subscribed"`
 	SpecialType int     `json:"specialType"`
+	Privacy     int     `json:"privacy"`
 	CreateTime  int64   `json:"createTime"`
 	UpdateTime  int64   `json:"updateTime"`
 	TrackIDs    []struct {
@@ -230,7 +234,8 @@ type apiPlaylist struct {
 func (a apiPlaylist) playlist() Playlist {
 	out := Playlist{
 		ID: a.ID, Name: a.Name, Cover: cover(a.CoverImgURL), TrackCount: a.TrackCount,
-		CreatedAt: millis(a.CreateTime), UpdatedAt: millis(a.UpdateTime), Source: sourceOnline,
+		CreatedAt: millis(a.CreateTime), UpdatedAt: millis(a.UpdateTime), Private: a.Privacy == privatePlaylist,
+		Source: sourceOnline,
 	}
 	if a.Description != nil {
 		out.Description = *a.Description
@@ -804,9 +809,24 @@ func (c *Client) DeletePlaylist(ctx context.Context, cookie string, id int64) er
 	return c.write(ctx, "/playlist/delete", cookie, url.Values{"id": {strconv.FormatInt(id, 10)}})
 }
 
-// AddToPlaylist adds songs to the playlist. The service wraps this endpoint's
-// answer in a "body" when it succeeds and returns it bare when NetEase refuses.
+// PublishPlaylist makes a private playlist public. NetEase has no way back.
+func (c *Client) PublishPlaylist(ctx context.Context, cookie string, id int64) error {
+	return c.write(ctx, "/playlist/privacy", cookie, url.Values{"id": {strconv.FormatInt(id, 10)}})
+}
+
+// AddToPlaylist adds songs to the playlist.
 func (c *Client) AddToPlaylist(ctx context.Context, cookie string, id int64, songs []int64) error {
+	return c.changeTracks(ctx, cookie, "add", id, songs)
+}
+
+// RemoveFromPlaylist removes songs from the playlist.
+func (c *Client) RemoveFromPlaylist(ctx context.Context, cookie string, id int64, songs []int64) error {
+	return c.changeTracks(ctx, cookie, "del", id, songs)
+}
+
+// changeTracks adds or removes songs. The service wraps this endpoint's answer
+// in a "body" when it succeeds and returns it bare when NetEase refuses.
+func (c *Client) changeTracks(ctx context.Context, cookie, op string, id int64, songs []int64) error {
 	parts := make([]string, len(songs))
 	for i, song := range songs {
 		parts[i] = strconv.FormatInt(song, 10)
@@ -816,7 +836,7 @@ func (c *Client) AddToPlaylist(ctx context.Context, cookie string, id int64, son
 		Body *writeResult `json:"body"`
 	}
 	params := url.Values{
-		"op": {"add"}, "pid": {strconv.FormatInt(id, 10)}, "tracks": {strings.Join(parts, ",")},
+		"op": {op}, "pid": {strconv.FormatInt(id, 10)}, "tracks": {strings.Join(parts, ",")},
 	}
 	if err := c.call(ctx, "/playlist/tracks", cookie, params, &out); err != nil {
 		return err

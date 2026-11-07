@@ -86,6 +86,8 @@ export interface DataSource {
   updateOnlinePlaylist(id: number, input: PlaylistInput): Promise<void>;
   deleteOnlinePlaylist(id: number): Promise<void>;
   addToOnlinePlaylist(id: number, songIds: number[]): Promise<void>;
+  removeFromOnlinePlaylist(id: number, songIds: number[]): Promise<void>;
+  publishOnlinePlaylist(id: number): Promise<void>;
   /** 在线歌曲的播放地址，带时效，每次播放时获取。 */
   onlineSongUrl(id: number): Promise<string>;
   onlineLyrics(id: number): Promise<Lyrics>;
@@ -270,6 +272,10 @@ const httpSource: DataSource = {
   deleteOnlinePlaylist: (id) => send("DELETE", `netease/playlists/${id}`),
   addToOnlinePlaylist: (id, ids) =>
     send("POST", `netease/playlists/${id}/tracks`, { ids }),
+  removeFromOnlinePlaylist: (id, ids) =>
+    send("DELETE", `netease/playlists/${id}/tracks`, { ids }),
+  publishOnlinePlaylist: (id) =>
+    send("POST", `netease/playlists/${id}/publish`),
   onlineSongUrl: async (id) =>
     (await get<{ url: string }>(`netease/songs/${id}/url`)).url,
   onlineLyrics: (id) => get(`netease/songs/${id}/lyrics`),

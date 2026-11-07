@@ -81,7 +81,7 @@ func newFakeNetease(t *testing.T) *fakeNetease {
 			}
 			w.Write([]byte(`{"code":200,"playlist":[
 				{"id":100,"name":"liked","specialType":5,"subscribed":false,"trackCount":2},
-				{"id":101,"name":"mine","specialType":0,"subscribed":false,"coverImgUrl":"http://p1/c.jpg","trackCount":1,"description":null},
+				{"id":101,"name":"mine","specialType":0,"subscribed":false,"coverImgUrl":"http://p1/c.jpg","trackCount":1,"description":null,"privacy":10},
 				{"id":102,"name":"theirs","specialType":0,"subscribed":true,"trackCount":1,"description":"d"}]}`))
 		case "/playlist/detail":
 			if r.PostForm.Get("id") == "404" {
@@ -173,6 +173,9 @@ func newFakeNetease(t *testing.T) *fakeNetease {
 			w.Write([]byte(`{"code":200}`))
 		case "/playlist/delete":
 			f.writes = append(f.writes, "delete "+r.PostForm.Get("id"))
+			w.Write([]byte(`{"code":200}`))
+		case "/playlist/privacy":
+			f.writes = append(f.writes, "publish "+r.PostForm.Get("id"))
 			w.Write([]byte(`{"code":200}`))
 		case "/playlist/tracks":
 			f.writes = append(f.writes, "tracks "+r.PostForm.Get("op")+" "+r.PostForm.Get("pid")+" "+r.PostForm.Get("tracks"))
@@ -796,6 +799,34 @@ func TestNeteasePlaylistWrites(t *testing.T) {
 		t.Fatalf("no songs: %d %s", rec.Code, rec.Body)
 	}
 
+	lists := decodeBody[struct{ Created, Collected []netease.Playlist }](t, ts.do("GET", playerAPI+"netease/playlists", ""))
+	if len(lists.Created) != 1 || !lists.Created[0].Private || lists.Collected[0].Private {
+		t.Fatalf("private: %+v", lists)
+	}
+
+	f.writes = nil
+	rec = ts.do("DELETE", playerAPI+"netease/playlists/101/tracks", `{"ids":[1,2]}`)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("remove: %d %s", rec.Code, rec.Body)
+	}
+	if !slices.Equal(f.writes, []string{"tracks del 101 1,2"}) {
+		t.Fatalf("remove writes: %q", f.writes)
+	}
+	rec = ts.do("DELETE", playerAPI+"netease/playlists/101/tracks", `{"ids":[500]}`)
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "歌单内歌曲重复") {
+		t.Fatalf("remove refused: %d %s", rec.Code, rec.Body)
+	}
+	if rec := ts.do("DELETE", playerAPI+"netease/playlists/101/tracks", `{"ids":[]}`); rec.Code != http.StatusBadRequest {
+		t.Fatalf("remove no songs: %d %s", rec.Code, rec.Body)
+	}
+	f.writes = nil
+	if rec := ts.do("POST", playerAPI+"netease/playlists/101/publish", ""); rec.Code != http.StatusNoContent {
+		t.Fatalf("publish: %d %s", rec.Code, rec.Body)
+	}
+	if !slices.Equal(f.writes, []string{"publish 101"}) {
+		t.Fatalf("publish writes: %q", f.writes)
+	}
+
 	// "Liked songs" and a collected playlist are playlists on NetEase, but
 	// not the listener's to edit or delete here.
 	f.writes = nil
@@ -805,6 +836,12 @@ func TestNeteasePlaylistWrites(t *testing.T) {
 		}
 		if rec := ts.do("PUT", playerAPI+"netease/playlists/"+id, `{"name":"x"}`); rec.Code != http.StatusNotFound {
 			t.Fatalf("update %s: %d %s", id, rec.Code, rec.Body)
+		}
+		if rec := ts.do("DELETE", playerAPI+"netease/playlists/"+id+"/tracks", `{"ids":[1]}`); rec.Code != http.StatusNotFound {
+			t.Fatalf("remove from %s: %d %s", id, rec.Code, rec.Body)
+		}
+		if rec := ts.do("POST", playerAPI+"netease/playlists/"+id+"/publish", ""); rec.Code != http.StatusNotFound {
+			t.Fatalf("publish %s: %d %s", id, rec.Code, rec.Body)
 		}
 		if rec := ts.do("POST", playerAPI+"netease/playlists/"+id+"/tracks", `{"ids":[1]}`); rec.Code != http.StatusNotFound {
 			t.Fatalf("add to %s: %d %s", id, rec.Code, rec.Body)

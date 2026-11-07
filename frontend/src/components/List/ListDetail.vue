@@ -47,6 +47,17 @@ n-image 默认的 object-fit: fill 会把长方形封面压成正方形，所以
             </n-ellipsis>
             <template v-else>
               {{ titleText }}
+              <!-- 隐私歌单 -->
+              <n-popover
+                v-if="detailData?.private"
+                :show-arrow="false"
+                placement="right"
+              >
+                <template #trigger>
+                  <SvgIcon :depth="3" name="EyeLock" size="22" />
+                </template>
+                <n-text>隐私歌单</n-text>
+              </n-popover>
             </template>
           </n-h2>
           <n-collapse-transition :show="!listScrolling" class="collapse">
