@@ -949,7 +949,7 @@ describe("保存与恢复", () => {
   });
 });
 
-describe("私人 FM", () => {
+describe("漫游 FM", () => {
   const album = (id: number, ...ids: number[]) => ({
     id,
     tracks: ids.map((t) => track(t)),

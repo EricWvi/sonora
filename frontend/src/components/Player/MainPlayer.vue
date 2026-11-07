@@ -161,7 +161,7 @@
           :depth="statusStore.shuffleMode === 'off' ? 3 : 1"
         />
       </div>
-      <!-- 私人 FM：跳过这张专辑（照搬 SPlayer 的位置，SPlayer 是移到垃圾桶） -->
+      <!-- 漫游 FM：跳过这张专辑（照搬 SPlayer 的位置，SPlayer 是移到垃圾桶） -->
       <div
         v-if="inFm"
         class="play-icon"
@@ -278,7 +278,7 @@ import { canImportSong, isOnline } from "@/utils/track";
 import { msToTime } from "@/utils/time";
 import type { DropdownOption } from "naive-ui";
 
-// 照搬 SPlayer components/Player/MainPlayer.vue。去掉倍速、定时关闭、电台与私人 FM；
+// 照搬 SPlayer components/Player/MainPlayer.vue。去掉倍速、定时关闭与电台；
 // 喜欢在阶段 4.4 接入。“更多”菜单按 Sonora 的歌曲菜单删减（2026-10-25）。
 
 const router = useRouter();
@@ -290,7 +290,7 @@ const userStore = useUserStore();
 
 const player = usePlayerController();
 
-// 是否正在听私人 FM
+// 是否正在听漫游 FM
 const inFm = computed(() => musicStore.playPlaylistId === FM_LIST);
 
 const { timeDisplay, toggleTimeFormat } = useTimeFormat();

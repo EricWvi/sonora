@@ -65,7 +65,7 @@
                 :depth="statusStore.shuffleMode === 'off' ? 3 : 1"
               />
             </div>
-            <!-- 私人 FM：跳过这张专辑（照搬 SPlayer 的位置，SPlayer 是移到垃圾桶） -->
+            <!-- 漫游 FM：跳过这张专辑（照搬 SPlayer 的位置，SPlayer 是移到垃圾桶） -->
             <div
               v-if="inFm"
               class="btn-icon"
@@ -154,7 +154,7 @@ import {
 import { useTimeFormat } from "@/composables/useTimeFormat";
 import { openPlaylistAdd } from "@/utils/modal";
 
-// 照搬 SPlayer components/Player/PlayerControl.vue。去掉下载、评论、私人 FM 的不喜欢、电台判断
+// 照搬 SPlayer components/Player/PlayerControl.vue。去掉下载、评论、电台判断
 // 与自动混音（Sonora 不做）；喜欢在阶段 4.4 接入。
 
 const dataStore = useDataStore();
@@ -165,7 +165,7 @@ const userStore = useUserStore();
 
 const player = usePlayerController();
 
-// 是否正在听私人 FM
+// 是否正在听漫游 FM
 const inFm = computed(() => musicStore.playPlaylistId === FM_LIST);
 
 const { timeDisplay, toggleTimeFormat } = useTimeFormat();

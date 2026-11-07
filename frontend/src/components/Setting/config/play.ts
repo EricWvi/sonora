@@ -109,10 +109,10 @@ export const usePlaySettings = (): SettingConfig => {
           },
           {
             key: "fmGroups",
-            label: "私人FM分组歌单",
+            label: "漫游 FM 分组歌单",
             type: "button",
             description:
-              "不足 10 首的专辑按这些歌单分组，不在其中的不进入私人FM；10 首及以上的专辑不受影响",
+              "不足 10 首的专辑按这些歌单分组，不在其中的不进入漫游 FM；10 首及以上的专辑不受影响",
             buttonLabel: "配置",
             action: openFmGroupManager,
           },

@@ -1,7 +1,7 @@
 <!-- 首页。问候语照搬 SPlayer views/Home/index.vue；快捷入口沿用 SPlayer 首页的 SongListCard，
-栏目沿用 HomeOnline 的标题与列表。内容：快捷入口（每日推荐、我喜欢的音乐、私人 FM）、
+栏目沿用 HomeOnline 的标题与列表。内容：快捷入口（每日推荐、我喜欢的音乐、漫游 FM）、
 “最近添加的歌曲”、“最近添加的专辑”、“最近播放”；栏目的显示与顺序由 homePageSections
-设置决定。快捷入口的布局照搬 HomeOnline（左边两张上下叠放，右边是私人 FM）；与 SPlayer 不同：
+设置决定。快捷入口的布局照搬 HomeOnline（左边两张上下叠放，右边是漫游 FM）；与 SPlayer 不同：
 卡片固定显示，账号是页面载入后才读到的，按登录状态切换卡片会闪动，
 没有歌曲时用默认封面，没有登录网易云时点开每日推荐，在该页提示登录。 -->
 <template>
@@ -35,7 +35,7 @@
             @click="router.push({ name: 'like-songs' })"
           />
         </n-flex>
-        <!-- 私人 FM -->
+        <!-- 漫游 FM -->
         <PersonalFM />
       </div>
     </div>

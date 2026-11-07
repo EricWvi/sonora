@@ -374,7 +374,7 @@ export const openFmGroupManager = async () => {
     transformOrigin: "center",
     autoFocus: false,
     style: { width: "500px" },
-    title: "私人FM分组歌单",
+    title: "漫游 FM 分组歌单",
     content: () => {
       return h(FmGroupManager);
     },

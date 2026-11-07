@@ -33,7 +33,7 @@ export type CoverSize = 96 | 100 | 300 | 1024;
 /** 播放端读取数据的唯一入口。页面与 store 只通过它访问服务端，开发时可整体换成 fixture。 */
 export interface DataSource {
   me(): Promise<User>;
-  /** 私人 FM 的状态，服务端需要时排好接下来的专辑。 */
+  /** 漫游 FM 的状态，服务端需要时排好接下来的专辑。 */
   fm(): Promise<FmState>;
   /** 这张专辑听完了，计一次。不是当前专辑时什么也不做。 */
   fmFinish(albumId: number): Promise<FmState>;

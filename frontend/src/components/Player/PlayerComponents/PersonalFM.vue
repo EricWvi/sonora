@@ -1,4 +1,4 @@
-<!-- 私人 FM 卡片。样式照搬 SPlayer components/Player/PlayerComponents/PersonalFM.vue。
+<!-- 漫游 FM 卡片（Eric 定的名字，SPlayer 叫“私人FM”）。样式照搬 SPlayer components/Player/PlayerComponents/PersonalFM.vue。
 与 SPlayer 不同（Eric，2026-11-07）：歌曲来自自己的曲库，按专辑排（backend/internal/store/fm.go）；
 “不喜欢”改为“跳过这张专辑”，Sonora 没有垃圾桶；没在听 FM 时跳过只换卡片上的专辑，不打断
 正在播放的歌；没有选择分组歌单时，专辑名下面多一行提示，点开设置。 -->
@@ -83,7 +83,7 @@
         <!-- 图标 -->
         <div class="radio">
           <SvgIcon :depth="3" name="Radio" />
-          <n-text :depth="3">私人FM</n-text>
+          <n-text :depth="3">漫游 FM</n-text>
         </div>
       </div>
     </Transition>
@@ -136,7 +136,7 @@ const load = async () => {
     state.value = await source.fm();
     loaded.value = true;
   } catch (e) {
-    console.error("获取私人 FM 失败：", e);
+    console.error("获取漫游 FM 失败：", e);
   }
 };
 

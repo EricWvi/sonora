@@ -55,13 +55,13 @@ export type Track = {
   playable?: boolean;
 };
 
-/** 私人 FM 排好的一张专辑，歌曲按播放顺序。 */
+/** 漫游 FM 排好的一张专辑，歌曲按播放顺序。 */
 export type FmAlbum = {
   id: number;
   tracks: Track[];
 };
 
-/** 私人 FM：当前专辑、接下来的专辑、继续收听的歌曲与分组歌单（按优先顺序）。 */
+/** 漫游 FM：当前专辑、接下来的专辑、继续收听的歌曲与分组歌单（按优先顺序）。 */
 export type FmState = {
   albums: FmAlbum[];
   trackId: number | null;

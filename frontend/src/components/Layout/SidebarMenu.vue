@@ -1,7 +1,7 @@
 <!-- 主菜单：按 SPlayer Menu.vue 改编，条目见阶段 2 的信息架构。
 与 SPlayer 不同（阶段 7，Eric 决定 2026-11-05）：歌单分组不能折叠，始终展开，标题是普通的小标题，
 文字样式不变。在线/本地歌单的切换按钮照搬 SPlayer（NPopselect），默认本地歌单；
-没有登录网易云时“在线歌单”不可选。“+”在在线模式下新建网易云歌单。
+没有登录网易云时“在线歌单”不可选。与 SPlayer 不同（Eric，2026-11-07）：在线模式的标题是“在线歌单”，不是“创建的歌单”，切换时文字长度不变。“+”在在线模式下新建网易云歌单。
 歌单项的右键菜单是 Sonora 新增，SPlayer 的侧边栏没有；在线歌单项的条目与本地相同。 -->
 <template>
   <n-menu
@@ -135,7 +135,7 @@ const options = computed<MenuOption[]>(() => [
     label: () =>
       h("div", { class: "user-list" }, [
         h(NText, { depth: 3 }, () =>
-          onlineMode.value ? "创建的歌单" : "本地歌单",
+          onlineMode.value ? "在线歌单" : "本地歌单",
         ),
         h(
           NPopselect,

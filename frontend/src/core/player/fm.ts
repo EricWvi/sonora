@@ -1,7 +1,7 @@
 import { ref } from "vue";
 import type { FmState, Track } from "@/api/types";
 
-/** 私人 FM 的列表来源（见 music store 的 playPlaylistId） */
+/** 漫游 FM 的列表来源（见 music store 的 playPlaylistId） */
 export const FM_LIST = "fm";
 
 /** 队列中保留的已播条目数：FM 没有尽头，队列不能一直变长 */

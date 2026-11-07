@@ -13,7 +13,7 @@ const state: FmState = {
   groupIds: [],
 };
 
-describe("私人 FM 的队列", () => {
+describe("漫游 FM 的队列", () => {
   it("歌曲带所属专辑，按播放顺序", () => {
     expect(fmTracks(state).map((t) => [t.id, t.fmAlbumId])).toEqual([
       [11, 1],

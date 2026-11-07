@@ -105,8 +105,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * - 播放失败不重试，直接跳过，连续 3 首失败或无歌可跳时停止并提示，不清空队列；
  * - 播放超过 min(30 秒, 时长的一半) 才记入最近播放，SPlayer 开始播放即记录；
  * - 解析或加载中暂停，加载完成后保持暂停；
- * - 私人 FM 用普通队列（SPlayer 有单独的列表），放当前专辑与下一张，单位是专辑，
- *   进度保存在服务端，见“私人 FM”一节。
+ * - 漫游 FM 用普通队列（SPlayer 有单独的列表），放当前专辑与下一张，单位是专辑，
+ *   进度保存在服务端，见“漫游 FM”一节。
  */
 const UNPLAYABLE = "这首歌暂时无法播放";
 
@@ -1227,7 +1227,7 @@ export class PlayerController {
     this.setLists(list, toRaw(dataStore.originalPlayList));
   }
 
-  // --- 私人 FM ---------------------------------------------------------------
+  // --- 漫游 FM ---------------------------------------------------------------
   //
   // 与 SPlayer 不同（Eric，2026-11-07）：SPlayer 的 FM 是网易云按歌推荐的单独列表；Sonora 按
   // 专辑排，排法在服务端（backend/internal/store/fm.go），歌曲放进普通队列，预加载、恢复与
@@ -1250,8 +1250,8 @@ export class PlayerController {
     try {
       state = await this.fmRequest(() => this.deps.source.fm());
     } catch (error) {
-      console.error("读取私人 FM 失败", error);
-      this.deps.message.error("读取私人FM失败");
+      console.error("读取漫游 FM 失败", error);
+      this.deps.message.error("读取漫游 FM 失败");
       return;
     }
     await this.playFmState(state);

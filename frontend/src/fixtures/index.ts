@@ -413,7 +413,7 @@ function librarySource(lib: Library): DataSource {
   const byArtist = (t: Track, id: number) => t.artists.some((a) => a.id === id);
 
   // 返回副本，页面修改结果不影响 fixture。
-  // 私人 FM：按专辑依次轮转，真实的排法在服务端
+  // 漫游 FM：按专辑依次轮转，真实的排法在服务端
   const fmAlbums = () =>
     lib.albums
       .map((album) => ({
