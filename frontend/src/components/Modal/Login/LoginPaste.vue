@@ -40,6 +40,8 @@ async function login(): Promise<void> {
   loading.value = true;
   try {
     userStore.netease = await source.neteaseCookieLogin(cookie.value);
+    // 歌单、喜欢与收藏也要读取，和二维码登录一样
+    await userStore.loadNetease();
     window.$message.success("登录成功");
     emit("success");
   } catch (error) {

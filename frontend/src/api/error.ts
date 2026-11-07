@@ -9,3 +9,8 @@ export class ApiError extends Error {
     this.code = code;
   }
 }
+
+/** 网易云没有登录或登录已失效：重试没有用，要重新登录。 */
+export const needsOnlineLogin = (error: unknown): boolean =>
+  error instanceof ApiError &&
+  (error.code === "netease_signed_out" || error.code === "netease_expired");

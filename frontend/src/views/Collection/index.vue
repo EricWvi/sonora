@@ -5,7 +5,7 @@
     <div class="title">
       <n-text class="keyword">我的收藏</n-text>
     </div>
-    <ListError v-if="error" :error="error" @retry="load" />
+    <ListError v-if="error" :error="error" :login="login" @retry="load" />
     <n-tabs v-else v-model:value="tab" type="segment" animated>
       <n-tab-pane name="albums" tab="专辑">
         <CoverList
@@ -36,7 +36,7 @@
 
 <script setup lang="ts">
 import type { Album, Artist, Playlist } from "@/api/types";
-import { ApiError, source } from "@/api/source";
+import { ApiError, needsOnlineLogin, source } from "@/api/source";
 import { useUserStore } from "@/stores/user";
 import CoverList from "@/components/List/CoverList.vue";
 import ArtistList from "@/components/List/ArtistList.vue";
@@ -51,6 +51,7 @@ const albums = shallowRef<Album[]>([]);
 const artists = shallowRef<Artist[]>([]);
 const loading = ref(true);
 const error = ref("");
+const login = ref(false);
 
 const load = async () => {
   loading.value = true;
@@ -69,6 +70,7 @@ const load = async () => {
     };
   } catch (e) {
     error.value = e instanceof ApiError ? e.message : "加载失败";
+    login.value = needsOnlineLogin(e);
   } finally {
     loading.value = false;
   }

@@ -47,7 +47,7 @@
         </n-button>
       </template>
     </ListDetail>
-    <ListError v-if="error" :error="error" @retry="load" />
+    <ListError v-if="error" :error="error" :login="login" @retry="load" />
     <!-- 标签照搬本地艺术家页 -->
     <n-tabs
       v-if="isArtist && !error"
@@ -68,6 +68,7 @@
       <ListError
         v-if="albums.error.value"
         :error="albums.error.value"
+        :login="albums.login.value"
         @retry="albums.reload()"
       />
       <CoverList
@@ -108,7 +109,7 @@
 <script setup lang="ts">
 import type { ListDetailData } from "@/viewmodels";
 import type { OnlineListType } from "@/api/types";
-import { ApiError, source } from "@/api/source";
+import { ApiError, needsOnlineLogin, source } from "@/api/source";
 import { useListDetail } from "@/composables/List/useListDetail";
 import { useListSearch } from "@/composables/List/useListSearch";
 import { useListScroll } from "@/composables/List/useListScroll";
@@ -147,6 +148,7 @@ const { listScrolling, handleListScroll } = useListScroll();
 const { playAllSongs: playAllSongsAction } = useListActions();
 
 const error = ref<string>("");
+const login = ref<boolean>(false);
 // 标签的高度算在歌曲列表之外
 const ARTIST_TABS_HEIGHT = 54;
 const songListHeight = computed(
@@ -304,6 +306,7 @@ const load = async () => {
   } catch (e) {
     setListData([]);
     error.value = e instanceof ApiError ? e.message : "加载失败";
+    login.value = needsOnlineLogin(e);
   } finally {
     setLoading(false);
   }

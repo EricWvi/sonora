@@ -1,4 +1,4 @@
-import { ApiError } from "./error";
+import { ApiError, needsOnlineLogin } from "./error";
 import { connection } from "./connection";
 import { onlineImage } from "@/utils/onlineImage";
 import type {
@@ -27,7 +27,7 @@ import type {
 } from "./types";
 import type { PlayerState } from "@/viewmodels";
 
-export { ApiError };
+export { ApiError, needsOnlineLogin };
 
 export type CoverSize = 96 | 100 | 300 | 1024;
 

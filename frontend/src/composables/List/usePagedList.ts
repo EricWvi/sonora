@@ -1,5 +1,5 @@
 import type { Page } from "@/api/types";
-import { ApiError } from "@/api/source";
+import { ApiError, needsOnlineLogin } from "@/api/source";
 
 /**
  * 分页列表：首次载入一页，触底或点击“加载更多”时追加下一页。
@@ -18,6 +18,8 @@ export const usePagedList = <T>(
   const loaded = ref<boolean>(false);
   /** 最近一次请求的错误说明；成功后清空 */
   const error = ref<string>("");
+  /** 错误是没有登录网易云，重试没有用 */
+  const login = ref<boolean>(false);
   const hasMore = computed(() => items.value.length < total.value);
 
   // 请求序号，丢弃过期的结果
@@ -41,6 +43,7 @@ export const usePagedList = <T>(
         total.value = 0;
       }
       error.value = e instanceof ApiError ? e.message : "加载失败";
+      login.value = needsOnlineLogin(e);
       console.error("列表加载失败", e);
     } finally {
       if (id === requestId) loading.value = false;
@@ -56,5 +59,15 @@ export const usePagedList = <T>(
     return load(false);
   };
 
-  return { items, total, loading, loaded, error, hasMore, reload, loadMore };
+  return {
+    items,
+    total,
+    loading,
+    loaded,
+    error,
+    login,
+    hasMore,
+    reload,
+    loadMore,
+  };
 };

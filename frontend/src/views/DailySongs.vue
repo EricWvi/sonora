@@ -45,7 +45,7 @@
         </n-dropdown>
       </n-flex>
     </div>
-    <ListError v-if="error" :error="error" @retry="load()" />
+    <ListError v-if="error" :error="error" :login="login" @retry="load()" />
     <!-- 列表 -->
     <SongList
       v-else
@@ -60,7 +60,7 @@
 <script setup lang="ts">
 import type { DropdownOption } from "naive-ui";
 import type { Track } from "@/api/types";
-import { ApiError, source } from "@/api/source";
+import { ApiError, needsOnlineLogin, source } from "@/api/source";
 import { usePlayerController } from "@/core/player/PlayerController";
 import { renderIcon } from "@/utils/helper";
 import { openBatchList } from "@/utils/modal";
@@ -72,6 +72,7 @@ const player = usePlayerController();
 const songs = shallowRef<Track[]>([]);
 const loading = ref<boolean>(true);
 const error = ref<string>("");
+const login = ref<boolean>(false);
 
 const load = async (refresh = false) => {
   loading.value = true;
@@ -82,6 +83,7 @@ const load = async (refresh = false) => {
   } catch (e) {
     songs.value = [];
     error.value = e instanceof ApiError ? e.message : "加载失败";
+    login.value = needsOnlineLogin(e);
   } finally {
     loading.value = false;
   }
