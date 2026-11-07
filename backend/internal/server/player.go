@@ -164,11 +164,12 @@ func (s *server) getMe(w http.ResponseWriter, r *http.Request) {
 func (s *server) listPlayerTracks(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	page, err := s.store.Tracks(r.Context(), store.TrackQuery{
-		Q:        q.Get("q"),
-		AlbumID:  queryInt(q.Get("albumId")),
-		ArtistID: queryInt(q.Get("artistId")),
-		Sort:     listSort(r),
-		Window:   window(r),
+		Q:           q.Get("q"),
+		AlbumID:     queryInt(q.Get("albumId")),
+		ArtistID:    queryInt(q.Get("artistId")),
+		OnlySingles: q.Get("onlySingles") == "true",
+		Sort:        listSort(r),
+		Window:      window(r),
 	})
 	respond(w, r, mapPage(page, toPlayerTrack), err)
 }

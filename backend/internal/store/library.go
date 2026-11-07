@@ -253,7 +253,10 @@ type TrackQuery struct {
 	// ArtistID keeps the tracks the artist performs, not those of their
 	// albums.
 	ArtistID int64
-	Sort     Sort
+	// OnlySingles leaves out the tracks of albums not marked single; a track
+	// without an album stays.
+	OnlySingles bool
+	Sort        Sort
 	Window
 }
 
@@ -358,6 +361,9 @@ func (s *Store) Tracks(ctx context.Context, q TrackQuery) (Page[Track], error) {
 	if q.ArtistID > 0 {
 		where = append(where, `EXISTS (SELECT 1 FROM track_artists WHERE track_id = t.id AND artist_id = ?)`)
 		args = append(args, q.ArtistID)
+	}
+	if q.OnlySingles {
+		where = append(where, `(al.id IS NULL OR al.single = 1)`)
 	}
 	cond := ""
 	if len(where) > 0 {

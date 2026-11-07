@@ -149,6 +149,8 @@ export type ListQuery = {
 export type TrackQuery = ListQuery & {
   albumId?: number;
   artistId?: number;
+  /** 不含没有标记为单曲的专辑里的歌曲，没有专辑的歌曲保留。 */
+  onlySingles?: boolean;
 };
 
 export type AlbumQuery = Omit<ListQuery, "sort"> & {

@@ -168,8 +168,9 @@ const getHomeData = async () => {
   try {
     const [likes, songs, albums, history] = await Promise.all([
       source.mixedLikes({ limit: 50 }),
-      // 默认新入库在前
-      source.tracks({ limit: 12 }),
+      // 默认新入库在前。只含单曲专辑里的歌（Eric，2026-11-07），整张专辑由下面的栏目展示，
+      // 否则刚入库一张专辑就会占满这一栏
+      source.tracks({ limit: 12, onlySingles: true }),
       // 与 SPlayer 不同：最近添加的专辑不含标记为单曲的专辑
       source.albums({
         sort: "createTime",

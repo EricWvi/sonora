@@ -521,6 +521,15 @@ func TestSingleAlbums(t *testing.T) {
 	if all.Total != 2 || shown.Total != 1 || shown.Items[0].ID != real.Album.ID {
 		t.Fatalf("all = %d, shown = %+v", all.Total, shown)
 	}
+	// The tracks shown beside them are the other way round; no album stays.
+	loose := fakeTracks(t, s, 1)[0]
+	singles, err := s.Tracks(ctx, TrackQuery{OnlySingles: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := trackIDs(singles.Items); singles.Total != 2 || !slices.Contains(got, single.ID) || !slices.Contains(got, loose) {
+		t.Fatalf("only singles = %v of %d", got, singles.Total)
+	}
 	no := false
 	if a, err = s.UpdateAlbum(ctx, single.Album.ID, AlbumInput{Title: "原声带", Artists: []string{"甲"}, Single: &no}); err != nil || a.Single {
 		t.Fatalf("unmark single = %+v, %v", a, err)
