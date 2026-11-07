@@ -154,15 +154,28 @@
     <!-- 控制 -->
     <n-flex :size="8" align="center" justify="center" class="play-control">
       <!-- 随机按钮 -->
-      <div class="play-icon" @click.stop="player.toggleShuffle()">
+      <div v-if="!inFm" class="play-icon" @click.stop="player.toggleShuffle()">
         <SvgIcon
           :name="statusStore.shuffleIcon"
           :size="20"
           :depth="statusStore.shuffleMode === 'off' ? 3 : 1"
         />
       </div>
+      <!-- 私人 FM：跳过这张专辑（照搬 SPlayer 的位置，SPlayer 是移到垃圾桶） -->
+      <div
+        v-if="inFm"
+        class="play-icon"
+        title="跳过这张专辑"
+        v-debounce="() => player.fmSkipAlbum()"
+      >
+        <SvgIcon :size="18" name="ThumbDown" />
+      </div>
       <!-- 上一曲 -->
-      <div class="play-icon" v-debounce="() => player.nextOrPrev('prev')">
+      <div
+        v-else
+        class="play-icon"
+        v-debounce="() => player.nextOrPrev('prev')"
+      >
         <SvgIcon :size="26" name="SkipPrev" />
       </div>
       <!-- 播放暂停 -->
@@ -192,7 +205,7 @@
         <SvgIcon :size="26" name="SkipNext" />
       </div>
       <!-- 循环按钮 -->
-      <div class="play-icon" @click.stop="player.toggleRepeat()">
+      <div v-if="!inFm" class="play-icon" @click.stop="player.toggleRepeat()">
         <SvgIcon
           :name="statusStore.repeatIcon"
           :size="20"
@@ -240,6 +253,7 @@
 
 <script setup lang="ts">
 import { importSong, toLikeSong } from "@/utils/auth";
+import { FM_LIST } from "@/core/player/fm";
 import { usePlayerController } from "@/core/player/PlayerController";
 import {
   useDataStore,
@@ -275,6 +289,9 @@ const settingStore = useSettingStore();
 const userStore = useUserStore();
 
 const player = usePlayerController();
+
+// 是否正在听私人 FM
+const inFm = computed(() => musicStore.playPlaylistId === FM_LIST);
 
 const { timeDisplay, toggleTimeFormat } = useTimeFormat();
 

@@ -1,6 +1,6 @@
 import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Track } from "@/api/types";
+import type { FmState, Track } from "@/api/types";
 import {
   AudioErrorCode,
   type AudioEventMap,
@@ -946,5 +946,155 @@ describe("保存与恢复", () => {
     const restored = newPlayer();
     await restored.restore();
     expect(useStatusStore().currentTime).toBe(0);
+  });
+});
+
+describe("私人 FM", () => {
+  const album = (id: number, ...ids: number[]) => ({
+    id,
+    tracks: ids.map((t) => track(t)),
+  });
+  const fmState = (
+    albums: FmState["albums"],
+    trackId: number | null = null,
+  ): FmState => ({ albums, trackId, groupIds: [] });
+
+  /** 开始时当前专辑是 1（歌曲 11、12），下一张是 2（歌曲 21）；听完 1 之后接上 3 */
+  function setup(first = fmState([album(1, 11, 12), album(2, 21)])) {
+    const player = newPlayer({
+      source: {
+        recordPlay: vi.fn(async () => {}),
+        audioStatus: vi.fn(async () => 200),
+        fm: vi.fn(async () => first),
+        fmFinish: vi.fn(async () => fmState([album(2, 21), album(3, 31)])),
+        fmSkip: vi.fn(async () => fmState([album(2, 21), album(3, 31)])),
+        fmPosition: vi.fn(async () => {}),
+      } as unknown as PlaybackDeps["source"],
+    });
+    return {
+      player,
+      source: deps.source as unknown as Record<
+        string,
+        ReturnType<typeof vi.fn>
+      >,
+    };
+  }
+  const queue = ids;
+
+  it("从记录的歌曲开始，关闭随机，不提示", async () => {
+    const { player, source } = setup(
+      fmState([album(1, 11, 12), album(2, 21)], 12),
+    );
+    useStatusStore().shuffleMode = "on";
+    await player.playFm();
+    await settle();
+    expect(useMusicStore().playPlaylistId).toBe("fm");
+    expect(useMusicStore().playSong.id).toBe(12);
+    expect(useStatusStore().shuffleMode).toBe("off");
+    expect(queue()).toEqual([11, 12, 21]);
+    expect(deps.message.success).not.toHaveBeenCalled();
+    expect(source.fmPosition).toHaveBeenCalledWith(12);
+  });
+
+  it("专辑内切歌不计数，放完最后一首才计一次并接上后面的专辑", async () => {
+    const { player, source } = setup();
+    await player.playFm();
+    await player.nextOrPrev("next");
+    await settle();
+    expect(useMusicStore().playSong.id).toBe(12);
+    expect(source.fmFinish).not.toHaveBeenCalled();
+    await player.nextOrPrev("next");
+    await settle();
+    expect(source.fmFinish).toHaveBeenCalledTimes(1);
+    expect(source.fmFinish).toHaveBeenCalledWith(1);
+    expect(useMusicStore().playSong.id).toBe(21);
+    expect(queue()).toEqual([11, 12, 21, 31]);
+  });
+
+  it("“听完”先于新专辑的收听位置到达服务端", async () => {
+    const { player, source } = setup();
+    await player.playFm();
+    await player.nextOrPrev("next");
+    await settle();
+    source.fmPosition.mockClear();
+    await player.nextOrPrev("next");
+    await settle();
+    expect(source.fmFinish.mock.invocationCallOrder[0]).toBeLessThan(
+      source.fmPosition.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("单曲循环与不循环都不影响 FM 接下去", async () => {
+    const { player } = setup(fmState([album(1, 11), album(2, 21)]));
+    useStatusStore().repeatMode = "one";
+    await player.playFm();
+    await player.nextOrPrev("next", true, true);
+    await settle();
+    expect(useMusicStore().playSong.id).toBe(21);
+    useStatusStore().repeatMode = "off";
+    await player.nextOrPrev("next", true, true);
+    await settle();
+    expect(useMusicStore().playSong.id).toBe(31);
+  });
+
+  it("用户插入的歌不算专辑结束", async () => {
+    const { player, source } = setup();
+    await player.playFm();
+    await player.addNextSong(track(99));
+    await player.nextOrPrev("next");
+    await settle();
+    expect(useMusicStore().playSong.id).toBe(99);
+    expect(source.fmFinish).not.toHaveBeenCalled();
+  });
+
+  it("取不到下一张专辑时停住，不绕回开头", async () => {
+    const { player, source } = setup(fmState([album(1, 11)]));
+    source.fmFinish.mockRejectedValue(new Error("offline"));
+    await player.playFm();
+    await settle();
+    await player.nextOrPrev("next", true, true);
+    await settle();
+    expect(useMusicStore().playSong.id).toBe(11);
+    expect(deps.message.error).toHaveBeenCalledWith("暂时取不到下一张专辑");
+    expect(player.playbackState).toBe("ended");
+  });
+
+  it("跳过专辑后播放下一张；没在听 FM 时不打断当前播放", async () => {
+    const { player, source } = setup();
+    await player.updatePlayList([track(1), track(2)], track(1), "album-9");
+    await settle();
+    await player.fmSkipAlbum(1);
+    await settle();
+    expect(source.fmSkip).toHaveBeenCalledWith(1);
+    expect(useMusicStore().playPlaylistId).toBe("album-9");
+    expect(useMusicStore().playSong.id).toBe(1);
+
+    await player.playFm();
+    await settle();
+    await player.fmSkipAlbum();
+    await settle();
+    expect(useMusicStore().playSong.id).toBe(21);
+    expect(queue()).toEqual([21, 31]);
+    expect(source.fmFinish).not.toHaveBeenCalled();
+  });
+
+  it("换去听别的列表后不再通知 FM，切歌也不受影响", async () => {
+    const { player, source } = setup();
+    await player.playFm();
+    await settle();
+    source.fmPosition.mockClear();
+    await player.updatePlayList([track(1), track(2)], track(1), "album-9");
+    await player.nextOrPrev("next");
+    await settle();
+    expect(useMusicStore().playSong.id).toBe(2);
+    expect(source.fmPosition).not.toHaveBeenCalled();
+    expect(source.fmFinish).not.toHaveBeenCalled();
+  });
+
+  it("FM 中不能开启随机", async () => {
+    const { player } = setup();
+    await player.playFm();
+    await player.toggleShuffle("on");
+    expect(useStatusStore().shuffleMode).toBe("off");
   });
 });

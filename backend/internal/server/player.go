@@ -18,6 +18,7 @@ func (s *server) registerPlayer(private *http.ServeMux) {
 	p := PlayerAPIPrefix
 	private.HandleFunc("GET "+p+"me", s.getMe)
 	s.registerNetease(private)
+	s.registerFM(private)
 
 	private.HandleFunc("GET "+p+"tracks", s.listPlayerTracks)
 	private.HandleFunc("GET "+p+"tracks/{id}", s.getPlayerTrack)

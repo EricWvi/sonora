@@ -1,8 +1,8 @@
 <!-- 首页。问候语照搬 SPlayer views/Home/index.vue；快捷入口沿用 SPlayer 首页的 SongListCard，
-栏目沿用 HomeOnline 的标题与列表。内容：快捷入口（每日推荐、我喜欢的音乐）、
+栏目沿用 HomeOnline 的标题与列表。内容：快捷入口（每日推荐、我喜欢的音乐、私人 FM）、
 “最近添加的歌曲”、“最近添加的专辑”、“最近播放”；栏目的显示与顺序由 homePageSections
-设置决定。“每日推荐”卡片照搬 HomeOnline；与 SPlayer 不同：两张卡片左右并排（SPlayer
-上下叠放，右边是私人 FM）；卡片固定显示，账号是页面载入后才读到的，按登录状态切换卡片会闪动，
+设置决定。快捷入口的布局照搬 HomeOnline（左边两张上下叠放，右边是私人 FM）；与 SPlayer 不同：
+卡片固定显示，账号是页面载入后才读到的，按登录状态切换卡片会闪动，
 没有歌曲时用默认封面，没有登录网易云时点开每日推荐，在该页提示登录。 -->
 <template>
   <div class="home">
@@ -13,26 +13,30 @@
     <!-- 快捷入口 -->
     <div class="main-rec">
       <div class="main-rec-grid">
-        <SongListCard
-          :data="dailySongs"
-          :cover="dailySongs.length ? undefined : defaultCovers.song"
-          :title="dailySongsTitle"
-          :height="90"
-          description="根据你的音乐口味 · 每日更新"
-          size="small"
-          :hiddenCover="settingStore.hiddenCovers.home"
-          @click="router.push({ name: 'daily-songs' })"
-        />
-        <SongListCard
-          :data="likedSongs"
-          :cover="likedSongs.length ? undefined : defaultCovers.song"
-          :height="90"
-          title="我喜欢的音乐"
-          description="发现你独特的音乐品味"
-          size="small"
-          :hiddenCover="settingStore.hiddenCovers.home"
-          @click="router.push({ name: 'like-songs' })"
-        />
+        <n-flex :size="20" class="rec-list" justify="space-between" vertical>
+          <SongListCard
+            :data="dailySongs"
+            :cover="dailySongs.length ? undefined : defaultCovers.song"
+            :title="dailySongsTitle"
+            :height="90"
+            description="根据你的音乐口味 · 每日更新"
+            size="small"
+            :hiddenCover="settingStore.hiddenCovers.home"
+            @click="router.push({ name: 'daily-songs' })"
+          />
+          <SongListCard
+            :data="likedSongs"
+            :cover="likedSongs.length ? undefined : defaultCovers.song"
+            :height="90"
+            title="我喜欢的音乐"
+            description="发现你独特的音乐品味"
+            size="small"
+            :hiddenCover="settingStore.hiddenCovers.home"
+            @click="router.push({ name: 'like-songs' })"
+          />
+        </n-flex>
+        <!-- 私人 FM -->
+        <PersonalFM />
       </div>
     </div>
     <ListError v-if="error" :error="error" @retry="getHomeData" />
@@ -88,6 +92,7 @@ import SongListCard from "@/components/Card/SongListCard.vue";
 import CoverList from "@/components/List/CoverList.vue";
 import SongList from "@/components/List/SongList.vue";
 import ListError from "@/components/List/ListError.vue";
+import PersonalFM from "@/components/Player/PlayerComponents/PersonalFM.vue";
 
 const router = useRouter();
 const settingStore = useSettingStore();

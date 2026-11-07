@@ -312,6 +312,40 @@ var migrations = []migration{
 	ALTER TABLE albums ADD COLUMN netease_id INTEGER;
 	ALTER TABLE artists ADD COLUMN netease_id INTEGER;
 	`),
+
+	// The private radio (fm.go). fm_groups is the listener's choice of
+	// playlists that sort small albums into groups, fm_albums how many times
+	// each album was heard to its end, and fm_plan the albums lined up next,
+	// the first being the current one. fm_plan.track_id is where listening
+	// to that album stopped.
+	execSQL(`
+	CREATE TABLE fm_groups (
+		user_id     INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+		playlist_id INTEGER NOT NULL REFERENCES playlists (id) ON DELETE CASCADE,
+		position    INTEGER NOT NULL,
+		PRIMARY KEY (user_id, playlist_id)
+	) WITHOUT ROWID;
+	CREATE INDEX fm_groups_playlist ON fm_groups (playlist_id);
+
+	CREATE TABLE fm_albums (
+		user_id  INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+		album_id INTEGER NOT NULL REFERENCES albums (id) ON DELETE CASCADE,
+		plays    INTEGER NOT NULL,
+		skipped  INTEGER NOT NULL DEFAULT 0,
+		PRIMARY KEY (user_id, album_id)
+	) WITHOUT ROWID;
+	CREATE INDEX fm_albums_album ON fm_albums (album_id);
+
+	CREATE TABLE fm_plan (
+		user_id  INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+		position INTEGER NOT NULL,
+		album_id INTEGER NOT NULL REFERENCES albums (id) ON DELETE CASCADE,
+		track_id INTEGER REFERENCES tracks (id) ON DELETE SET NULL,
+		PRIMARY KEY (user_id, position)
+	) WITHOUT ROWID;
+	CREATE INDEX fm_plan_album ON fm_plan (album_id);
+	CREATE INDEX fm_plan_track ON fm_plan (track_id);
+	`),
 }
 
 func migrate(db *sql.DB) error {

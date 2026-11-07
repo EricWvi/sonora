@@ -8,6 +8,8 @@ import type { Track } from "@/api/types";
 export type QueueEntry = Track & {
   /** 条目身份，在本浏览器中递增，不随歌曲变化 */
   entryId: number;
+  /** FM 排的歌曲所属的专辑；用户插入的歌曲没有 */
+  fmAlbumId?: number;
 };
 
 let lastEntryId = 0;
@@ -16,7 +18,7 @@ let lastEntryId = 0;
  * 把歌曲包装成新的队列条目
  * @param track 歌曲；已经是条目时也会分配新的身份
  */
-export function newEntry(track: Track): QueueEntry {
+export function newEntry(track: Track & { fmAlbumId?: number }): QueueEntry {
   return { ...track, entryId: ++lastEntryId };
 }
 

@@ -1,6 +1,6 @@
 # Sonora API 约定
 
-更新日期：2026-11-05。本文记录已实现的管理 API（阶段 1）、播放端登录与播放端 API（阶段 4）及其通用约定。实现见 [server.go](../backend/internal/server/server.go)、[player.go](../backend/internal/server/player.go)、[admin.go](../backend/internal/admin/admin.go) 与 [auth.go](../backend/internal/auth/auth.go)。
+更新日期：2026-11-07。本文记录已实现的管理 API（阶段 1）、播放端登录与播放端 API（阶段 4）及其通用约定。实现见 [server.go](../backend/internal/server/server.go)、[player.go](../backend/internal/server/player.go)、[admin.go](../backend/internal/admin/admin.go) 与 [auth.go](../backend/internal/auth/auth.go)。
 
 ## 通用约定
 
@@ -184,3 +184,17 @@
 | `PUT playlists/{id}/order`                      | `{trackIds}` 为歌单的全部歌曲的新顺序。与服务端现有歌曲不一致时返回 409 `conflict`，说明客户端的副本已过期，应刷新后重试                                                                                                                                                                                |
 
 歌单为 `{id, name, description, cover, trackCount, durationMs, createdAt, updatedAt}`。同一首歌在一个歌单中只出现一次。`cover` 取歌单中第一首有封面的歌曲的封面，都没有时为 `null`；歌单暂不支持自定义封面。
+
+### 私人 FM
+
+每个用户一份、没有尽头的专辑序列（排法见[阶段 6](phase/phase-6-first-release.md) 的“私人 FM”）。只包含本地曲库。
+
+| 方法与路径                   | 说明                                                                                                            |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `GET fm`                     | 状态；需要时排好接下来的专辑，所以这个 GET 可能写库。曲库里没有可播放的专辑时 `albums` 为空                     |
+| `POST fm/albums/{id}/finish` | 这张专辑听完了，计一次，返回状态。不是当前专辑时什么也不做，重复请求不会多计                                    |
+| `POST fm/albums/{id}/skip`   | 跳过：不计数，不参与紧接着的下一次抽取，返回状态。不是当前专辑时什么也不做                                      |
+| `PUT fm/position`            | `{trackId}` 记录正在听的歌曲，204。歌曲属于排在后面的专辑时，前面的专辑按跳过处理；不属于已排的专辑时什么也不做 |
+| `PUT fm/groups`              | `{playlistIds}` 按优先顺序设置分组歌单，返回状态。当前专辑不变，后面的重新排。歌单不是自己的时返回 404          |
+
+状态为 `{albums: [{id, tracks}], trackId, groupIds}`：`albums` 是当前专辑与下一张，歌曲按碟号、音轨号排列，形态同其他列表；`trackId` 是当前专辑继续收听的歌曲，没有记录时为 `null`；`groupIds` 是分组歌单。

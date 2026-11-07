@@ -4,6 +4,7 @@ import type {
   Album,
   Artist,
   ArtistRef,
+  FmState,
   HistoryEntry,
   ListQuery,
   Lyrics,
@@ -412,6 +413,33 @@ function librarySource(lib: Library): DataSource {
   const byArtist = (t: Track, id: number) => t.artists.some((a) => a.id === id);
 
   // 返回副本，页面修改结果不影响 fixture。
+  // 私人 FM：按专辑依次轮转，真实的排法在服务端
+  const fmAlbums = () =>
+    lib.albums
+      .map((album) => ({
+        id: album.id,
+        tracks: lib.tracks.filter((t) => t.album?.id === album.id),
+      }))
+      .filter((album) => album.tracks.length);
+  let fmHead = 0;
+  let fmTrackId: number | null = null;
+  let fmGroupIds: number[] = [];
+  const fmState = (): FmState => {
+    const albums = fmAlbums();
+    return {
+      albums: albums.length
+        ? [albums[fmHead % albums.length], albums[(fmHead + 1) % albums.length]]
+        : [],
+      trackId: fmTrackId,
+      groupIds: fmGroupIds,
+    };
+  };
+  const fmMoveOn = (albumId: number) => {
+    if (fmState().albums[0]?.id !== albumId) return;
+    fmHead++;
+    fmTrackId = null;
+  };
+
   const reply = async <T>(value: () => T): Promise<T> =>
     structuredClone(value());
 
@@ -534,6 +562,26 @@ function librarySource(lib: Library): DataSource {
         const found = lib.artists.find((a) => a.id === id);
         if (!found) throw notFound();
         return found;
+      }),
+    fm: () => reply(fmState),
+    fmFinish: (albumId) =>
+      reply(() => {
+        fmMoveOn(albumId);
+        return fmState();
+      }),
+    fmSkip: (albumId) =>
+      reply(() => {
+        fmMoveOn(albumId);
+        return fmState();
+      }),
+    fmPosition: (trackId) =>
+      reply(() => {
+        fmTrackId = trackId;
+      }),
+    fmSetGroups: (playlistIds) =>
+      reply(() => {
+        fmGroupIds = playlistIds;
+        return fmState();
       }),
     likes: (query) =>
       reply(() => page(sortTracks(lib.likes.map(track), query), query)),

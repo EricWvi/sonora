@@ -7,6 +7,7 @@ import type {
   AlbumQuery,
   Artist,
   Cover,
+  FmState,
   HistoryEntry,
   ImportJob,
   ListQuery,
@@ -32,6 +33,16 @@ export type CoverSize = 96 | 100 | 300 | 1024;
 /** 播放端读取数据的唯一入口。页面与 store 只通过它访问服务端，开发时可整体换成 fixture。 */
 export interface DataSource {
   me(): Promise<User>;
+  /** 私人 FM 的状态，服务端需要时排好接下来的专辑。 */
+  fm(): Promise<FmState>;
+  /** 这张专辑听完了，计一次。不是当前专辑时什么也不做。 */
+  fmFinish(albumId: number): Promise<FmState>;
+  /** 跳过这张专辑：不计数，也不参与紧接着的下一次抽取。 */
+  fmSkip(albumId: number): Promise<FmState>;
+  /** 记录正在听的歌曲，换去听别的之后从这里继续。 */
+  fmPosition(trackId: number): Promise<void>;
+  /** 设置分组歌单，按优先顺序。 */
+  fmSetGroups(playlistIds: number[]): Promise<FmState>;
   /** 网易云账号的状态。Cookie 只保存在服务端，不经过播放端。 */
   neteaseStatus(): Promise<NeteaseStatus>;
   /** 开始二维码登录，`url` 是二维码的内容。 */
@@ -223,6 +234,11 @@ const write = <T>(method: string, path: string, body?: unknown) =>
 
 const httpSource: DataSource = {
   me: () => get("me"),
+  fm: () => get("fm"),
+  fmFinish: (albumId) => write("POST", `fm/albums/${albumId}/finish`),
+  fmSkip: (albumId) => write("POST", `fm/albums/${albumId}/skip`),
+  fmPosition: (trackId) => send("PUT", "fm/position", { trackId }),
+  fmSetGroups: (playlistIds) => write("PUT", "fm/groups", { playlistIds }),
   neteaseStatus: () => get("netease/status"),
   neteaseQRStart: () => write("POST", "netease/login/qr"),
   neteaseQRCheck: (key) => get(`netease/login/qr/${encodeURIComponent(key)}`),

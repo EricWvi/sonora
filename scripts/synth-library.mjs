@@ -38,7 +38,7 @@ if (!args.data || !args.media) {
   throw new Error("--data and --media are required");
 }
 
-const SCHEMA_VERSION = 12;
+const SCHEMA_VERSION = 14;
 const TRACKS = 10_000;
 const ALBUMS = 2_000;
 const ARTISTS = 1_000;

@@ -1,6 +1,6 @@
 import { fixturePlayer, source, type DataSource } from "@/api/source";
 import { connection } from "@/api/connection";
-import type { Track } from "@/api/types";
+import type { FmState, Track } from "@/api/types";
 import { isOnline, isPlayable, sameTrack } from "@/utils/track";
 import {
   AudioErrorCode,
@@ -18,6 +18,13 @@ import { calculateProgress } from "@/utils/time";
 import type { PlayerState } from "@/viewmodels";
 import { debounce, throttle, type DebouncedFunc } from "lodash-es";
 import { browserDeps } from "./browserDeps";
+import {
+  FM_HISTORY,
+  FM_LIST,
+  fmCurrentTrack,
+  fmTracks,
+  fmTracksToAppend,
+} from "./fm";
 import { mediaSessionManager } from "./MediaSessionManager";
 import {
   indexAfterMove,
@@ -55,7 +62,16 @@ export interface PlaybackDeps {
    * 过期的解析可以被丢弃，也便于测试切歌竞态
    */
   resolveAudio(track: Track): Promise<string>;
-  source: Pick<DataSource, "recordPlay" | "recordOnlinePlay" | "audioStatus">;
+  source: Pick<
+    DataSource,
+    | "recordPlay"
+    | "recordOnlinePlay"
+    | "audioStatus"
+    | "fm"
+    | "fmFinish"
+    | "fmSkip"
+    | "fmPosition"
+  >;
   storage: PlayerStorage;
   message: Pick<Window["$message"], "success" | "error" | "warning">;
   /** 切换歌曲时更新歌词、封面取色与系统媒体信息，歌词载入后完成 */
@@ -81,14 +97,16 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * 与 PlayModeManager.ts，照搬的组件因此不用改。
  *
  * 只用 Web Audio（HTMLAudioElement 经 MediaElementSource），不迁入 MPV、FFmpeg、自动混音、
- * 倍速、AB 循环、定时关闭、私人 FM 与心动模式。与 SPlayer 的差异：
+ * 倍速、AB 循环、定时关闭与心动模式。与 SPlayer 的差异：
  *
  * - 队列条目有独立身份，允许重复入队（见 queue.ts）；随机时当前曲目放在第一位，
  *   增删同时作用于原始顺序；
  * - 不循环时播完最后一首就停止，SPlayer 会绕回第一首；
  * - 播放失败不重试，直接跳过，连续 3 首失败或无歌可跳时停止并提示，不清空队列；
  * - 播放超过 min(30 秒, 时长的一半) 才记入最近播放，SPlayer 开始播放即记录；
- * - 解析或加载中暂停，加载完成后保持暂停。
+ * - 解析或加载中暂停，加载完成后保持暂停；
+ * - 私人 FM 用普通队列（SPlayer 有单独的列表），放当前专辑与下一张，单位是专辑，
+ *   进度保存在服务端，见“私人 FM”一节。
  */
 const UNPLAYABLE = "这首歌暂时无法播放";
 
@@ -119,6 +137,8 @@ export class PlayerController {
   private onTimeUpdate: DebouncedFunc<() => void>;
   /** 保存队列，合并连续的修改 */
   private saveQueue: DebouncedFunc<() => void>;
+  /** FM 请求按发出的顺序到达：换到下一张专辑时，“听完”必须先于新的收听位置 */
+  private fmSync: Promise<unknown> = Promise.resolve();
 
   constructor(private deps: PlaybackDeps) {
     this.onTimeUpdate = throttle(() => this.handleTimeUpdate(), 200);
@@ -369,6 +389,10 @@ export class PlayerController {
     }
     this.wantPlay = autoPlay;
     this.resetListening();
+    if (this.inFm && entry.fmAlbumId != null)
+      void this.fmRequest(() => this.deps.source.fmPosition(entry.id)).catch(
+        (error) => console.warn("保存 FM 位置失败", error),
+      );
     // AB 循环只对当前歌曲有效（照搬 SPlayer）
     statusStore.abLoop.enable = false;
     statusStore.abLoop.pointA = null;
@@ -461,10 +485,11 @@ export class PlayerController {
   public nextAutoEntry(): QueueEntry | null {
     const statusStore = useStatusStore();
     const { playList } = useDataStore();
-    if (statusStore.repeatMode === "one" || playList.length < 2) return null;
+    if ((statusStore.repeatMode === "one" && !this.inFm) || playList.length < 2)
+      return null;
     let index = statusStore.playIndex + 1;
     if (index >= playList.length) {
-      if (statusStore.repeatMode === "off") return null;
+      if (statusStore.repeatMode === "off" || this.inFm) return null;
       index = 0;
     }
     return playList[index] ?? null;
@@ -653,6 +678,9 @@ export class PlayerController {
       this.deps.message.error(`${reason}，播放失败次数过多，已停止播放`);
       return;
     }
+    // FM 跳过的可能是专辑的最后一首，要接上下一张
+    await this.fmBeforeNext();
+    if (token !== this.currentRequestToken) return;
     // 列表只有一首 -> 停止播放
     if (dataStore.playList.length <= 1) {
       this.failSkipCount = 0;
@@ -661,7 +689,7 @@ export class PlayerController {
       return;
     }
     const last = statusStore.playIndex >= dataStore.playList.length - 1;
-    if (last && statusStore.repeatMode === "off") {
+    if (last && (statusStore.repeatMode === "off" || this.inFm)) {
       this.failSkipCount = 0;
       this.stopAfterError();
       this.deps.message.error(`${reason}，已停止播放`);
@@ -754,22 +782,34 @@ export class PlayerController {
     const dataStore = useDataStore();
     const statusStore = useStatusStore();
     // 播放列表是否为空
-    const playListLength = dataStore.playList.length;
-    if (playListLength === 0) {
+    if (dataStore.playList.length === 0) {
       this.deps.message.error("播放列表为空，请添加歌曲");
       return;
     }
     if (!autoEnd) this.resetFailures();
     // 单曲循环
-    // 如果是自动结束触发的单曲循环，则重播当前歌曲
-    if (statusStore.repeatMode === "one" && autoEnd) {
+    // 如果是自动结束触发的单曲循环，则重播当前歌曲。FM 里没有循环按钮（照搬 SPlayer），不循环
+    if (statusStore.repeatMode === "one" && autoEnd && !this.inFm) {
       await this.playSong({ autoPlay: play, seek: 0 });
       return;
     }
+    if (type === "next") {
+      const token = this.currentRequestToken;
+      await this.fmBeforeNext();
+      // 等待期间换了别的列表
+      if (token !== this.currentRequestToken) return;
+    }
+    const playListLength = dataStore.playList.length;
     // 计算索引
     let nextIndex = statusStore.playIndex + (type === "next" ? 1 : -1);
     // 边界处理 (索引越界)
     if (nextIndex >= playListLength) {
+      // FM 只有取不到下一张专辑时才会走到末尾，不能绕回开头
+      if (this.inFm) {
+        this.deps.message.error("暂时取不到下一张专辑");
+        if (autoEnd) this.finish();
+        return;
+      }
       // 不循环：播完最后一首后停止
       if (autoEnd && statusStore.repeatMode === "off") {
         this.finish();
@@ -777,7 +817,8 @@ export class PlayerController {
       }
       nextIndex = 0;
     }
-    if (nextIndex < 0) nextIndex = playListLength - 1;
+    // FM 的队列末尾是还没听的专辑，不能绕过去
+    if (nextIndex < 0) nextIndex = this.inFm ? 0 : playListLength - 1;
     // 更新状态并播放
     statusStore.playIndex = nextIndex;
     this.saveQueue();
@@ -1186,6 +1227,121 @@ export class PlayerController {
     this.setLists(list, toRaw(dataStore.originalPlayList));
   }
 
+  // --- 私人 FM ---------------------------------------------------------------
+  //
+  // 与 SPlayer 不同（Eric，2026-11-07）：SPlayer 的 FM 是网易云按歌推荐的单独列表；Sonora 按
+  // 专辑排，排法在服务端（backend/internal/store/fm.go），歌曲放进普通队列，预加载、恢复与
+  // 队列抽屉都不用另写。听完一张专辑才计数，换去听别的列表只是离开，回来从离开的歌曲继续。
+
+  /** 当前队列是否是 FM */
+  private get inFm(): boolean {
+    return useMusicStore().playPlaylistId === FM_LIST;
+  }
+
+  private fmRequest<T>(run: () => Promise<T>): Promise<T> {
+    const result = this.fmSync.then(run);
+    this.fmSync = result.catch(() => {});
+    return result;
+  }
+
+  /** 从服务端记录的位置开始播放 FM */
+  public async playFm() {
+    let state: FmState;
+    try {
+      state = await this.fmRequest(() => this.deps.source.fm());
+    } catch (error) {
+      console.error("读取私人 FM 失败", error);
+      this.deps.message.error("读取私人FM失败");
+      return;
+    }
+    await this.playFmState(state);
+  }
+
+  private async playFmState(state: FmState) {
+    const start = fmCurrentTrack(state);
+    if (!start) {
+      this.deps.message.warning("还没有可以播放的专辑");
+      return;
+    }
+    useStatusStore().shuffleMode = "off";
+    await this.updatePlayList(fmTracks(state), start, FM_LIST, {
+      showTip: false,
+      play: true,
+    });
+  }
+
+  /**
+   * 跳过专辑：不计数，也不参与紧接着的下一次抽取。正在听 FM 时接着播下一张；
+   * 没在听时只换掉卡片上的专辑，不打断正在播放的歌（SPlayer 会切到 FM 并开始播放）
+   * @param albumId 没在听 FM 时要跳过的专辑
+   * @returns 跳过之后的状态；失败时为 null
+   */
+  public async fmSkipAlbum(albumId?: number): Promise<FmState | null> {
+    const id = this.inFm
+      ? (this.currentEntry()?.fmAlbumId ?? albumId)
+      : albumId;
+    if (id == null) return null;
+    try {
+      const state = await this.fmRequest(() => this.deps.source.fmSkip(id));
+      if (this.inFm) await this.playFmState(state);
+      return state;
+    } catch (error) {
+      console.error("跳过专辑失败", error);
+      this.deps.message.error("跳过专辑失败，请重试");
+      return null;
+    }
+  }
+
+  /**
+   * 离开当前条目之前：当前专辑放完了就告诉服务端，并把接下来的专辑接到队列后面。队列里还有
+   * 歌时不等响应，切歌不必多等一次请求；已经到队尾时要等到下一张专辑才能切
+   */
+  private async fmBeforeNext() {
+    if (!this.inFm) return;
+    const { playList } = useDataStore();
+    const index = useStatusStore().playIndex;
+    const albumId = playList[index]?.fmAlbumId;
+    const later = playList.slice(index + 1);
+    const ended =
+      albumId != null && !later.some((e) => e.fmAlbumId === albumId);
+    if (!ended && later.length) return;
+    const load = this.fmRequest(() =>
+      ended && albumId != null
+        ? this.deps.source.fmFinish(albumId)
+        : this.deps.source.fm(),
+    ).then(
+      (state) => {
+        if (this.inFm) this.fmAppend(state, ended ? albumId : undefined);
+      },
+      (error: unknown) => console.error("取下一张专辑失败", error),
+    );
+    if (!later.length) await load;
+  }
+
+  /**
+   * 把 FM 接下来的专辑接到队列后面，并去掉太早的已播条目
+   * @param state FM 状态
+   * @param finished 刚听完的专辑。响应到达时可能已经切到下一张，正在放的专辑也算已在队列；
+   * 刚听完的除外，曲库很小时它可能马上又排到
+   */
+  private fmAppend(state: FmState, finished?: number) {
+    const { playList } = useDataStore();
+    const statusStore = useStatusStore();
+    const index = statusStore.playIndex;
+    const queued = new Set(
+      playList.slice(index + 1).map((entry) => entry.fmAlbumId ?? 0),
+    );
+    const current = playList[index]?.fmAlbumId;
+    if (current != null && current !== finished) queued.add(current);
+    const added = fmTracksToAppend(state, queued).map(newEntry);
+    const drop = Math.max(0, index - FM_HISTORY);
+    if (!added.length && !drop) return;
+    const hadNext = index + 1 < playList.length;
+    this.setLists([...playList.slice(drop), ...added]);
+    statusStore.playIndex = index - drop;
+    if (!hadNext) this.preloadNext();
+  }
+
   /**
    * 切换循环模式
    * @param mode 可选，直接设置目标模式。如果不传，则按 List -> One -> Off 顺序轮转
@@ -1213,6 +1369,8 @@ export class PlayerController {
    * @param mode 可选，直接设置目标模式。如果不传则按 Off -> On -> Off 顺序轮转
    */
   public async toggleShuffle(mode?: ShuffleModeType) {
+    // FM 的顺序由服务端决定，界面上也没有这个按钮（照搬 SPlayer）；这里挡住快捷键
+    if (this.inFm) return;
     const dataStore = useDataStore();
     const statusStore = useStatusStore();
     const nextMode = mode ?? (statusStore.shuffleMode === "off" ? "on" : "off");

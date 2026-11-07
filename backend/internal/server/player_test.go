@@ -275,3 +275,42 @@ func TestSettingsSync(t *testing.T) {
 		t.Fatalf("alice settings = %v", got)
 	}
 }
+
+func TestFMIsPerListener(t *testing.T) {
+	ts := newTest(t)
+	ts.setup()
+	if rec := ts.upload("a.mp3", sample(t, "tagged.mp3"), ""); rec.Code != http.StatusCreated {
+		t.Fatalf("upload: %d %s", rec.Code, rec.Body)
+	}
+	ts.signIn("alice", "Alice")
+	alice := ts.listener
+	state := decodeBody[playerFM](t, ts.do("GET", playerAPI+"fm", ""))
+	// One small album outside any group: nothing to play, and not an error.
+	if len(state.Albums) != 0 || state.GroupIDs == nil {
+		t.Fatalf("fm %+v", state)
+	}
+	pl := decodeBody[store.Playlist](t, ts.do("POST", playerAPI+"playlists", `{"name":"CN"}`))
+	if rec := ts.do("PUT", playerAPI+"fm/groups", `{"playlistIds":[`+itoa(pl.ID)+`]}`); rec.Code != http.StatusOK {
+		t.Fatalf("groups: %d %s", rec.Code, rec.Body)
+	}
+	ts.signIn("bob", "Bob")
+	if rec := ts.do("PUT", playerAPI+"fm/groups", `{"playlistIds":[`+itoa(pl.ID)+`]}`); rec.Code != http.StatusNotFound {
+		t.Fatalf("bob's groups: %d %s", rec.Code, rec.Body)
+	}
+	ts.listener = alice
+	state = decodeBody[playerFM](t, ts.do("GET", playerAPI+"fm", ""))
+	if len(state.GroupIDs) != 1 || state.GroupIDs[0] != pl.ID {
+		t.Fatalf("alice fm %+v", state)
+	}
+	for _, c := range []struct{ method, path, body string }{
+		{"POST", "fm/albums/999/finish", ""},
+		{"POST", "fm/albums/999/skip", ""},
+	} {
+		if rec := ts.do(c.method, playerAPI+c.path, c.body); rec.Code != http.StatusOK {
+			t.Fatalf("%s: %d %s", c.path, rec.Code, rec.Body)
+		}
+	}
+	if rec := ts.do("PUT", playerAPI+"fm/position", `{"trackId":999}`); rec.Code != http.StatusNoContent {
+		t.Fatalf("position: %d %s", rec.Code, rec.Body)
+	}
+}

@@ -7,6 +7,7 @@
 import { useSettingStore } from "@/stores";
 import { usePlayerController } from "@/core/player/PlayerController";
 import { renderOption } from "@/utils/helper";
+import { openFmGroupManager } from "@/utils/modal";
 import type { SettingConfig } from "@/types/settings";
 import type { SelectOption } from "naive-ui";
 import { uniqBy } from "lodash-es";
@@ -105,6 +106,15 @@ export const usePlaySettings = (): SettingConfig => {
               get: () => settingStore.autoPlay,
               set: (v) => (settingStore.autoPlay = v),
             }),
+          },
+          {
+            key: "fmGroups",
+            label: "私人FM分组歌单",
+            type: "button",
+            description:
+              "不足 10 首的专辑按这些歌单分组，不在其中的不进入私人FM；10 首及以上的专辑不受影响",
+            buttonLabel: "配置",
+            action: openFmGroupManager,
           },
           {
             key: "useNextPrefetch",

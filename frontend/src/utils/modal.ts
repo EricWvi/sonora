@@ -366,6 +366,21 @@ export const openCoverManager = async () => {
 };
 
 /** 打开首页栏目配置弹窗 */
+export const openFmGroupManager = async () => {
+  const { default: FmGroupManager } =
+    await import("@/components/Modal/Setting/FmGroupManager.vue");
+  window.$modal.create({
+    preset: "card",
+    transformOrigin: "center",
+    autoFocus: false,
+    style: { width: "500px" },
+    title: "私人FM分组歌单",
+    content: () => {
+      return h(FmGroupManager);
+    },
+  });
+};
+
 export const openHomePageSectionManager = async () => {
   const { default: HomePageSectionManager } =
     await import("@/components/Modal/Setting/HomePageSectionManager.vue");
