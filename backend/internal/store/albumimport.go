@@ -265,10 +265,7 @@ func (s *Store) MissingArtists(ctx context.Context, names []string) ([]string, e
 // out. It reports whether the artist was found.
 func (s *Store) FillImportedArtist(ctx context.Context, name string, neteaseID int64, image []byte, description string) (bool, error) {
 	name = truncate(strings.TrimSpace(name))
-	description = strings.TrimSpace(description)
-	if utf8.RuneCountInString(description) > maxAlbumDescription {
-		description = string([]rune(description)[:maxAlbumDescription])
-	}
+	description = trimDescription(description)
 	s.files.Lock()
 	defer s.files.Unlock()
 	var cover sql.NullString

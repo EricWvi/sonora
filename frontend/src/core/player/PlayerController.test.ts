@@ -1098,3 +1098,23 @@ describe("漫游 FM", () => {
     expect(useStatusStore().shuffleMode).toBe("off");
   });
 });
+
+describe("补全歌词", () => {
+  it("更新队列中的条目；正在播放时立即重新读取，进度不变", async () => {
+    const setupSong = vi.fn(async () => {});
+    const player = newPlayer({ setupSong });
+    await player.updatePlayList([track(1), track(2)], track(1));
+    await settle();
+    useStatusStore().currentTime = 5000;
+    setupSong.mockClear();
+
+    player.lyricsAdded(track(2));
+    expect(useDataStore().playList[1].hasLyrics).toBe(true);
+    expect(setupSong).not.toHaveBeenCalled();
+
+    player.lyricsAdded(track(1));
+    expect(useDataStore().playList[0].hasLyrics).toBe(true);
+    expect(setupSong).toHaveBeenCalledTimes(1);
+    expect(useStatusStore().currentTime).toBe(5000);
+  });
+});

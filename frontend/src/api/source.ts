@@ -7,6 +7,7 @@ import type {
   AlbumQuery,
   Artist,
   Cover,
+  FillField,
   FmState,
   HistoryEntry,
   ImportJob,
@@ -33,6 +34,12 @@ export type CoverSize = 96 | 100 | 300 | 1024;
 /** 播放端读取数据的唯一入口。页面与 store 只通过它访问服务端，开发时可整体换成 fixture。 */
 export interface DataSource {
   me(): Promise<User>;
+  /** 从关联的在线专辑补全简介，只写空的字段。 */
+  fillAlbum(id: number): Promise<{ album: Album; filled: FillField[] }>;
+  /** 从关联的在线艺术家补全图片与简介，只写空的字段。 */
+  fillArtist(id: number): Promise<{ artist: Artist; filled: FillField[] }>;
+  /** 从关联的在线歌曲补全歌词，只写空的字段。 */
+  fillTrack(id: number): Promise<{ track: Track; filled: FillField[] }>;
   /** 漫游 FM 的状态，服务端需要时排好接下来的专辑。 */
   fm(): Promise<FmState>;
   /** 这张专辑听完了，计一次。不是当前专辑时什么也不做。 */
@@ -234,6 +241,9 @@ const write = <T>(method: string, path: string, body?: unknown) =>
 
 const httpSource: DataSource = {
   me: () => get("me"),
+  fillAlbum: (id) => write("POST", `albums/${id}/fill`),
+  fillArtist: (id) => write("POST", `artists/${id}/fill`),
+  fillTrack: (id) => write("POST", `tracks/${id}/fill`),
   fm: () => get("fm"),
   fmFinish: (albumId) => write("POST", `fm/albums/${albumId}/finish`),
   fmSkip: (albumId) => write("POST", `fm/albums/${albumId}/skip`),

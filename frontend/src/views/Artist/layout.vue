@@ -182,11 +182,12 @@ import { listSortQuery } from "@/utils/meta";
 import { source } from "@/api/source";
 import { useLoadError } from "@/composables/List/useLoadError";
 import { coverLoaded, downloadImage, renderIcon } from "@/utils/helper";
+import { fillArtist } from "@/utils/onlineFill";
 import { onlinePageRoute } from "@/utils/track";
 import { renderDownloadToolbar } from "@/utils/meta";
 import { removeBrackets } from "@/utils/format";
 import { coverUrl, defaultCovers } from "@/utils/cover";
-import { useSettingStore, useStatusStore } from "@/stores";
+import { useSettingStore, useStatusStore, useUserStore } from "@/stores";
 import { openBatchList, openDescModal } from "@/utils/modal";
 import ListError from "@/components/List/ListError.vue";
 import ArtistSongs from "./songs.vue";
@@ -195,6 +196,7 @@ const route = useRoute();
 const router = useRouter();
 const settingStore = useSettingStore();
 const statusStore = useStatusStore();
+const userStore = useUserStore();
 
 // 路由元素
 const componentRef = ref<InstanceType<typeof ArtistSongs> | null>(null);
@@ -278,11 +280,22 @@ const openBatch = async () => {
   }
 };
 
+// 补全图片与简介
+const fillProfile = async () => {
+  const artist = artistDetailData.value;
+  if (!artist) return;
+  const updated = await fillArtist(artist);
+  if (updated && artistDetailData.value?.id === updated.id)
+    artistDetailData.value = updated;
+};
+
 // 更多操作
 // 照搬 SPlayer，批量操作只在歌曲标签下。与 SPlayer 不同：关联了在线艺术家时多“查看在线艺术家”，
-// 两个标签下都有，所以有它时专辑标签下也显示“更多”
+// 两个标签下都有，所以有它时专辑标签下也显示“更多”；有导入权限且图片或简介为空时多
+// “从网易云补全资料”（Eric，2026-11-07）
 const moreOptions = computed<DropdownOption[]>(() => {
-  const onlineId = artistDetailData.value?.onlineId;
+  const artist = artistDetailData.value;
+  const onlineId = artist?.onlineId;
   return [
     {
       label: "查看在线艺术家",
@@ -293,6 +306,17 @@ const moreOptions = computed<DropdownOption[]>(() => {
           onlineId && router.push(onlinePageRoute("artist", onlineId)),
       },
       icon: renderIcon("Cloud"),
+    },
+    {
+      label: "从网易云补全资料",
+      key: "fill-profile",
+      show:
+        !!userStore.user?.canImport &&
+        !!onlineId &&
+        !!artist &&
+        (!artist.image || !artist.description),
+      props: { onClick: fillProfile },
+      icon: renderIcon("EditNote"),
     },
     {
       label: "批量操作",

@@ -1343,6 +1343,28 @@ export class PlayerController {
   }
 
   /**
+   * 歌曲补上了歌词：更新队列中的条目，下次恢复与播放时才会读取；正在播放时立即显示
+   * @param song 歌曲
+   */
+  public lyricsAdded(song: Track) {
+    const dataStore = useDataStore();
+    const statusStore = useStatusStore();
+    const update = (list: readonly QueueEntry[]) =>
+      list.map((e) => (sameTrack(e, song) ? { ...e, hasLyrics: true } : e));
+    this.setLists(
+      update(dataStore.playList),
+      update(dataStore.originalPlayList),
+    );
+    const entry = this.currentEntry();
+    if (entry && sameTrack(entry, song))
+      void this.setupSongUI(
+        entry,
+        statusStore.currentTime,
+        statusStore.duration,
+      );
+  }
+
+  /**
    * 切换循环模式
    * @param mode 可选，直接设置目标模式。如果不传，则按 List -> One -> Off 顺序轮转
    */

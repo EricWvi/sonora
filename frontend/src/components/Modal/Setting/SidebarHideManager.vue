@@ -26,7 +26,7 @@
 </template>
 
 <script setup lang="ts">
-// 照搬 SPlayer，只保留 Sonora 侧栏中可隐藏的最近播放与创建的歌单。
+// 照搬 SPlayer，只保留 Sonora 侧栏中可隐藏的最近播放与歌单。
 import { NScrollbar } from "naive-ui";
 import { useSettingStore } from "@/stores";
 
@@ -37,7 +37,7 @@ type SidebarHideItem = { label: string; key: SidebarHideKey };
 
 const sidebarItems: SidebarHideItem[] = [
   { label: "最近播放", key: "hideHistory" },
-  { label: "创建的歌单", key: "hideUserPlaylists" },
+  { label: "歌单", key: "hideUserPlaylists" },
 ];
 
 const updateSetting = (key: SidebarHideKey, val: boolean) => {

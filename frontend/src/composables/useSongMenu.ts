@@ -17,6 +17,7 @@ import {
 } from "@/utils/modal";
 import { copyShareLink } from "@/utils/onlineLink";
 import { deleteSongs, importSong } from "@/utils/auth";
+import { fillLyrics } from "@/utils/onlineFill";
 
 /**
  * 歌曲菜单。照搬 SPlayer composables/useSongMenu.ts，条目按阶段 2 的“歌曲列表”：
@@ -24,7 +25,9 @@ import { deleteSongs, importSong } from "@/utils/auth";
  * 从歌单中删除（在自己的歌单中时）、查看专辑、查看艺术家、同名搜索（在曲库中搜索）。
  * SPlayer 没有“查看专辑”与“查看艺术家”，图标沿用其 Album 与 Artist。
  * 菜单项的显示设置 contextMenuOptions 照搬，只有 Sonora 的条目；“更多操作”只剩复制歌曲名称，
- * 关掉复制歌曲名称时“更多操作”一并隐藏。
+ * 关掉复制歌曲名称时“更多操作”一并隐藏，除非还有“从网易云补全歌词”。
+ * 与 SPlayer 不同（Eric，2026-11-07）：有导入权限的用户在关联了网易云、没有歌词的本地歌曲上
+ * 多一项“从网易云补全歌词”。
  */
 export const useSongMenu = () => {
   const router = useRouter();
@@ -46,6 +49,12 @@ export const useSongMenu = () => {
     // 本地歌单只放曲库中的歌曲；在线歌曲只能加入网易云歌单，所以没有登录时不显示
     const showAdd =
       options.addToPlaylist && (!isOnline(song) || userStore.onlineSignedIn);
+    const showFillLyrics =
+      !isOnline(song) &&
+      !!userStore.user?.canImport &&
+      !!song.onlineId &&
+      !song.hasLyrics;
+    const showMore = options.more && (options.copyName || showFillLyrics);
 
     return [
       {
@@ -96,7 +105,7 @@ export const useSongMenu = () => {
       {
         key: "more",
         label: "更多操作",
-        show: options.more && options.copyName,
+        show: showMore,
         icon: renderIcon("Menu", { size: 18 }),
         children: [
           {
@@ -107,6 +116,15 @@ export const useSongMenu = () => {
               onClick: () => copyData(song.title),
             },
             icon: renderIcon("Copy", { size: 18 }),
+          },
+          {
+            key: "fill-lyrics",
+            label: "从网易云补全歌词",
+            show: showFillLyrics,
+            props: {
+              onClick: () => fillLyrics(song),
+            },
+            icon: renderIcon("Lyrics", { size: 18 }),
           },
           // 在线歌曲按 SPlayer 补齐（Eric，2026-11-06）；本地歌曲的 ID 对听众没有用，保持现状
           {
@@ -142,7 +160,7 @@ export const useSongMenu = () => {
       {
         key: "line-two",
         type: "divider",
-        show: options.more && options.copyName,
+        show: showMore,
       },
       {
         key: "delete-playlist",

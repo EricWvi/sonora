@@ -563,6 +563,20 @@ function librarySource(lib: Library): DataSource {
         if (!found) throw notFound();
         return found;
       }),
+    // fixture 的用户没有导入权限，界面上没有这些入口
+    fillAlbum: (id) =>
+      reply(() => {
+        const album = lib.albums.find((a) => a.id === id);
+        if (!album) throw notFound();
+        return { album, filled: [] };
+      }),
+    fillArtist: (id) =>
+      reply(() => {
+        const artist = lib.artists.find((a) => a.id === id);
+        if (!artist) throw notFound();
+        return { artist, filled: [] };
+      }),
+    fillTrack: (id) => reply(() => ({ track: track(id), filled: [] })),
     fm: () => reply(fmState),
     fmFinish: (albumId) =>
       reply(() => {

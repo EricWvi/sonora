@@ -106,7 +106,7 @@
 
 数据形态：
 
-- 歌曲 `{id, title, artists, album, trackNo, discNo, year, durationMs, format, cover, hasLyrics}`。`album` 为 `{id, title, artists}` 或 `null`；`cover` 是歌曲实际显示的封面，单曲封面优先，否则为专辑封面，都没有时为 `null`。
+- 歌曲 `{id, title, artists, album, trackNo, discNo, year, durationMs, format, cover, hasLyrics, onlineId}`，`onlineId` 是关联的网易云歌曲，没有时为 `null`。`album` 为 `{id, title, artists}` 或 `null`；`cover` 是歌曲实际显示的封面，单曲封面优先，否则为专辑封面，都没有时为 `null`。
 - 专辑 `{id, title, artists, year, cover, description, trackCount, durationMs}`。`description` 为管理后台填写的简介，没有时为空字符串。
 - 艺术家 `{id, name, image, description, trackCount, albumCount}`，`image` 是管理后台上传的图片，没有时为 `null`；`description` 为管理后台填写的简介，没有时为空字符串。
 - `artists` 与 `cover` 的形态和管理 API 一致：`[{id, name}]` 与 `{name, thumbhash}`。
@@ -184,6 +184,18 @@
 | `PUT playlists/{id}/order`                      | `{trackIds}` 为歌单的全部歌曲的新顺序。与服务端现有歌曲不一致时返回 409 `conflict`，说明客户端的副本已过期，应刷新后重试                                                                                                                                                                                |
 
 歌单为 `{id, name, description, cover, trackCount, durationMs, createdAt, updatedAt}`。同一首歌在一个歌单中只出现一次。`cover` 取歌单中第一首有封面的歌曲的封面，都没有时为 `null`；歌单暂不支持自定义封面。
+
+### 从网易云补全
+
+把关联的网易云内容补到本地的空字段上，已有内容不变。需要在导入组内（否则 403 `import_forbidden`）并登录了网易云（否则 403 `netease_signed_out`）；本地内容没有关联网易云 ID 时返回 409 `conflict`；其余网易云错误与导入相同。
+
+| 方法与路径               | 说明                                    |
+| ------------------------ | --------------------------------------- |
+| `POST albums/{id}/fill`  | 补全简介，返回 `{album, filled}`        |
+| `POST artists/{id}/fill` | 补全图片与简介，返回 `{artist, filled}` |
+| `POST tracks/{id}/fill`  | 补全歌词，返回 `{track, filled}`        |
+
+`filled` 列出实际写入的字段（`image`、`description`、`lyrics`）。没有可写的内容时状态仍为 200，`filled` 为空数组；字段都不为空时不请求网易云。
 
 ### 漫游 FM
 

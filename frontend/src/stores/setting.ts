@@ -148,7 +148,7 @@ export interface SettingState {
   sidebarHide: {
     /** 隐藏最近播放 */
     hideHistory: boolean;
-    /** 隐藏创建的歌单 */
+    /** 隐藏歌单 */
     hideUserPlaylists: boolean;
   };
 

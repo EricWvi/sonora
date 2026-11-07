@@ -53,7 +53,12 @@ export type Track = {
   source?: Source;
   /** 在线歌曲是否可以播放；本地歌曲没有这个字段 */
   playable?: boolean;
+  /** 本地歌曲关联的在线 ID，没有时为 null；在线歌曲没有这个字段 */
+  onlineId?: number | null;
 };
+
+/** 从关联的在线内容补全了哪些字段。 */
+export type FillField = "image" | "description" | "lyrics";
 
 /** 漫游 FM 排好的一张专辑，歌曲按播放顺序。 */
 export type FmAlbum = {

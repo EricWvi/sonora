@@ -51,8 +51,9 @@ import type { DropdownOption } from "naive-ui";
 import { source } from "@/api/source";
 import { useLoadError } from "@/composables/List/useLoadError";
 import { fetchAll } from "@/api/pages";
-import { useStatusStore } from "@/stores";
+import { useStatusStore, useUserStore } from "@/stores";
 import { renderIcon } from "@/utils/helper";
+import { fillAlbum } from "@/utils/onlineFill";
 import { onlinePageRoute } from "@/utils/track";
 import { listSortQuery } from "@/utils/meta";
 import { openBatchList, openPlaylistAdd } from "@/utils/modal";
@@ -124,7 +125,18 @@ const playButtonText = computed(() => {
 // 关联的在线专辑（导入或管理后台填写），没有时为 null
 const onlineId = ref<number | null>(null);
 
-// 更多操作。与 SPlayer 不同：关联了在线专辑时多“查看在线专辑”
+const userStore = useUserStore();
+
+// 补全简介，只更新头部，不重新载入列表
+const fillDescription = async () => {
+  const id = albumId.value;
+  const album = await fillAlbum(id);
+  if (album && detailData.value?.id === id)
+    setDetailData({ ...detailData.value, description: album.description });
+};
+
+// 更多操作。与 SPlayer 不同：关联了在线专辑时多“查看在线专辑”；有导入权限且没有简介时
+// 多“从网易云补全简介”（Eric，2026-11-07）
 const moreOptions = computed<DropdownOption[]>(() => [
   {
     label: "查看在线专辑",
@@ -135,6 +147,17 @@ const moreOptions = computed<DropdownOption[]>(() => [
         onlineId.value && router.push(onlinePageRoute("album", onlineId.value)),
     },
     icon: renderIcon("Cloud"),
+  },
+  {
+    label: "从网易云补全简介",
+    key: "fill-description",
+    show:
+      !!userStore.user?.canImport &&
+      !!onlineId.value &&
+      !!detailData.value &&
+      !detailData.value.description,
+    props: { onClick: fillDescription },
+    icon: renderIcon("EditNote"),
   },
   {
     label: "添加到歌单",
