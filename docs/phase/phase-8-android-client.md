@@ -1,6 +1,6 @@
 # 阶段 8：安卓客户端
 
-状态：进行中（2026-11-07 Eric 提出并开始）：参照源码已加入并在 Mac 上构建成功；7 个待决事项已全部确定，工作包已建立，第 1、2 项已完成。前置：阶段 7 退出（2026-11-06）。
+状态：进行中（2026-11-07 Eric 提出并开始）：参照源码已加入并在 Mac 上构建成功；7 个待决事项已全部确定，工作包已建立，第 1–3 项已完成。前置：阶段 7 退出（2026-11-06）。
 
 ## 目标
 
@@ -43,7 +43,10 @@
 - `MusicService`：只保留围绕引擎的会话部分（原版 2584 行）。小组件、均衡器、统计、队列持久化、睡眠定时、自定义会话命令与自定义通知都没有复制，需要时再加。
 - 不带 FFmpeg 解码器：Sonora 只入库 MP3、FLAC、AAC、Vorbis 与 Opus，由系统解码。
 - `Transition.kt`：去掉依赖 Room 的 `TransitionRule`。
-- `MainActivity` 是临时的单按钮页面，第 4 项替换。暂时没有应用图标（新视觉方案须 Eric 同意）。
+- `MainActivity` 登录后是临时页面（用户名、测试音播放、退出登录），第 4 项替换。暂时没有应用图标（新视觉方案须 Eric 同意）。
+- 主题（`ui/theme/`）：`Color`、`Shape`、`Type` 照搬，`Theme.kt` 去掉 AMOLED 预设与正在播放取色的覆盖，复制对应设置时再加；字体 `gflex_variable.ttf` 照搬。
+- 登录页按原版 `NavidromeLoginScreen` 的布局：只有服务器地址一个输入框（账号在浏览器里输入），没有返回按钮（它是第一个页面），一个圆形徽标放占位图标（Navidrome、Subsonic 两个标志的位置，等 Eric 同意 Sonora 的标志）。文案参照原版的 zh-CN 译文。
+- 网络：OkHttp 访问回环地址时不走系统代理，见第 3 项。
 
 ## 构建
 
@@ -52,6 +55,8 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 export ANDROID_HOME="$HOME/Library/Android/sdk"
 cd android && ./gradlew :app:assembleDebug :app:testDebugUnitTest
 ```
+
+在模拟器上连开发后端：开发服务器上 `task run:server`（`127.0.0.1:14560`），Mac 上 `ssh -f -N -L 127.0.0.1:14560:127.0.0.1:14560 eric`，再 `adb reverse tcp:14560 tcp:14560`，登录页填 `http://127.0.0.1:14560`。
 
 ## 工作包
 
@@ -66,7 +71,10 @@ cd android && ./gradlew :app:assembleDebug :app:testDebugUnitTest
   - 运行确认（2026-11-07，模拟器 `Medium_Phone`，API 36，无音频输出）：`dumpsys media_session` 显示点击播放后进入 `PLAYING`；切到后台后进度从 3059 ms 走到 9078 ms；媒体键暂停后两次读数都停在 9214 ms；恢复后走到 12324 ms；服务在前台并有媒体通知；logcat 没有崩溃或 `ExoPlaybackException`。
   - 运行确认（2026-11-07）：`./gradlew :app:assembleDebug :app:testDebugUnitTest` 成功，debug APK 约 41 MB，复制来的 74 个单元测试全部通过。
   - 待验证：实际听感（模拟器没有音频输出）；PKB110 真机；除 MP3 外的格式实际播放（模拟器上有 AAC、FLAC、Opus、Vorbis 的系统解码器）。
-- [ ] **3. 登录与 API 层**：系统浏览器登录、自定义 scheme 回调、token 保存、API 客户端。验证：模拟器连开发服务器。
+- [x] **3. 登录与 API 层**：系统浏览器登录、自定义 scheme 回调、token 保存、API 客户端。
+  - 运行确认（2026-11-07，模拟器 `Medium_Phone`，API 36，连开发服务器的开发模式后端）：登录页用 Custom Tab 打开设备登录，确认页带上 App 当前的动态配色；点“允许”后 Chrome 跳回 `sonora://auth/callback`，App 换到 token 并用 Bearer 调 `GET me` 得到 `listener`；重启 App 后保持登录；“退出登录”吊销自己，服务端 `devices` 表清空；确认页点“取消”回到登录页；服务端删掉设备后重启 App，`GET me` 返回 401，App 回到登录页并提示“登录已失效，请重新登录”。`./gradlew :app:testDebugUnitTest` 通过（PKCE、服务器地址、配色参数与代理选择的单元测试）。
+  - 待验证：真实 Authelia 下的登录（开发模式跳过 OIDC）；PKB110 真机上 Custom Tab 的跳回；登录页与原版的逐项截图对照（布局已与原版 Subsonic 登录页并排看过，未逐像素对照）。
+  - 访问回环地址（`localhost`、`127.x`、`::1`）不走系统代理，与 Chrome 一致。模拟器的全局代理（`10.0.2.2`）会把 `127.0.0.1` 的请求转到别处，开发时曾因此连到一台使用真实 Authelia 的服务，没有在那个页面上输入或操作。
 - [ ] **4. 曲库与播放**：首页、歌曲、专辑、艺术家、搜索、播放器、队列、后台播放和媒体通知。验证：模拟器运行。
 - [ ] **5. 用户数据**：喜欢、歌单、最近播放、歌词。验证：模拟器运行，并与 Web 端核对数据。
 - [ ] **6. 漫游 FM**。验证：模拟器运行。

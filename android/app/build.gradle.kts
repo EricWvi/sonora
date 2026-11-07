@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.dagger.hilt.android)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -54,6 +55,14 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.material.icons.extended)
+    implementation(libs.smooth.corner.rect.android.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.browser)
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.okhttp)
+    implementation(libs.kotlinx.serialization.json)
 
     // Unlike PixelPlayerOSS, no FFmpeg decoder: Sonora only ingests MP3, FLAC, AAC, Vorbis and
     // Opus, which the platform decodes on API 30+.

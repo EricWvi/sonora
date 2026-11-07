@@ -86,5 +86,8 @@
 - `data/service/MusicService.kt`：按原版缩减，只保留会话部分。
 - `data/model/AudioOutputMode.kt`、`data/model/Transition.kt`（去掉 `TransitionRule`）、`utils/Envelope.kt`。
 - `android/app/build.gradle.kts`、`android/gradle/`：构建配置与依赖版本取自原版，Gradle Wrapper 复制自原版。
+- `ui/theme/`：`Color.kt`、`Shape.kt`、`Type.kt` 照搬，`Theme.kt` 去掉 AMOLED 预设与正在播放取色的覆盖。
+- `res/font/gflex_variable.ttf`：Google Sans Flex（Copyright 2015 Google LLC，SIL Open Font License 1.1，许可证全文见 [frontend/public/fonts/OFL.txt](frontend/public/fonts/OFL.txt)），照搬。
+- `presentation/auth/LoginScreen.kt`：按原版 `presentation/navidrome/auth/NavidromeLoginActivity.kt` 的 `NavidromeLoginScreen` 改编；文案参照原版 `values-zh-rCN/strings_auth.xml`。
 
 `backend/internal/auth/assets/gflex.woff2` 是安卓设备登录确认页的字体，取自 PixelPlayerOSS 的 `app/src/main/res/font/gflex_variable.ttf`（Google Sans Flex 3.007，Copyright 2015 Google LLC，SIL Open Font License 1.1，许可证全文见 [frontend/public/fonts/OFL.txt](frontend/public/fonts/OFL.txt)）。与原版的 `RoundedSans` 一样把 ROND 轴固定为 100，其余轴取默认值，只保留 300–700 的字重，并只取拉丁字符子集（`fonttools varLib.instancer … wdth=100 opsz=drop GRAD=0 ROND=100 slnt=0 wght=300:700`，再 `pyftsubset --unicodes='U+0020-007E,U+00A0-00FF,U+2018-201D,U+2026' --layout-features='*' --flavor=woff2`）。确认页的图标是 Material Icons Rounded（Apache-2.0）的 `PhoneAndroid`、`Person`、`Check`、`Close`。

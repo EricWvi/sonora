@@ -1,4 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Sonora</string>
+
+    <!-- Login, worded after the zh-CN strings_auth.xml of PixelPlayerOSS. -->
+    <string name="auth_title">Sonora</string>
+    <string name="auth_subtitle">连接到你的 Sonora 服务器</string>
+    <string name="auth_info_card">登录在浏览器中进行，使用 Sonora 网页端的同一个账号。登录后这台设备会出现在你的账号下。</string>
+    <string name="auth_connection_details">连接详情</string>
+    <string name="auth_connection_details_subtitle">输入服务器地址，然后在浏览器中登录。</string>
+    <string name="auth_server_url">服务器地址</string>
+    <string name="auth_server_placeholder">https://music.example.com</string>
+    <string name="auth_server_url_hint">填写完整服务器地址，局域网使用 http://，外网远程服务器使用 https://。</string>
+    <string name="auth_prefill_http">自动填入 http://</string>
+    <string name="auth_connect">登录</string>
+    <string name="auth_connecting">正在连接…</string>
+    <string name="auth_footer">登录凭证只保存在这台设备上</string>
+    <string name="auth_cancelled">已取消登录</string>
+    <string name="cd_sonora_logo">Sonora</string>
 </resources>
