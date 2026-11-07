@@ -90,7 +90,9 @@
         :height="songListHeight"
         :play-list-id="listId"
         :doubleClickAction="searchData?.length ? 'add' : 'all'"
+        :user-playlist-id="ownPlaylist ? listIdNumber : 0"
         @scroll="handleListScroll"
+        @removeSong="removeSong"
       />
       <n-empty
         v-else
@@ -214,15 +216,20 @@ const removeSongs = (keys: string[]) => {
   setListData(listData.value.filter((song) => !keys.includes(trackKey(song))));
   if (detailData.value)
     setDetailData({ ...detailData.value, count: listData.value.length });
+  // 搜索结果是单独保存的
+  if (searchValue.value) performSearch(searchValue.value);
 };
+
+// 歌曲右键菜单的“从歌单中删除”；这个页面的歌都是在线歌曲
+const removeSong = (ids: number[]) =>
+  removeSongs(ids.map((id) => trackKey({ id, source: "online" })));
 
 const afterPublished = () => {
   if (detailData.value) setDetailData({ ...detailData.value, private: false });
 };
 
 // “更多”照搬 SPlayer：公开隐私歌单、删除歌单（自己创建的）、批量操作、复制分享链接、打开源页面。
-// 不做“刷新缓存”（在线列表不缓存）。与 SPlayer 不同：歌曲右键菜单没有“从歌单中删除”。
-// 艺术家页的批量操作只在歌曲标签下。
+// 不做“刷新缓存”（在线列表不缓存）。艺术家页的批量操作只在歌曲标签下。
 // 专辑另有“导入专辑到曲库”（Sonora 新增，可以导入的用户才有）。
 const moreOptions = computed<DropdownOption[]>(() => {
   const type = listType.value;

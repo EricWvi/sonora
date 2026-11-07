@@ -171,6 +171,7 @@ export const useSongMenu = () => {
             deleteSongs(playlistId, [song.id], {
               callback: () => emit?.("removeSong", [song.id]),
               songName: song.title,
+              online: isOnline(song),
             }),
         },
         icon: renderIcon("Delete"),
