@@ -130,17 +130,32 @@ audio {
 .n-modal {
   max-width: calc(100vw - 40px);
   border-radius: 8px;
+  // 弹窗卡片独立占一个合成层：弹窗内滚动重绘不与蒙层采样竞速
+  will-change: transform;
 }
 .n-modal-mask {
-  backdrop-filter: blur(16px);
+  // 不用 backdrop-filter（Eric，2026-11-08）：Mos 一类把滚轮转成触控板式
+  // 滚动的工具下，弹窗内滚动（慢滚、滚到边界反向）会让 Chrome 在个别帧
+  // 丢掉蒙层的 backdrop-filter，背景清晰一闪；DOM 侧的层防御验证无效。
+  // 蒙层不采样背景就永不闪：半透明跟随主题色（亮色近白纱、暗色近黑纱，
+  // --background 是 "r, g, b" 三元组变量，见 utils/color.ts 的
+  // setColorSchemes），视觉近似"变暗的模糊"。以后若要恢复模糊，加回
+  // backdrop-filter: blur(16px) 即可
+  background-color: rgba(var(--background), 0.7);
 }
 .n-modal-scroll-content {
   justify-content: center;
 }
+.n-modal .n-scrollbar-container {
+  contain: paint;
+  overscroll-behavior: none;
+}
 
 // drawer
 .n-drawer-mask {
-  backdrop-filter: blur(20px);
+  // 同 .n-modal-mask：不用 backdrop-filter（播放队列抽屉里滚动会闪，Eric
+  // 2026-11-08），半透明跟随主题色
+  background-color: rgba(var(--background), 0.7);
 }
 
 // dropdown
