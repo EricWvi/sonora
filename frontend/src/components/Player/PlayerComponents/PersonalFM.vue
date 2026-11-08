@@ -1,7 +1,8 @@
 <!-- 漫游 FM 卡片（Eric 定的名字，SPlayer 叫“私人FM”）。样式照搬 SPlayer components/Player/PlayerComponents/PersonalFM.vue。
 与 SPlayer 不同（Eric，2026-11-07）：歌曲来自自己的曲库，按专辑排（backend/internal/store/fm.go）；
 “不喜欢”改为“跳过这张专辑”，Sonora 没有垃圾桶，图标由 ThumbDown 改为快进 FastForward（Eric 选定）；没在听 FM 时跳过只换卡片上的专辑，不打断
-正在播放的歌；没有选择分组歌单时，专辑名下面多一行提示，点开设置。 -->
+正在播放的歌；没有选择分组歌单时，专辑名下面多一行提示，点开设置。
+与 SPlayer 不同（Eric，2026-11-08）：艺术家与专辑可以点开详情页；标题、艺术家与专辑之间的间距比 SPlayer 稍大。 -->
 <template>
   <n-card class="personal-fm">
     <!-- 封面 -->
@@ -37,13 +38,20 @@
         </n-text>
         <div v-if="song?.artists.length" class="artists text-hidden">
           <SvgIcon name="Artist" :depth="3" />
-          <n-text v-for="ar in song.artists" :key="ar.id" class="ar">
+          <n-text
+            v-for="ar in song.artists"
+            :key="ar.id"
+            class="ar"
+            @click.stop="openJumpArtist(song.artists, ar.id, isOnline(song))"
+          >
             {{ ar.name }}
           </n-text>
         </div>
         <div v-if="song?.album" class="album text-hidden">
           <SvgIcon name="Album" :depth="3" />
-          <n-text class="album-text">{{ song.album.title }}</n-text>
+          <n-text class="album-text" @click.stop="jumpPage(albumRoute(song))">
+            {{ song.album.title }}
+          </n-text>
         </div>
         <n-text
           v-if="needsGroups"
@@ -91,6 +99,7 @@
 </template>
 
 <script setup lang="ts">
+import type { RouteLocationRaw } from "vue-router";
 import type { FmState } from "@/api/types";
 import { source } from "@/api/source";
 import SvgIcon from "@/components/Global/SvgIcon.vue";
@@ -99,13 +108,15 @@ import { usePlayerController } from "@/core/player/PlayerController";
 import { useMusicStore, useSettingStore, useStatusStore } from "@/stores";
 import { coverUrl, defaultCovers } from "@/utils/cover";
 import { coverLoaded } from "@/utils/helper";
-import { openFmGroupManager } from "@/utils/modal";
+import { openFmGroupManager, openJumpArtist } from "@/utils/modal";
+import { albumRoute, isOnline } from "@/utils/track";
 import { debounce } from "lodash-es";
 
 const musicStore = useMusicStore();
 const statusStore = useStatusStore();
 const settingStore = useSettingStore();
 const player = usePlayerController();
+const router = useRouter();
 
 const state = shallowRef<FmState | null>(null);
 const loaded = ref<boolean>(false);
@@ -157,6 +168,19 @@ const skipAlbum = async () => {
   const next = await player.fmSkipAlbum(state.value?.albums[0]?.id);
   if (next) state.value = next;
 };
+
+// 点开专辑的详情页
+const jumpPage = debounce(
+  (go: RouteLocationRaw) => {
+    if (!go) return;
+    router.push(go);
+  },
+  300,
+  {
+    leading: true,
+    trailing: false,
+  },
+);
 
 // 离开 FM 或改了分组歌单之后，卡片要换成服务端记录的专辑
 watch([inFm, fmRevision], load);
@@ -217,7 +241,7 @@ onMounted(load);
       font-weight: bold;
     }
     .artists {
-      margin-top: 2px;
+      margin-top: 6px;
       font-size: 14px;
       .n-icon {
         font-size: 18px;
@@ -228,6 +252,7 @@ onMounted(load);
         display: inline-flex;
         transition: opacity 0.3s;
         opacity: 0.6;
+        cursor: pointer;
         &::after {
           content: "/";
           margin: 0 4px;
@@ -237,9 +262,13 @@ onMounted(load);
             display: none;
           }
         }
+        &:hover {
+          opacity: 1;
+        }
       }
     }
     .album {
+      margin-top: 6px;
       font-size: 14px;
       .n-icon {
         font-size: 18px;
@@ -249,6 +278,10 @@ onMounted(load);
       .album-text {
         transition: opacity 0.3s;
         opacity: 0.6;
+        cursor: pointer;
+        &:hover {
+          opacity: 1;
+        }
       }
     }
     .hint {
