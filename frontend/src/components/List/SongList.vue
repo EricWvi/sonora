@@ -1,15 +1,26 @@
 <!-- 歌曲列表 - 虚拟列表。照搬 SPlayer components/List/SongList.vue，歌曲是播放端 API 的 Track。
 排序由服务端完成：排序菜单只修改 status store 中的排序字段与顺序，页面据此重新请求。
-不迁入电台、大小列与移动端菜单。 -->
+不迁入电台、大小列与移动端菜单。
+与 SPlayer 不同（Eric，2026-11-08）：未传 height 时内联高度改为命令式写入。SPlayer 用
+useElementSize 测 .song-list 高度并绑定进模板，详情页折叠动画期间测量值每帧变化，导致整棵
+SongList 每帧重渲染（一次折叠约 256 次 SongCard 更新）而掉帧；内联高度本身是承重的（内容多于
+视口的页面靠它约束 .song-list，纯 CSS height:100% 会跟着内容增长撑破布局），不能去掉，改为在
+ResizeObserver 回调里直接写 wrapper 的 style，测量不再经过响应式。传了数值 height 的页面仍由
+模板绑定（折叠时靠 SCSS 的 height 过渡平滑），height="auto" 不变。 -->
 <template>
   <Transition name="fade">
     <div v-if="!isEmpty(listData)" ref="songListRef" class="song-list">
       <Transition name="fade">
         <div
+          ref="virtualWrapperRef"
           :key="listKey"
           :style="{
             height:
-              height === 'auto' ? 'auto' : `${height || songListHeight}px`,
+              height !== undefined
+                ? height === 'auto'
+                  ? 'auto'
+                  : `${height}px`
+                : '0px',
             transition: disableHeightTransition
               ? 'transform 0.3s, opacity 0.3s'
               : undefined,
@@ -437,9 +448,24 @@ const hasPlaySong = computed(() => {
   );
 });
 
-// 列表元素高度
+// 虚拟列表容器。未传 height 时由下面的 ResizeObserver 命令式写高度
+const virtualWrapperRef = ref<HTMLElement | null>(null);
+
+// 列表元素高度测量。未传 height 时把测量值直接写进 wrapper 的内联高度，
+// 不经过响应式：绑定进模板会让折叠动画期间每帧的测量触发整棵 SongList
+// 重渲染（见文件头注释）。模板在挂载时先写 0px 打断“wrapper 高度跟着
+// .song-list 内容增长”的循环，之后由这里的测量接管；列表换 key 重挂时
+// 同样先回到 0px，再测出布局高度。height="auto" 时停止测量，交给页面滚动。
 const { height: songListHeight, stop: stopCalcHeight } =
   useElementSize(songListRef);
+watch(
+  [songListHeight, virtualWrapperRef, () => props.height],
+  ([h, wrapper, height]) => {
+    if (height !== undefined || !wrapper || !h) return;
+    wrapper.style.height = `${h}px`;
+  },
+  { flush: "post" },
+);
 
 // 列表滚动
 const onScroll = (e: Event) => {
@@ -635,6 +661,9 @@ onBeforeUnmount(() => {
   .virtual-list-wrapper {
     height: 100%;
     position: relative;
+    // 传了数值 height 时内联高度由页面驱动，折叠时靠这条 height 过渡平滑
+    // （ListDetail 系页面）；disableHeightTransition 的内联 transition 会整体
+    // 覆盖这里，未传 height 时内联由测量写入，height 过渡由命令式更新承担
     transition:
       height 0.3s,
       transform 0.3s,
