@@ -5,8 +5,10 @@
 useElementSize 测 .song-list 高度并绑定进模板，详情页折叠动画期间测量值每帧变化，导致整棵
 SongList 每帧重渲染（一次折叠约 256 次 SongCard 更新）而掉帧；内联高度本身是承重的（内容多于
 视口的页面靠它约束 .song-list，纯 CSS height:100% 会跟着内容增长撑破布局），不能去掉，改为在
-ResizeObserver 回调里直接写 wrapper 的 style，测量不再经过响应式。传了数值 height 的页面仍由
-模板绑定（折叠时靠 SCSS 的 height 过渡平滑），height="auto" 不变。 -->
+ResizeObserver 回调里直接写 wrapper 的 style，测量不再经过响应式。模板不输出 height（保持
+undefined）：patchStyle 对样式对象是无条件写入，重渲染会把命令式高度覆盖回模板字面量（切回
+标签页后设置同步 patch store 触发过一次，列表高度卡死在 0）；挂载与重挂的 0px 也由 watch 写。
+传了数值 height 的页面仍由模板绑定（折叠时靠 SCSS 的 height 过渡平滑），height="auto" 不变。 -->
 <template>
   <Transition name="fade">
     <div v-if="!isEmpty(listData)" ref="songListRef" class="song-list">
@@ -20,7 +22,7 @@ ResizeObserver 回调里直接写 wrapper 的 style，测量不再经过响应�
                 ? height === 'auto'
                   ? 'auto'
                   : `${height}px`
-                : '0px',
+                : undefined,
             transition: disableHeightTransition
               ? 'transform 0.3s, opacity 0.3s'
               : undefined,
@@ -453,16 +455,21 @@ const virtualWrapperRef = ref<HTMLElement | null>(null);
 
 // 列表元素高度测量。未传 height 时把测量值直接写进 wrapper 的内联高度，
 // 不经过响应式：绑定进模板会让折叠动画期间每帧的测量触发整棵 SongList
-// 重渲染（见文件头注释）。模板在挂载时先写 0px 打断“wrapper 高度跟着
-// .song-list 内容增长”的循环，之后由这里的测量接管；列表换 key 重挂时
-// 同样先回到 0px，再测出布局高度。height="auto" 时停止测量，交给页面滚动。
+// 重渲染（见文件头注释）。内联高度由这里独占：挂载与换 key 重挂时先写
+// 0px（打断“wrapper 高度跟着 .song-list 内容增长”的循环），之后由测量
+// 接管。模板不再输出 height（undefined），否则组件因 store 改动重渲染时
+// Vue 的 patchStyle 会无条件把内联高度写回模板字面量（如 '0px'），覆盖
+// 命令式写入；而测量值没变不触发本 watch，高度就卡死在 0（标签页切回后
+// 设置同步 patch store 即触发，见 History 页列表消失的问题）。height="auto"
+// 时停止测量，交给页面滚动。
 const { height: songListHeight, stop: stopCalcHeight } =
   useElementSize(songListRef);
 watch(
   [songListHeight, virtualWrapperRef, () => props.height],
   ([h, wrapper, height]) => {
-    if (height !== undefined || !wrapper || !h) return;
-    wrapper.style.height = `${h}px`;
+    if (height !== undefined || !wrapper) return;
+    // 初次绑定与换 key 后的新元素先归零（打断内容撑高循环），h 为 0 时保持 0
+    wrapper.style.height = h ? `${h}px` : "0px";
   },
   { flush: "post" },
 );
