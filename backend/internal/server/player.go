@@ -35,6 +35,7 @@ func (s *server) registerPlayer(private *http.ServeMux) {
 	private.HandleFunc("GET "+p+"artists/{id}", s.getPlayerArtist)
 
 	private.HandleFunc("GET "+p+"covers/{name}", s.getCover)
+	private.HandleFunc("GET "+p+"library/changes", s.listLibraryChanges)
 
 	private.HandleFunc("GET "+p+"settings", s.getSettings)
 	private.HandleFunc("PUT "+p+"settings", s.saveSettings)

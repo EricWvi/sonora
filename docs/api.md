@@ -1,6 +1,6 @@
 # Sonora API 约定
 
-更新日期：2026-11-07。本文记录已实现的管理 API（阶段 1）、播放端登录与播放端 API（阶段 4）及其通用约定。实现见 [server.go](../backend/internal/server/server.go)、[player.go](../backend/internal/server/player.go)、[admin.go](../backend/internal/admin/admin.go) 与 [auth.go](../backend/internal/auth/auth.go)。
+更新日期：2026-11-08。本文记录已实现的管理 API（阶段 1）、播放端登录与播放端 API（阶段 4）及其通用约定。实现见 [server.go](../backend/internal/server/server.go)、[player.go](../backend/internal/server/player.go)、[admin.go](../backend/internal/admin/admin.go) 与 [auth.go](../backend/internal/auth/auth.go)。
 
 ## 通用约定
 
@@ -121,6 +121,7 @@
 | `GET tracks/{id}/audio`           | 音频流，支持 Range                                                                                                                                                                                                                                                                        |
 | `GET albums`、`GET albums/{id}`   | 列表（`q`、`artistId`、`sort`、`order`、`hideSingles`）/ 详情；`hideSingles=true` 时不含标记为单曲的专辑，专辑页与首页使用；首页“最近添加的专辑”用 `sort=createTime&order=desc&hideSingles=true`；专辑另有 `onlineId`：关联的在线专辑（导入或管理后台填写的网易云 ID），没有时为 `null`。 |
 | `GET artists`、`GET artists/{id}` | 列表（`q`）/ 详情；艺术家的歌曲与专辑用 `tracks?artistId=`、`albums?artistId=` 获取；艺术家另有 `onlineId`，含义同专辑。                                                                                                                                                                  |
+| `GET library/changes`             | 曲库的增量变更，供安卓客户端同步本机曲库，见[曲库变更](#曲库变更)                                                                                                                                                                                                                         |
 | `GET covers/{name}`               | 封面与艺术家图片，与管理 API 相同，支持同样的 `?size=`。播放端按 SPlayer 的封面尺寸取 `100`（小图：底部栏、背景与取色）、`300`、`1024`（全屏播放器的大封面），2026-10-25 增加 `100` 与 `1024`                                                                                             |
 
 数据形态：
@@ -129,6 +130,32 @@
 - 专辑 `{id, title, artists, year, cover, description, trackCount, durationMs}`。`description` 为管理后台填写的简介，没有时为空字符串。
 - 艺术家 `{id, name, image, description, trackCount, albumCount}`，`image` 是管理后台上传的图片，没有时为 `null`；`description` 为管理后台填写的简介，没有时为空字符串。
 - `artists` 与 `cover` 的形态和管理 API 一致：`[{id, name}]` 与 `{name, thumbhash}`。
+
+### 曲库变更
+
+安卓客户端在本机保存整个曲库，用变更日志增量更新（阶段 8，2026-11-08）。Web 播放端不使用。
+
+`GET library/changes?since=<cursor>&limit=<n>` 返回 cursor 之后变化过的歌曲、专辑、艺术家：
+
+```json
+{
+  "cursor": 1234,
+  "more": false,
+  "reset": false,
+  "tracks": [],
+  "albums": [],
+  "artists": [],
+  "deleted": { "tracks": [], "albums": [], "artists": [] }
+}
+```
+
+- **cursor**：首次同步用 `since=0`（或不带），得到当前整个曲库；之后带上次返回的 `cursor`。`since` 不是非负整数时返回 400 `invalid`。
+- **分页**：`limit` 按条目数计，默认 50，上限 500，与列表相同。`more` 为 `true` 时用新的 `cursor` 接着取，直到 `more` 为 `false`。没有变化时 `cursor` 原样返回。
+- **内容**：每个条目只出现一次，是它当前的状态；已删除的只给 ID，在 `deleted` 中。服务端每个条目只保留最后一次变化，所以 `since=0` 也会带上曾经删除过的 ID，客户端忽略本机没有的即可。条目的变化包括它显示的内容来自别处的情况：艺术家改名时，他的歌曲和专辑都算变化；专辑改标题、艺术家或封面时，它的歌曲都算变化；歌曲进出专辑时，专辑的 `trackCount` 与 `durationMs` 变化。
+- **重置**：`reset` 为 `true` 表示 `since` 比服务端的日志还新（例如数据库从备份恢复），其他字段为空，客户端清空本机曲库，从 `since=0` 重新同步。数据库恢复到较早的状态后又产生了更多变化、序号超过客户端的 cursor 时，服务端无法分辨，这种情况需要在客户端重新同步。
+- **形态**：歌曲、专辑、艺术家与上面的数据形态相同，另加 `sortKey`；专辑另加 `single`（是否标记为单曲，供客户端实现 `hideSingles` 与 `onlySingles`）。`sortKey` 是名称（歌曲与专辑的标题、艺术家名）的排序键，按字符串比较的顺序与服务端列表的拼音与数值排序（`zh_numeric`）一致；相等时按列表自身的顺序：歌曲新入库在前（ID 降序），专辑与艺术家按 ID 升序。按艺术家排序的歌曲取第一位艺术家的 `sortKey`，按专辑排序的取专辑的。
+
+实现：迁移 16 的 `library_changes` 表由 SQLite 触发器维护（[migrate.go](../backend/internal/store/migrate.go)），读取见 [changes.go](../backend/internal/store/changes.go)。
 
 ## 网易云账号
 

@@ -361,7 +361,127 @@ var migrations = []migration{
 	);
 	CREATE INDEX devices_user ON devices (user_id);
 	`),
+
+	// The library change log the native clients sync from (changes.go).
+	// Each track, album and artist has one row, moved to a new seq
+	// whenever anything the player sees of it changes, deletion included;
+	// a row whose item no longer exists stands for its deletion. Triggers
+	// keep it, so every write path is covered: a migration that rebuilds
+	// one of these tables must recreate its triggers. AUTOINCREMENT keeps
+	// seq growing past rows that moved on.
+	execSQL(`
+	CREATE TABLE library_changes (
+		seq     INTEGER PRIMARY KEY AUTOINCREMENT,
+		kind    TEXT    NOT NULL,
+		item_id INTEGER NOT NULL,
+		UNIQUE (kind, item_id)
+	);
+	INSERT INTO library_changes (kind, item_id) SELECT 'artist', id FROM artists ORDER BY id;
+	INSERT INTO library_changes (kind, item_id) SELECT 'album', id FROM albums ORDER BY id;
+	INSERT INTO library_changes (kind, item_id) SELECT 'track', id FROM tracks ORDER BY id;
+	` + libraryChangeTriggers),
 }
+
+// touch moves the kind rows of the IDs ids selects (as column id) to new
+// seqs. It deletes and inserts rather than INSERT OR REPLACE, because a
+// trigger takes the conflict policy of the statement that fired it, and
+// MergeArtists fires these with UPDATE OR IGNORE.
+//
+// touch and libraryChangeTriggers belong to migration 16: once released,
+// a change to them goes into a new migration that recreates the triggers.
+func touch(kind, ids string) string {
+	return `
+		DELETE FROM library_changes WHERE kind = '` + kind + `' AND item_id IN (SELECT id FROM (` + ids + `));
+		INSERT INTO library_changes (kind, item_id) SELECT DISTINCT '` + kind + `', id FROM (` + ids + `) WHERE id IS NOT NULL;`
+}
+
+// What the player sees of an item also comes from others: a track shows
+// its artists' names and its album's title, artists and cover; an album
+// counts its tracks and their duration; an artist counts its tracks and
+// albums. The triggers touch those items too.
+var libraryChangeTriggers = `
+	CREATE TRIGGER library_tracks_insert AFTER INSERT ON tracks BEGIN` +
+	touch("track", `SELECT NEW.id AS id`) +
+	touch("album", `SELECT NEW.album_id AS id`) + `
+	END;
+	CREATE TRIGGER library_tracks_update AFTER UPDATE ON tracks BEGIN` +
+	touch("track", `SELECT NEW.id AS id`) +
+	touch("album", `SELECT OLD.album_id AS id WHERE OLD.album_id IS NOT NEW.album_id OR OLD.duration_ms <> NEW.duration_ms
+		UNION SELECT NEW.album_id WHERE OLD.album_id IS NOT NEW.album_id OR OLD.duration_ms <> NEW.duration_ms`) + `
+	END;
+	CREATE TRIGGER library_tracks_delete AFTER DELETE ON tracks BEGIN` +
+	touch("track", `SELECT OLD.id AS id`) +
+	touch("album", `SELECT OLD.album_id AS id`) + `
+	END;
+
+	CREATE TRIGGER library_track_artists_insert AFTER INSERT ON track_artists BEGIN` +
+	touch("track", `SELECT NEW.track_id AS id`) +
+	touch("artist", `SELECT NEW.artist_id AS id`) + `
+	END;
+	CREATE TRIGGER library_track_artists_update AFTER UPDATE ON track_artists BEGIN` +
+	touch("track", `SELECT OLD.track_id AS id UNION SELECT NEW.track_id`) +
+	touch("artist", `SELECT OLD.artist_id AS id UNION SELECT NEW.artist_id`) + `
+	END;
+	CREATE TRIGGER library_track_artists_delete AFTER DELETE ON track_artists BEGIN` +
+	touch("track", `SELECT OLD.track_id AS id`) +
+	touch("artist", `SELECT OLD.artist_id AS id`) + `
+	END;
+
+	CREATE TRIGGER library_album_artists_insert AFTER INSERT ON album_artists BEGIN` +
+	touch("album", `SELECT NEW.album_id AS id`) +
+	touch("artist", `SELECT NEW.artist_id AS id`) +
+	touch("track", `SELECT id FROM tracks WHERE album_id = NEW.album_id`) + `
+	END;
+	CREATE TRIGGER library_album_artists_update AFTER UPDATE ON album_artists BEGIN` +
+	touch("album", `SELECT OLD.album_id AS id UNION SELECT NEW.album_id`) +
+	touch("artist", `SELECT OLD.artist_id AS id UNION SELECT NEW.artist_id`) +
+	touch("track", `SELECT id FROM tracks WHERE album_id IN (OLD.album_id, NEW.album_id)`) + `
+	END;
+	CREATE TRIGGER library_album_artists_delete AFTER DELETE ON album_artists BEGIN` +
+	touch("album", `SELECT OLD.album_id AS id`) +
+	touch("artist", `SELECT OLD.artist_id AS id`) +
+	touch("track", `SELECT id FROM tracks WHERE album_id = OLD.album_id`) + `
+	END;
+
+	CREATE TRIGGER library_albums_insert AFTER INSERT ON albums BEGIN` +
+	touch("album", `SELECT NEW.id AS id`) + `
+	END;
+	CREATE TRIGGER library_albums_update AFTER UPDATE ON albums BEGIN` +
+	touch("album", `SELECT NEW.id AS id`) +
+	touch("track", `SELECT id FROM tracks WHERE album_id = NEW.id`) + `
+	END;
+	CREATE TRIGGER library_albums_delete AFTER DELETE ON albums BEGIN` +
+	touch("album", `SELECT OLD.id AS id`) + `
+	END;
+
+	CREATE TRIGGER library_artists_insert AFTER INSERT ON artists BEGIN` +
+	touch("artist", `SELECT NEW.id AS id`) + `
+	END;
+	CREATE TRIGGER library_artists_update AFTER UPDATE ON artists BEGIN` +
+	touch("artist", `SELECT NEW.id AS id`) + `
+	END;
+	CREATE TRIGGER library_artists_rename AFTER UPDATE OF name ON artists WHEN OLD.name IS NOT NEW.name BEGIN` +
+	touch("track", `SELECT track_id AS id FROM track_artists WHERE artist_id = NEW.id
+		UNION SELECT t.id FROM tracks t JOIN album_artists x ON x.album_id = t.album_id WHERE x.artist_id = NEW.id`) +
+	touch("album", `SELECT album_id AS id FROM album_artists WHERE artist_id = NEW.id`) + `
+	END;
+	CREATE TRIGGER library_artists_delete AFTER DELETE ON artists BEGIN` +
+	touch("artist", `SELECT OLD.id AS id`) + `
+	END;
+
+	CREATE TRIGGER library_covers_insert AFTER INSERT ON covers BEGIN` +
+	touch("track", `SELECT id FROM tracks WHERE cover = NEW.name
+		UNION SELECT t.id FROM tracks t JOIN albums al ON al.id = t.album_id WHERE al.cover = NEW.name`) +
+	touch("album", `SELECT id FROM albums WHERE cover = NEW.name`) +
+	touch("artist", `SELECT id FROM artists WHERE image = NEW.name`) + `
+	END;
+	CREATE TRIGGER library_covers_update AFTER UPDATE ON covers BEGIN` +
+	touch("track", `SELECT id FROM tracks WHERE cover = NEW.name
+		UNION SELECT t.id FROM tracks t JOIN albums al ON al.id = t.album_id WHERE al.cover = NEW.name`) +
+	touch("album", `SELECT id FROM albums WHERE cover = NEW.name`) +
+	touch("artist", `SELECT id FROM artists WHERE image = NEW.name`) + `
+	END;
+`
 
 func migrate(db *sql.DB) error {
 	var version int
