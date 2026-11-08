@@ -1,5 +1,7 @@
-<!-- 我喜欢的音乐。照搬 SPlayer views/List/liked.vue：头部为 ListDetail，封面为 SPlayer 的
-默认封面，信息只有歌曲数（阶段 2 的“详情页头部”）；歌曲一次载入全部，默认最近喜欢的在前。
+<!-- 我喜欢的音乐。照搬 SPlayer views/List/liked.vue：头部为 ListDetail，
+信息只有歌曲数（阶段 2 的“详情页头部”）；歌曲一次载入全部，默认最近喜欢的在前。
+封面（Eric，2026-11-08）与 SPlayer 不同：SPlayer 显示网易云“喜欢歌单”的封面，Sonora 的喜欢列表
+不是歌单，改为取第一首有封面歌曲的封面，与服务端歌单的规则一致；没有时为 SPlayer 的默认封面。
 本地与在线歌曲混合（阶段 7），服务端按喜欢时间混排。不迁入歌单编辑、拖动排序、评论与分享。“更多”只有批量操作（阶段 7），其中“取消喜欢”是 Sonora 新增。 -->
 <template>
   <div class="liked-list">
@@ -121,11 +123,16 @@ const moreOptions = computed<DropdownOption[]>(() => [
   },
 ]);
 
-// 取消喜欢后从列表移除，并更新头部的数量
+// 取消喜欢后从列表移除，并更新头部的数量与封面
 const removeSongs = (keys: string[]) => {
-  setListData(listData.value.filter((song) => !keys.includes(trackKey(song))));
+  const songs = listData.value.filter((song) => !keys.includes(trackKey(song)));
+  setListData(songs);
   if (detailData.value)
-    setDetailData({ ...detailData.value, count: listData.value.length });
+    setDetailData({
+      ...detailData.value,
+      count: songs.length,
+      cover: songs.find((song) => song.cover)?.cover ?? null,
+    });
 };
 
 // 获取喜欢的歌曲（按当前排序）
@@ -150,7 +157,8 @@ const getLikedSongs = async () => {
     setDetailData({
       id: 0,
       name: "我喜欢的音乐",
-      cover: null,
+      // 封面取第一首有封面歌曲的封面，与服务端歌单的规则一致；没有时为默认封面
+      cover: songs.find((song) => song.cover)?.cover ?? null,
       count: songs.length,
     });
     setListData(songs);
