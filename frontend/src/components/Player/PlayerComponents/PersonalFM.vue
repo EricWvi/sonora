@@ -2,7 +2,9 @@
 与 SPlayer 不同（Eric，2026-11-07）：歌曲来自自己的曲库，按专辑排（backend/internal/store/fm.go）；
 “不喜欢”改为“跳过这张专辑”，Sonora 没有垃圾桶，图标由 ThumbDown 改为快进 FastForward（Eric 选定）；没在听 FM 时跳过只换卡片上的专辑，不打断
 正在播放的歌；没有选择分组歌单时，专辑名下面多一行提示，点开设置。
-与 SPlayer 不同（Eric，2026-11-08）：艺术家与专辑可以点开详情页；标题、艺术家与专辑之间的间距比 SPlayer 稍大。 -->
+与 SPlayer 不同（Eric，2026-11-08）：艺术家与专辑可以点开详情页；标题、艺术家与专辑之间的间距比 SPlayer 稍大。
+跳过专辑的图标与下一曲同为 26px：SPlayer 的 ThumbDown 在 18px 也饱满，FastForward 的双三角
+占比小，18px 显得比旁边的按钮小一圈。 -->
 <template>
   <n-card class="personal-fm">
     <!-- 封面 -->
@@ -65,7 +67,7 @@
         <n-flex :wrap="false" class="menu" align="center">
           <!-- 跳过这张专辑 -->
           <div class="menu-icon" title="跳过这张专辑" v-debounce="skipAlbum">
-            <SvgIcon class="icon" size="18" name="FastForward" />
+            <SvgIcon class="icon" size="26" name="FastForward" />
           </div>
           <!-- 播放暂停 -->
           <n-button
