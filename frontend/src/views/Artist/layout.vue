@@ -6,7 +6,11 @@
 不迁入别名、身份、视频、关注、分享与源页面。“更多 → 批量操作”（阶段 7，Eric 确认 2026-11-04）
 照搬 SPlayer 只在“歌曲”标签下显示；与 SPlayer 不同，点开时按当前排序取这位艺术家的全部歌曲，
 而不是只用已载入的部分。
-简介（2026-11-04 起）照搬 SPlayer，内容由管理后台填写。 -->
+简介（2026-11-04 起）照搬 SPlayer，内容由管理后台填写。
+与 SPlayer 不同（Eric，2026-11-09）：列表滚动改用歌单/专辑页同款 useListScroll。SPlayer 这里的
+listScroll 只看 scrollTop > 10，歌曲刚好比可视区高一点（溢出不足收缩让出的 120px）时，收缩后
+内容不再溢出，scrollTop 被夹回 0 又展开，头部原地反复抽动；useListScroll 在溢出不足 150px 时不进入
+收缩状态。 -->
 <template>
   <div :key="artistId" :class="['artist', { small: listScrolling }]">
     <Transition name="fade" mode="out-in">
@@ -181,6 +185,7 @@ import { fetchAll } from "@/api/pages";
 import { listSortQuery } from "@/utils/meta";
 import { source } from "@/api/source";
 import { useLoadError } from "@/composables/List/useLoadError";
+import { useListScroll } from "@/composables/List/useListScroll";
 import { coverLoaded, downloadImage, renderIcon } from "@/utils/helper";
 import { fillArtist } from "@/utils/onlineFill";
 import { onlinePageRoute } from "@/utils/track";
@@ -225,8 +230,8 @@ const artistImageToolbar = renderDownloadToolbar(() =>
   downloadImage(previewSrc.value, artistDetailData.value?.name || "artist"),
 );
 
-// 列表是否滚动
-const listScrolling = ref<boolean>(false);
+// 列表是否滚动。溢出不足以支撑收缩时不收缩，避免收缩 -> 不溢出 -> 展开的反复抽动
+const { listScrolling, handleListScroll: listScroll } = useListScroll();
 
 // 获取歌手详情
 const getArtistDetail = async (id: number) => {
@@ -327,13 +332,6 @@ const moreOptions = computed<DropdownOption[]>(() => {
     },
   ];
 });
-
-// 列表滚动
-const listScroll = (e: Event) => {
-  // 滚动高度
-  const scrollTop = (e.target as HTMLElement).scrollTop;
-  listScrolling.value = scrollTop > 10;
-};
 
 // 监听路由更新
 onBeforeRouteUpdate((to) => {
