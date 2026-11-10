@@ -11,6 +11,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import top.onlyquant.sonora.data.auth.AuthRepository
 import top.onlyquant.sonora.data.auth.SessionStore
+import top.onlyquant.sonora.data.model.Song
 
 /** A failed player API call; [status] is the HTTP status, 0 when the server was not reached. */
 class ApiException(val status: Int, message: String) : Exception(message)
@@ -31,11 +32,17 @@ class SonoraApi @Inject constructor(
 ) {
     suspend fun me(): Me = get("me", Me.serializer())
 
+    /** One page of `GET tracks`, newest first, as the original's songs. */
+    suspend fun songs(offset: Int = 0, limit: Int = 500): List<Song> {
+        val server = sessions.current()?.server ?: throw ApiException(401, "未登录")
+        return get("tracks?offset=$offset&limit=$limit", Page.serializer(Track.serializer()))
+            .items.map { it.toSong(server) }
+    }
+
     private suspend fun <T> get(path: String, serializer: KSerializer<T>): T {
         val session = sessions.current() ?: throw ApiException(401, "未登录")
         val request = Request.Builder()
             .url("${session.server}/api/v1/$path")
-            .header("Authorization", "Bearer ${session.token}")
             .build()
         val (code, body) = try {
             withContext(Dispatchers.IO) {

@@ -18,9 +18,17 @@ import java.net.URI
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 import kotlinx.serialization.json.Json
+import coil.ImageLoader
+import coil.disk.DiskCache
+import coil.memory.MemoryCache
+import kotlinx.coroutines.Dispatchers
 import okhttp3.OkHttpClient
+import top.onlyquant.sonora.data.api.AuthHeaderInterceptor
+import top.onlyquant.sonora.data.auth.SessionStore
+import top.onlyquant.sonora.data.preferences.SettingsDataStore
 
 private val Context.sessionDataStore: DataStore<Preferences> by preferencesDataStore(name = "session")
+private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -31,15 +39,45 @@ object AppModule {
 
     @Provides
     @Singleton
+    @SettingsDataStore
+    fun settingsDataStore(@ApplicationContext context: Context): DataStore<Preferences> =
+        context.settingsDataStore
+
+    @Provides
+    @Singleton
     fun json(): Json = Json { ignoreUnknownKeys = true }
 
     @Provides
     @Singleton
-    fun http(): OkHttpClient = OkHttpClient.Builder()
+    fun http(sessions: SessionStore): OkHttpClient = OkHttpClient.Builder()
+        .addInterceptor(AuthHeaderInterceptor(sessions))
         .proxySelector(LoopbackDirectProxySelector(ProxySelector.getDefault()))
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
+
+    /** As in PixelPlayerOSS (di/AppModule.kt); on the shared client so covers carry the device token. */
+    @Provides
+    @Singleton
+    fun imageLoader(@ApplicationContext context: Context, okHttpClient: OkHttpClient): ImageLoader {
+        return ImageLoader.Builder(context)
+            .okHttpClient(okHttpClient)
+            .dispatcher(Dispatchers.Default)
+            .allowHardware(true)
+            .memoryCache {
+                MemoryCache.Builder(context)
+                    .maxSizeBytes(40 * 1024 * 1024)
+                    .build()
+            }
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(context.cacheDir.resolve("image_cache"))
+                    .maxSizeBytes(100L * 1024 * 1024)
+                    .build()
+            }
+            .respectCacheHeaders(false)
+            .build()
+    }
 }
 
 /**

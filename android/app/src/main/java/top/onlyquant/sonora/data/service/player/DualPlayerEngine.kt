@@ -23,6 +23,8 @@ import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.okhttp.OkHttpDataSource
+import okhttp3.OkHttpClient
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -229,6 +231,7 @@ internal fun shouldDisableAudioOffloadOnEarlyBuffering(
 @Singleton
 class DualPlayerEngine @Inject constructor(
     @param:ApplicationContext private val context: Context,
+    private val http: OkHttpClient,
 ) {
     private companion object {
         // A local file reaches READY in ~100ms with a working output path, so 1.5s of
@@ -1056,7 +1059,8 @@ class DualPlayerEngine @Inject constructor(
             .setUsage(C.USAGE_MEDIA)
             .build()
             
-        val dataSourceFactory = DefaultDataSource.Factory(context)
+        // Sonora: network URIs go through the app's OkHttpClient, which adds the device token.
+        val dataSourceFactory = DefaultDataSource.Factory(context, OkHttpDataSource.Factory(http))
         val extractorsFactory = DefaultExtractorsFactory()
             .setMp3ExtractorFlags(Mp3Extractor.FLAG_ENABLE_CONSTANT_BITRATE_SEEKING)
             .setFlacExtractorFlags(FlacExtractor.FLAG_DISABLE_ID3_METADATA)
