@@ -23,7 +23,10 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import kotlinx.coroutines.Dispatchers
 import okhttp3.OkHttpClient
+import androidx.room.Room
 import top.onlyquant.sonora.data.api.AuthHeaderInterceptor
+import top.onlyquant.sonora.data.database.MusicDao
+import top.onlyquant.sonora.data.database.SonoraDatabase
 import top.onlyquant.sonora.data.auth.SessionStore
 import top.onlyquant.sonora.data.preferences.SettingsDataStore
 
@@ -55,6 +58,16 @@ object AppModule {
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
+
+    @Provides
+    @Singleton
+    fun database(@ApplicationContext context: Context): SonoraDatabase =
+        Room.databaseBuilder(context.applicationContext, SonoraDatabase::class.java, "sonora_database")
+            .fallbackToDestructiveMigration(dropAllTables = true)
+            .build()
+
+    @Provides
+    fun musicDao(database: SonoraDatabase): MusicDao = database.musicDao()
 
     /** As in PixelPlayerOSS (di/AppModule.kt); on the shared client so covers carry the device token. */
     @Provides

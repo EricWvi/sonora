@@ -27,6 +27,8 @@ kotlinxCollectionsImmutable = "0.5.1"
 navigationCompose = "2.9.8"
 reorderables = "3.1.0"
 desugarJdkLibs = "2.1.5"
+paging = "3.5.0"
+room = "2.8.4"
 junit = "4.13.2"
 junitJupiter = "6.1.2"
 mockk = "1.14.11"
@@ -65,6 +67,12 @@ androidx-graphics-shapes = { module = "androidx.graphics:graphics-shapes", versi
 androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
 coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coilCompose" }
 kotlinx-collections-immutable = { module = "org.jetbrains.kotlinx:kotlinx-collections-immutable", version.ref = "kotlinxCollectionsImmutable" }
+androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
+androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
+androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
+androidx-room-paging = { module = "androidx.room:room-paging", version.ref = "room" }
+androidx-paging-runtime = { module = "androidx.paging:paging-runtime", version.ref = "paging" }
+androidx-paging-compose = { module = "androidx.paging:paging-compose", version.ref = "paging" }
 reorderables = { group = "sh.calvin.reorderable", name = "reorderable", version.ref = "reorderables" }
 
 [plugins]

@@ -97,6 +97,15 @@ cd android && ./gradlew :app:assembleDebug :app:testDebugUnitTest
       - 定时停止：“当前歌曲播放完毕”在“中学时代”结尾暂停，停在下一首“藏心”的 0 ms，不自动播放；“播放次数”设为 2 次时先单曲循环一遍，第二遍结尾暂停并回到 0 ms，循环按钮恢复为原来的关闭状态；自定义时长设为 1 分钟，23:18:34.540 设定，23:19:34.539 到期并暂停。
       - 整个过程 logcat 的 crash 缓冲区为空，App 进程没有错误日志。
     - 待验证：切换到其他音频输出设备（蓝牙等，PKB110 上）；实际听感。
+  - 曲库（Eric，2026-11-11）：照原版 `LibraryScreen`，只有歌曲、专辑、艺术家三个标签，数据来自本机 Room（用 `library/changes` 同步）。
+    - 歌曲的“⋮”菜单只留播放、喜欢、添加到队列、下一首、加入歌单（喜欢与歌单在第 5 项接上）；去掉分享、删除、设置提示音、在 MusicBrainz 上查找、编辑与“详情”页。
+    - 长按多选保留，批量操作只留添加到队列、下一首、加入歌单、喜欢，去掉删除与批量编辑。
+    - 标题右边去掉书签按钮（音频书签已去掉），保留设置按钮，设置页做好之前点了没有反应。
+    - 排序面板去掉“云端 · 仅云端”开关（Sonora 的歌都在服务器上）；“默认顺序”用服务端列表的默认顺序：歌曲新入库在前，专辑按标题，艺术家按名称，与 Web 端一致。
+    - “专辑”标签与 Web 端的专辑页一样隐藏标记为单曲的专辑（`hideSingles`，Eric，2026-11-11）。
+    - 本机曲库（提交见 git log）：Room 数据库 `SonoraDatabase`，表名沿用原版（`songs`、`albums`、`artists`、`song_artist_cross_ref`），列按 Sonora 的接口，另有 `library_state` 记录服务器地址与 cursor。没有外键（一页变更里歌曲可能先于它的专辑与艺术家）；艺术家与专辑的 `sortKey` 只存在各自的表里，按艺术家、专辑排序歌曲时联表取。`LibraryRepository.sync()` 逐页取 `library/changes`，每页连同 cursor 在一个事务里写入；服务器地址变了或服务端返回 `reset` 时清空重来。打开 App（已登录）时同步一次。排序照原版 `SortOption` 的键在 SQL 里排，名称按 `sortKey`，“添加时间”按 ID（服务端按入库顺序分配、不复用；播放端 API 没有入库时间）。上线前改表结构直接删库重新同步（`fallbackToDestructiveMigration`），发布后照原版写迁移。
+      - 运行确认（2026-11-11，模拟器，开发服务器 `2f4b8eb`）：首次同步后本机有 369 首歌、311 张专辑、215 位艺术家、420 条歌曲与艺术家的关系，cursor 897，与开发库的 `tracks`、`albums`、`artists`、`track_artists` 行数和 `library_changes` 最大序号相同；本机 SQL 排出的顺序与服务端列表逐项相同：歌曲的 `default`、`title`（升降序）、`artist`、`album`、`duration`、`createTime`，专辑的 `default`、`hideSingles=true`、`createTime` 降序，艺术家的 `default`。`./gradlew :app:testDebugUnitTest` 81 个测试通过，其中新增 3 个测试变更到本机行与 `Song` 的转换。
+      - 待验证：增量同步（服务端改名、删除后再同步）、`reset`、断网时同步失败的提示。
 - [ ] **5. 用户数据**：喜欢、歌单、最近播放、歌词。验证：模拟器运行，并与 Web 端核对数据。
 - [ ] **6. 漫游 FM**。验证：模拟器运行。
 - [ ] **7. 歌曲缓存**：手动下载、播放缓存（默认 5 GB，超出后删最久没播放的）、下载管理页、已删除歌曲的清理、离线播放。验证：模拟器断网测试。

@@ -39,6 +39,10 @@ class SonoraApi @Inject constructor(
             .items.map { it.toSong(server) }
     }
 
+    /** One page of `GET library/changes` after [since] (docs/api.md#曲库变更). */
+    suspend fun libraryChanges(since: Long, limit: Int = 500): LibraryChanges =
+        get("library/changes?since=$since&limit=$limit", LibraryChanges.serializer())
+
     private suspend fun <T> get(path: String, serializer: KSerializer<T>): T {
         val session = sessions.current() ?: throw ApiException(401, "未登录")
         val request = Request.Builder()

@@ -28,6 +28,7 @@ import top.onlyquant.sonora.presentation.main.BlankTab
 import top.onlyquant.sonora.presentation.main.MainUI
 import top.onlyquant.sonora.presentation.main.TrackListPlaceholder
 import top.onlyquant.sonora.presentation.navigation.Screen
+import top.onlyquant.sonora.presentation.viewmodel.LibraryViewModel
 import top.onlyquant.sonora.presentation.viewmodel.PlayerViewModel
 import top.onlyquant.sonora.ui.theme.PixelPlayerTheme
 
@@ -41,6 +42,7 @@ class MainActivity : ComponentActivity() {
     private val auth: AuthViewModel by viewModels()
     // Activity-scoped, as sharedPlayerViewModel() resolves it for the copied components.
     private val playerViewModel: PlayerViewModel by viewModels()
+    private val libraryViewModel: LibraryViewModel by viewModels()
 
     private val notificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
@@ -69,6 +71,7 @@ class MainActivity : ComponentActivity() {
                         onConnect = auth::connect,
                     )
                     is SessionState.SignedIn -> Surface(Modifier.fillMaxSize()) {
+                        LaunchedEffect(Unit) { libraryViewModel.sync() }
                         val navController = rememberNavController()
                         MainUI(playerViewModel, navController) { padding ->
                             NavHost(navController, startDestination = Screen.Home.route) {
