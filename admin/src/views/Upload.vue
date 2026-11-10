@@ -20,7 +20,7 @@ import {
   type ApiError,
   type TrackDetail,
 } from "../api";
-import { isLyrics, isTTML, stem, uploadTrack } from "../upload";
+import { isLyrics, lyricsRank, stem, uploadTrack } from "../upload";
 
 type State =
   "queued" | "uploading" | "processing" | "created" | "duplicate" | "failed";
@@ -51,8 +51,9 @@ const counts = computed(() => {
   return c;
 });
 
-// Files picked together are paired by name: "song.lrc" or "song.ttml"
-// goes with "song.flac". A song has one lyrics file; TTML wins over LRC.
+// Files picked together are paired by name: "song.lrc", "song.yrc" or
+// "song.ttml" goes with "song.flac". A song has one lyrics file; TTML wins
+// over YRC, YRC over LRC.
 // The service decides what counts as audio.
 function add(files: File[]) {
   const audio = files.filter((f) => !isLyrics(f.name));
@@ -60,7 +61,7 @@ function add(files: File[]) {
   const spare: File[] = [];
   for (const f of files.filter((f) => isLyrics(f.name))) {
     const other = lyrics.get(stem(f.name));
-    if (other && !isTTML(f.name)) {
+    if (other && lyricsRank(f.name) <= lyricsRank(other.name)) {
       spare.push(f);
       continue;
     }
@@ -91,7 +92,7 @@ function add(files: File[]) {
       lyrics: null,
       state: "failed",
       progress: 0,
-      error: "同名的 .ttml 歌词已优先使用",
+      error: "已优先使用同名的另一份歌词",
       track: null,
     });
   }
@@ -263,13 +264,13 @@ const columns: DataTableColumns<Item> = [
       directory-dnd
       :default-upload="false"
       :show-file-list="false"
-      accept="audio/*,.mp3,.flac,.m4a,.ogg,.opus,.lrc,.ttml"
+      accept="audio/*,.mp3,.flac,.m4a,.ogg,.opus,.lrc,.ttml,.yrc"
       @change="onChange"
     >
       <n-upload-dragger>
         <n-p style="margin: 0; font-size: 16px">点击或拖入音频文件</n-p>
         <n-text depth="3"
-          >MP3、FLAC、AAC（M4A）、Ogg Vorbis、Opus；同名 .lrc 或 .ttml
+          >MP3、FLAC、AAC（M4A）、Ogg Vorbis、Opus；同名 .lrc、.yrc 或 .ttml
           作为歌词一并上传</n-text
         >
       </n-upload-dragger>

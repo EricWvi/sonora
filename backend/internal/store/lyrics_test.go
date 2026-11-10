@@ -70,3 +70,17 @@ func TestLyricsKeepTheirFormat(t *testing.T) {
 		}
 	}
 }
+
+func TestYRCUploadBecomesTTML(t *testing.T) {
+	yrc := "{\"t\":0,\"c\":[{\"tx\":\"作词: 周杰伦\"}]}\n[1000,2000](1000,1000,0)刮风(2000,1000,0)这天"
+	text, format, err := readLyrics([]byte(yrc))
+	if err != nil || format != TTML {
+		t.Fatalf("readLyrics(yrc) = %q, %v; want TTML", format, err)
+	}
+	if got, err := lyricsFormat(text); err != nil || got != TTML {
+		t.Errorf("converted YRC is not valid TTML: %q, %v", got, err)
+	}
+	if _, format, _ := readLyrics([]byte("[00:01.00]晴天")); format != LRC {
+		t.Errorf("LRC read as %q", format)
+	}
+}

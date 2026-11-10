@@ -49,6 +49,16 @@ func (l LyricSet) Compose() (text, format string) {
 	return mergeLRC(parseLRC(l.LRC), parseLRC(l.Translation), parseLRC(l.Roman)), lyricLRC
 }
 
+// YRCToTTML turns an uploaded YRC file into TTML, the format the player reads
+// word timings from. ok is false when raw has no YRC lines.
+func YRCToTTML(raw string) (ttml string, ok bool) {
+	lines := parseYRC(raw)
+	if len(lines) == 0 {
+		return "", false
+	}
+	return renderTTML(lines, align(lines, nil), align(lines, nil)), true
+}
+
 func firstNonEmpty(a, b string) string {
 	if strings.TrimSpace(a) != "" {
 		return a

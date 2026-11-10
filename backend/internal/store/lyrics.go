@@ -11,6 +11,8 @@ import (
 
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/encoding/unicode"
+
+	"sonora/internal/netease"
 )
 
 // MaxLyricsBytes caps lyrics text.
@@ -81,16 +83,20 @@ func decodeLyrics(data []byte) (string, error) {
 	return strings.TrimSpace(text), nil
 }
 
-// readLyrics decodes an uploaded lyrics file and finds its format.
+// readLyrics decodes an uploaded lyrics file and finds its format. NetEase
+// YRC is stored as TTML, as on import, since the player does not read YRC.
 func readLyrics(data []byte) (text, format string, err error) {
 	if text, err = decodeLyrics(data); err != nil {
 		return "", "", err
+	}
+	if ttml, ok := netease.YRCToTTML(text); ok {
+		return ttml, TTML, nil
 	}
 	format, err = lyricsFormat(text)
 	return text, format, err
 }
 
-// SetTrackLyrics replaces a track's lyrics with an uploaded LRC or TTML
+// SetTrackLyrics replaces a track's lyrics with an uploaded LRC, TTML or YRC
 // file or edited text. Empty input removes them.
 func (s *Store) SetTrackLyrics(ctx context.Context, id int64, data []byte) (TrackDetail, error) {
 	text, format, err := readLyrics(data)

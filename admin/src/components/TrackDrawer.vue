@@ -277,7 +277,7 @@ function confirmDelete() {
             :disabled="savingLyrics"
             @click="lyricsInput?.click()"
           >
-            上传 .lrc / .ttml
+            上传 .lrc / .yrc / .ttml
           </n-button>
           <n-button
             v-if="track.hasLyrics"
@@ -291,7 +291,7 @@ function confirmDelete() {
         <input
           ref="lyricsInput"
           type="file"
-          accept=".lrc,.ttml,.txt"
+          accept=".lrc,.ttml,.yrc,.txt"
           hidden
           @change="lyricsPicked"
         />

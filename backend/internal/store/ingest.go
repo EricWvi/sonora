@@ -76,7 +76,7 @@ type IngestResult struct {
 
 // Ingest adds the upload to the library. A file whose content is already
 // in the library is not stored again; the existing track is returned.
-// lyrics is an optional sidecar LRC or TTML file that takes precedence
+// lyrics is an optional sidecar LRC, TTML or YRC file that takes precedence
 // over lyrics embedded in the tags.
 func (s *Store) Ingest(ctx context.Context, u *Upload, lyrics []byte) (IngestResult, error) {
 	return s.ingest(ctx, u, lyrics, NeteaseIDs{})
