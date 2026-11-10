@@ -32,10 +32,10 @@ class SonoraApi @Inject constructor(
 ) {
     suspend fun me(): Me = get("me", Me.serializer())
 
-    /** One page of `GET tracks`, newest first, as the original's songs. */
-    suspend fun songs(offset: Int = 0, limit: Int = 500): List<Song> {
+    /** One page of `GET tracks` in [sort] order (docs/api.md), as the original's songs. */
+    suspend fun songs(offset: Int = 0, limit: Int = 500, sort: String = "default"): List<Song> {
         val server = sessions.current()?.server ?: throw ApiException(401, "未登录")
-        return get("tracks?offset=$offset&limit=$limit", Page.serializer(Track.serializer()))
+        return get("tracks?offset=$offset&limit=$limit&sort=$sort", Page.serializer(Track.serializer()))
             .items.map { it.toSong(server) }
     }
 
