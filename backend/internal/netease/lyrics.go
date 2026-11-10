@@ -74,12 +74,14 @@ type yrcWord struct {
 type yrcLine struct {
 	start, duration int
 	words           []yrcWord
+	bg              *yrcLine // background vocal sung over the line
 }
 
 var (
 	yrcLineHead = regexp.MustCompile(`^\[(\d+),(\d+)\]`)
 	// Only the timing is matched: the words themselves may hold parentheses.
 	yrcWordHead = regexp.MustCompile(`\((\d+),(\d+),\d+\)`)
+	qrcWordTail = regexp.MustCompile(`\((\d+),(\d+)\)`)
 	lrcStamp    = regexp.MustCompile(`\[(\d+):(\d+)(?:[.:](\d+))?\]`)
 )
 
@@ -113,6 +115,57 @@ func parseYRC(raw string) []yrcLine {
 		}
 	}
 	return lines
+}
+
+// parseQRC reads QQ Music's word-timed lyric, one line of
+// "[start,duration]word(start,duration)word(start,duration)", the timing
+// after each word rather than before it as in YRC. Tags such as [ti:] have no
+// timing and are left out. A line wrapped in parentheses is a background
+// vocal, as AMLL's parseQrc reads it; it goes with the line before it.
+func parseQRC(raw string) []yrcLine {
+	var lines []yrcLine
+	for _, row := range strings.Split(raw, "\n") {
+		row = strings.TrimSpace(row)
+		head := yrcLineHead.FindStringSubmatch(row)
+		if head == nil {
+			continue
+		}
+		body := strings.TrimSpace(row[len(head[0]):])
+		line := yrcLine{start: atoi(head[1]), duration: atoi(head[2])}
+		from := 0
+		for _, m := range qrcWordTail.FindAllStringSubmatchIndex(body, -1) {
+			line.words = append(line.words, yrcWord{
+				start:    atoi(body[m[2]:m[3]]),
+				duration: atoi(body[m[4]:m[5]]),
+				text:     body[from:m[0]],
+			})
+			from = m[1]
+		}
+		if len(line.words) == 0 {
+			continue
+		}
+		first, last := &line.words[0], &line.words[len(line.words)-1]
+		if (strings.HasPrefix(first.text, "(") || strings.HasPrefix(first.text, "（")) &&
+			(strings.HasSuffix(last.text, ")") || strings.HasSuffix(last.text, "）")) &&
+			len(lines) > 0 && lines[len(lines)-1].bg == nil {
+			first.text = strings.TrimPrefix(strings.TrimPrefix(first.text, "("), "（")
+			last.text = strings.TrimSuffix(strings.TrimSuffix(last.text, ")"), "）")
+			lines[len(lines)-1].bg = &line
+			continue
+		}
+		lines = append(lines, line)
+	}
+	return lines
+}
+
+// QRCToTTML turns an uploaded QRC file into TTML. ok is false when raw has no
+// QRC lines.
+func QRCToTTML(raw string) (ttml string, ok bool) {
+	lines := parseQRC(raw)
+	if len(lines) == 0 {
+		return "", false
+	}
+	return renderTTML(lines, align(lines, nil), align(lines, nil)), true
 }
 
 func atoi(s string) int {
@@ -227,20 +280,12 @@ func renderTTML(lines []yrcLine, translation, roman []string) string {
 	for i, line := range lines {
 		fmt.Fprintf(&b, `<p begin="%s" end="%s" itunes:key="L%d" ttm:agent="v1">`,
 			ttmlTime(line.start), ttmlTime(line.start+line.duration), i+1)
-		for _, w := range line.words {
-			word := strings.TrimSpace(w.text)
-			if word == "" {
-				b.WriteString(" ")
-				continue
-			}
-			if strings.HasPrefix(w.text, " ") {
-				b.WriteString(" ")
-			}
-			fmt.Fprintf(&b, `<span begin="%s" end="%s">%s</span>`,
-				ttmlTime(w.start), ttmlTime(w.start+w.duration), escapeXML(word))
-			if strings.HasSuffix(w.text, " ") {
-				b.WriteString(" ")
-			}
+		writeWords(&b, line.words)
+		if bg := line.bg; bg != nil {
+			fmt.Fprintf(&b, `<span ttm:role="x-bg" begin="%s" end="%s">`,
+				ttmlTime(bg.start), ttmlTime(bg.start+bg.duration))
+			writeWords(&b, bg.words)
+			b.WriteString(`</span>`)
 		}
 		if translation[i] != "" {
 			fmt.Fprintf(&b, `<span ttm:role="x-translation" xml:lang="zh-CN">%s</span>`, escapeXML(translation[i]))
@@ -252,4 +297,22 @@ func renderTTML(lines []yrcLine, translation, roman []string) string {
 	}
 	b.WriteString(`</div></body></tt>`)
 	return b.String()
+}
+
+func writeWords(b *strings.Builder, words []yrcWord) {
+	for _, w := range words {
+		word := strings.TrimSpace(w.text)
+		if word == "" {
+			b.WriteString(" ")
+			continue
+		}
+		if strings.HasPrefix(w.text, " ") {
+			b.WriteString(" ")
+		}
+		fmt.Fprintf(b, `<span begin="%s" end="%s">%s</span>`,
+			ttmlTime(w.start), ttmlTime(w.start+w.duration), escapeXML(word))
+		if strings.HasSuffix(w.text, " ") {
+			b.WriteString(" ")
+		}
+	}
 }

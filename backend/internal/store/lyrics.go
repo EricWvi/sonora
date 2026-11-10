@@ -84,7 +84,8 @@ func decodeLyrics(data []byte) (string, error) {
 }
 
 // readLyrics decodes an uploaded lyrics file and finds its format. NetEase
-// YRC is stored as TTML, as on import, since the player does not read YRC.
+// YRC and QQ Music QRC are stored as TTML, as on import, since the player
+// reads neither.
 func readLyrics(data []byte) (text, format string, err error) {
 	if text, err = decodeLyrics(data); err != nil {
 		return "", "", err
@@ -92,12 +93,15 @@ func readLyrics(data []byte) (text, format string, err error) {
 	if ttml, ok := netease.YRCToTTML(text); ok {
 		return ttml, TTML, nil
 	}
+	if ttml, ok := netease.QRCToTTML(text); ok {
+		return ttml, TTML, nil
+	}
 	format, err = lyricsFormat(text)
 	return text, format, err
 }
 
-// SetTrackLyrics replaces a track's lyrics with an uploaded LRC, TTML or YRC
-// file or edited text. Empty input removes them.
+// SetTrackLyrics replaces a track's lyrics with an uploaded LRC, TTML, YRC or
+// QRC file or edited text. Empty input removes them.
 func (s *Store) SetTrackLyrics(ctx context.Context, id int64, data []byte) (TrackDetail, error) {
 	text, format, err := readLyrics(data)
 	if err != nil {

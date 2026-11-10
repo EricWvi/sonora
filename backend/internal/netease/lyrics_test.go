@@ -73,3 +73,31 @@ func TestComposeFallsBackOnLineTimedTranslation(t *testing.T) {
 		t.Fatal(text)
 	}
 }
+
+func TestQRCToTTML(t *testing.T) {
+	text, ok := QRCToTTML("[ti:17岁]\n[ar:刘德华]\n[offset:0]\n" +
+		"[266,1551]17(266,311)岁(577,148) - (726,148)刘(874,287)\r\n" +
+		"[5545,10751]Billy (6081,312)Chan(6393,9903)\n" +
+		"[6000,2000](ooh (6000,1000)yeah)(7000,1000)\n" +
+		"[19000,1000]好(19000,1000)\n" +
+		"[20000,1000]（啊）(20000,1000)")
+	if !ok {
+		t.Fatal("no QRC lines")
+	}
+	for _, want := range []string{
+		`<p begin="00:00:00.266" end="00:00:01.817" itunes:key="L1" ttm:agent="v1"><span begin="00:00:00.266" end="00:00:00.577">17</span><span begin="00:00:00.577" end="00:00:00.725">岁</span> <span begin="00:00:00.726" end="00:00:00.874">-</span> <span begin="00:00:00.874" end="00:00:01.161">刘</span></p>`,
+		`<span begin="00:00:06.081" end="00:00:06.393">Billy</span> <span begin="00:00:06.393" end="00:00:16.296">Chan</span>`,
+		`<span ttm:role="x-bg" begin="00:00:06.000" end="00:00:08.000"><span begin="00:00:06.000" end="00:00:07.000">ooh</span> <span begin="00:00:07.000" end="00:00:08.000">yeah</span></span></p>`,
+		`>好</span><span ttm:role="x-bg" begin="00:00:20.000" end="00:00:21.000"><span begin="00:00:20.000" end="00:00:21.000">啊</span></span></p>`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("missing %s in\n%s", want, text)
+		}
+	}
+	if strings.Contains(text, "ti:") || strings.Contains(text, `key="L4"`) {
+		t.Errorf("tags or extra lines in\n%s", text)
+	}
+	if _, ok := QRCToTTML("[1000,2000](1000,500,0)YRC 不是 QRC"); ok {
+		t.Error("YRC read as QRC")
+	}
+}

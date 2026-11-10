@@ -51,9 +51,9 @@ const counts = computed(() => {
   return c;
 });
 
-// Files picked together are paired by name: "song.lrc", "song.yrc" or
-// "song.ttml" goes with "song.flac". A song has one lyrics file; TTML wins
-// over YRC, YRC over LRC.
+// Files picked together are paired by name: "song.lrc", "song.yrc",
+// "song.qrc" or "song.ttml" goes with "song.flac". A song has one lyrics
+// file; TTML wins over YRC and QRC, those over LRC.
 // The service decides what counts as audio.
 function add(files: File[]) {
   const audio = files.filter((f) => !isLyrics(f.name));
@@ -264,14 +264,14 @@ const columns: DataTableColumns<Item> = [
       directory-dnd
       :default-upload="false"
       :show-file-list="false"
-      accept="audio/*,.mp3,.flac,.m4a,.ogg,.opus,.lrc,.ttml,.yrc"
+      accept="audio/*,.mp3,.flac,.m4a,.ogg,.opus,.lrc,.ttml,.yrc,.qrc"
       @change="onChange"
     >
       <n-upload-dragger>
         <n-p style="margin: 0; font-size: 16px">点击或拖入音频文件</n-p>
         <n-text depth="3"
-          >MP3、FLAC、AAC（M4A）、Ogg Vorbis、Opus；同名 .lrc、.yrc 或 .ttml
-          作为歌词一并上传</n-text
+          >MP3、FLAC、AAC（M4A）、Ogg Vorbis、Opus；同名 .lrc、.yrc、.qrc 或
+          .ttml 作为歌词一并上传</n-text
         >
       </n-upload-dragger>
     </n-upload>

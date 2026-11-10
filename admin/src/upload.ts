@@ -45,8 +45,8 @@ export function stem(name: string) {
   return (dot > 0 ? name.slice(0, dot) : name).toLowerCase();
 }
 
-export const isLyrics = (name: string) => /\.(lrc|ttml|yrc)$/i.test(name);
+export const isLyrics = (name: string) => /\.(lrc|ttml|yrc|qrc)$/i.test(name);
 // When a song has several lyrics files, the highest rank wins: TTML, then
-// YRC, then LRC.
+// YRC or QRC, then LRC.
 export const lyricsRank = (name: string) =>
-  /\.ttml$/i.test(name) ? 2 : /\.yrc$/i.test(name) ? 1 : 0;
+  /\.ttml$/i.test(name) ? 2 : /\.(yrc|qrc)$/i.test(name) ? 1 : 0;
