@@ -103,7 +103,7 @@ cd android && ./gradlew :app:assembleDebug :app:testDebugUnitTest
     - 标题右边去掉书签按钮（音频书签已去掉），保留设置按钮，设置页做好之前点了没有反应。
     - 排序面板去掉“云端 · 仅云端”开关（Sonora 的歌都在服务器上）；“默认顺序”用服务端列表的默认顺序：歌曲新入库在前，专辑按标题，艺术家按名称，与 Web 端一致。
     - “专辑”标签与 Web 端的专辑页一样隐藏标记为单曲的专辑（`hideSingles`，Eric，2026-11-11）。
-    - 本机曲库（提交见 git log）：Room 数据库 `SonoraDatabase`，表名沿用原版（`songs`、`albums`、`artists`、`song_artist_cross_ref`），列按 Sonora 的接口，另有 `library_state` 记录服务器地址与 cursor。没有外键（一页变更里歌曲可能先于它的专辑与艺术家）；艺术家与专辑的 `sortKey` 只存在各自的表里，按艺术家、专辑排序歌曲时联表取。`LibraryRepository.sync()` 逐页取 `library/changes`，每页连同 cursor 在一个事务里写入；服务器地址变了或服务端返回 `reset` 时清空重来。打开 App（已登录）时同步一次。排序照原版 `SortOption` 的键在 SQL 里排，名称按 `sortKey`，“添加时间”按 ID（服务端按入库顺序分配、不复用；播放端 API 没有入库时间）。上线前改表结构直接删库重新同步（`fallbackToDestructiveMigration`），发布后照原版写迁移。
+    - 本机曲库（提交 `f799103`）：Room 数据库 `SonoraDatabase`，表名沿用原版（`songs`、`albums`、`artists`、`song_artist_cross_ref`），列按 Sonora 的接口，另有 `library_state` 记录服务器地址与 cursor。没有外键（一页变更里歌曲可能先于它的专辑与艺术家）；艺术家与专辑的 `sortKey` 只存在各自的表里，按艺术家、专辑排序歌曲时联表取。`LibraryRepository.sync()` 逐页取 `library/changes`，每页连同 cursor 在一个事务里写入；服务器地址变了或服务端返回 `reset` 时清空重来。打开 App（已登录）时同步一次。排序照原版 `SortOption` 的键在 SQL 里排，名称按 `sortKey`，“添加时间”按 ID（服务端按入库顺序分配、不复用；播放端 API 没有入库时间）。上线前改表结构直接删库重新同步（`fallbackToDestructiveMigration`），发布后照原版写迁移。
       - 运行确认（2026-11-11，模拟器，开发服务器 `2f4b8eb`）：首次同步后本机有 369 首歌、311 张专辑、215 位艺术家、420 条歌曲与艺术家的关系，cursor 897，与开发库的 `tracks`、`albums`、`artists`、`track_artists` 行数和 `library_changes` 最大序号相同；本机 SQL 排出的顺序与服务端列表逐项相同：歌曲的 `default`、`title`（升降序）、`artist`、`album`、`duration`、`createTime`，专辑的 `default`、`hideSingles=true`、`createTime` 降序，艺术家的 `default`。`./gradlew :app:testDebugUnitTest` 81 个测试通过，其中新增 3 个测试变更到本机行与 `Song` 的转换。
       - 待验证：增量同步（服务端改名、删除后再同步）、`reset`、断网时同步失败的提示。
 - [ ] **5. 用户数据**：喜欢、歌单、最近播放、歌词。验证：模拟器运行，并与 Web 端核对数据。
