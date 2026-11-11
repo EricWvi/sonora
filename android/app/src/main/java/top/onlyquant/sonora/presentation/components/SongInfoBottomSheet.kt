@@ -241,6 +241,9 @@ fun SongInfoBottomSheet(
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                                             ) {
+                                                // Sonora: without the share button, play and like split the row
+                                                // evenly and like is a labelled pill like play (Eric, 2026-11-11);
+                                                // the original has play 0.5, an icon-only like 0.25 and share 0.25.
                                                 MediumExtendedFloatingActionButton(
                                                     modifier = Modifier
                                                         .weight(0.5f)
@@ -259,25 +262,30 @@ fun SongInfoBottomSheet(
                                                     }
                                                 )
 
-                                                FilledIconButton(
+                                                MediumExtendedFloatingActionButton(
                                                     modifier = Modifier
-                                                        .weight(0.25f)
+                                                        .weight(0.5f)
                                                         .fillMaxHeight(),
                                                     onClick = onToggleFavorite,
+                                                    elevation = FloatingActionButtonDefaults.elevation(0.dp),
                                                     shape = favoriteButtonShape,
-                                                    colors = IconButtonDefaults.filledIconButtonColors(
-                                                        containerColor = favoriteButtonContainerColor,
-                                                        contentColor = favoriteButtonContentColor
-                                                    )
-                                                ) {
-                                                    Icon(
-                                                        modifier = Modifier.size(FloatingActionButtonDefaults.LargeIconSize),
-                                                        imageVector = if (isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                                                        contentDescription = stringResource(
-                                                            if (isFavorite) R.string.cd_remove_from_favorites else R.string.cd_add_to_favorites
+                                                    containerColor = favoriteButtonContainerColor,
+                                                    contentColor = favoriteButtonContentColor,
+                                                    icon = {
+                                                        Icon(
+                                                            imageVector = if (isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                                                            contentDescription = stringResource(
+                                                                if (isFavorite) R.string.cd_remove_from_favorites else R.string.cd_add_to_favorites
+                                                            )
                                                         )
-                                                    )
-                                                }
+                                                    },
+                                                    text = {
+                                                        Text(
+                                                            modifier = Modifier.padding(end = 10.dp),
+                                                            text = stringResource(R.string.action_like)
+                                                        )
+                                                    }
+                                                )
                                                 // Sonora: the original has a share button here.
                                             }
                                         }

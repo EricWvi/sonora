@@ -257,29 +257,41 @@ fun MultiSelectionBottomSheet(
                                     style = MaterialTheme.typography.titleMediumEmphasized
                                 )
                             }
-                            FilledIconButton(
+                            // Sonora: without the share button, play all and like split the row evenly and
+                            // like is a labelled pill like play all (Eric, 2026-11-11); the original has
+                            // play all 0.5, an icon-only like 0.25 and share 0.25.
+                            FilledTonalButton(
                                 modifier = Modifier
-                                    .weight(0.25f)
-                                    .fillMaxHeight(),
+                                    .weight(0.5f)
+                                    .heightIn(min = 80.dp),
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = favoriteButtonContainerColor,
+                                    contentColor = favoriteButtonContentColor
+                                ),
+                                contentPadding = PaddingValues(horizontal = 10.dp),
+                                shape = favoriteButtonShape,
                                 onClick = {
                                     onToggleLikeAll(!allAreLiked)
                                     onDismiss()
-                                },
-                                shape = favoriteButtonShape,
-                                colors = IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = favoriteButtonContainerColor,
-                                    contentColor = favoriteButtonContentColor
-                                )
+                                }
                             ) {
                                 Icon(
-                                    modifier = Modifier.size(FloatingActionButtonDefaults.LargeIconSize),
-                                    imageVector = if (allAreLiked) 
-                                        Icons.Rounded.HeartBroken 
+                                    imageVector = if (allAreLiked)
+                                        Icons.Rounded.HeartBroken
                                     else
                                         Icons.Rounded.FavoriteBorder,
                                     contentDescription = stringResource(
                                         if (allAreLiked) R.string.cd_unlike_all else R.string.cd_like_all
                                     )
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                TightWrapText(
+                                    text = stringResource(R.string.action_like),
+                                    modifier = Modifier.padding(end = 4.dp),
+                                    overflow = TextOverflow.Ellipsis,
+                                    maxLines = 2,
+                                    lineHeight = 22.sp,
+                                    style = MaterialTheme.typography.titleMediumEmphasized
                                 )
                             }
                             // Sonora: the original has "share all as zip" here (Eric, 2026-11-11: left out).

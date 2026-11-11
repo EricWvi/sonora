@@ -2,6 +2,8 @@
 <!-- Library strings, from the zh-CN strings of PixelPlayerOSS v0.4.0-alpha.53 (GPL-3.0). -->
 <resources>
     <string name="action_add_to_queue">添加到队列</string>
+    <!-- Sonora: the like button carries a label (Eric, 2026-11-11); the original has an icon only. -->
+    <string name="action_like">喜欢</string>
     <string name="action_play_all">全部播放</string>
     <string name="action_queue_next">下一首</string>
     <string name="cd_add_all_to_queue">全部加入队列</string>
