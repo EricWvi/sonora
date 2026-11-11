@@ -171,6 +171,7 @@ fun AlbumEntity.toAlbum(server: String): Album = Album(
     albumArtUriString = coverName?.let { coverUrl(server, Cover(it)) },
     songCount = songCount,
     albumArtist = artistName.takeIf { it.isNotBlank() },
+    artistId = artistId,
 )
 
 fun ArtistEntity.toArtist(server: String): Artist = Artist(

@@ -123,7 +123,6 @@ fun AlbumDetailScreen(
     // Sonora: as in MainUI, the navigation bar is never compact until there are settings for it.
     val navBarCompactMode = false
     val completedOfflineUris by viewModel.completedOfflineUris.collectAsStateWithLifecycle()
-    val allArtists by playerViewModel.artistsFlow.collectAsStateWithLifecycle()
 
     var showSongInfoBottomSheet by remember { mutableStateOf(false) }
     // Sonora: the original's playerViewModel.selectSongForInfo keeps the song in the view model
@@ -208,10 +207,11 @@ fun AlbumDetailScreen(
                     songs.groupBy { it.discNumber ?: 1 }
                 }
                 val lazyListState = rememberLazyListState()
-                val albumArtist = remember(songs, allArtists) {
-                    val artistId = songs.firstOrNull()?.artistId
-                    allArtists.firstOrNull { it.id == artistId }
-                }
+                // Sonora: the album's own artist (Eric, 2026-11-11). The original takes the first
+                // song's artist from the loaded artists, so on a compilation the chip named the
+                // album artist but opened the first track's artist.
+                val albumArtist by remember(album.artistId) { viewModel.artist(album.artistId) }
+                    .collectAsStateWithLifecycle(initialValue = null)
                 // Sonora: the server has no genres; the original shows the one most tracks share.
                 val albumGenre: String? = null
                 val albumDurationMs = remember(songs) { songs.sumOf { it.duration } }

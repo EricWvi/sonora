@@ -5,11 +5,13 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import top.onlyquant.sonora.data.model.Album
+import top.onlyquant.sonora.data.model.Artist
 import top.onlyquant.sonora.data.model.Song
 import top.onlyquant.sonora.data.repository.LibraryRepository
 import top.onlyquant.sonora.R
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -105,6 +107,9 @@ class AlbumDetailViewModel @Inject constructor(
             }
         }
     }
+
+    /** Sonora: the album's artist, for the artist chip (see AlbumDetailScreen). */
+    fun artist(artistId: Long): Flow<Artist?> = libraryRepository.artist(artistId)
 
     /** Re-attempts loading the album after a failure (wired to the error-state retry button). */
     fun retry() {

@@ -14,7 +14,9 @@ data class Album(
     val dateAdded: Long,
     val albumArtUriString: String?,
     val songCount: Int,
-    val albumArtist: String? = null
+    val albumArtist: String? = null,
+    /** Sonora: the album's first artist, for the album page's artist chip; -1 when unknown. */
+    val artistId: Long = -1
 ) : Parcelable {
     companion object {
         fun empty() = Album(
