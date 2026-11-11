@@ -121,7 +121,7 @@ cd android && ./gradlew :app:assembleDebug :app:testDebugUnitTest
     - 截图对照（同一模拟器、深色、原版 zh-CN，数据相同：周笔畅的“锦绣南歌 电视剧原声带”，1 首“藏心”，两边都播放“藏心”后暂停）：艺术家页逐像素比较，只有状态栏时间、去掉的编辑按钮和专辑行末尾的“• C-Pop”不同；专辑页只有状态栏时间、“下载专辑”按钮（原版本机歌曲不显示）、流派与年份一行（原版“C-Pop · 2020”）和标题字形不同。标题字形不同是因为原版按专辑 ID 选可变字体的参数（`GenreTypography.getGenreStyle`），两边的 ID 不同；封面相同。
     - 专辑页的艺术家胶囊（标题下方）的头像和点击跳转改用专辑艺术家（专辑的第一位艺术家，Eric，2026-11-11）；原版取第一首歌的艺术家，合辑上名字是专辑艺术家、点进去却是第一首歌的艺术家。运行确认（2026-11-11，模拟器）：“F1 The Album (Cinematic Edition)”点“Hans Zimmer”进入 Hans Zimmer 的页面（该专辑 15 首）。
     - 待验证：有艺术家图时的头部（开发库 215 位艺术家都没有图）、PKB110 真机。
-  - 首页与漫游 FM（2026-11-11）：
+  - 首页与漫游 FM（2026-11-11，服务端提交 `9ff653f`，客户端提交 `2244697`）：
     - 服务端：`GET fm?count=N`（1–10，默认 2，超出范围 400），返回从当前专辑起的 N 张，这些专辑是真正排进计划的；没有分组歌单时一次抽取只排一张大专辑，所以抽取次数随 N 增加。`store.FMAhead`，`FM` 不变；测试 `TestFMAheadLinesUpMoreAlbums` 与 `player_test` 的参数校验。接口见 [api.md](../api.md#漫游-fm)。
     - 客户端：复制原版 `HomeScreen`（按上面的决定缩减）、`AlbumArtCollage`、`CollagePatterns`、`CollagePattern`、`RecentlyPlayedSection`、`GradientTopBar` 的 `HomeGradientTopBar`、`RecentlyPlayedSongUiModel`、`RoundedStarShape`；首页数据在 `HomeViewModel`（`GET fm?count=5` 与 `GET history`），首页显示时和 FM 换专辑时重新读取。最近播放长按用曲库相同的缩减菜单；“全部”箭头暂时没有反应（最近播放页在第 5 项）；首页的空状态副标题用 Web 端的“还没有可以播放的专辑”。临时的歌曲列表页（`TrackListPlaceholder`）去掉；退出登录暂时放在首页的设置按钮后面（点了弹出确认框），设置页做好后移过去（Eric，2026-11-11 同意）。
     - 漫游 FM 播放照 Web 端（`PlayerController` 的漫游 FM 部分）：FM 的歌放进普通队列，用队列标签 `sonora_fm` 标出，用户插入的“下一首播放”不带标签；离开一张专辑的最后一首去下一首时 `finish`，并把服务端排好的后续专辑接到队列后面；每换到一首 FM 的歌就 `PUT fm/position`，请求按顺序发出。队列后面没有歌（服务端没能及时排出下一张）时，按“下一首”或播完都先等服务端再切过去，取不到时提示“暂时取不到下一张专辑”（Web 端的文案）。开始 FM 时关掉随机播放与循环（Web 端在 FM 里没有这两个按钮，这里按钮还在）。纯函数在 `data/fm/RoamingFm.kt`，有单元测试。
