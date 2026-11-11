@@ -39,6 +39,8 @@ class UserPreferencesRepository @Inject constructor(
         val LAST_LIBRARY_TAB_INDEX =
                 intPreferencesKey("last_library_tab_index")
         val IS_ALBUMS_LIST_VIEW = booleanPreferencesKey("is_albums_list_view")
+        val ARTIST_ALBUMS_COLLAPSED_BY_DEFAULT =
+                booleanPreferencesKey("artist_albums_collapsed_by_default")
     }
 
     suspend fun setRepeatMode(@Player.RepeatMode mode: Int) {
@@ -157,4 +159,10 @@ class UserPreferencesRepository @Inject constructor(
             preferences[PreferencesKeys.LAST_LIBRARY_TAB_INDEX] = tabIndex
         }
     }
+
+    /** Display-only: the artist page reads it when it opens, so no rescan is needed. */
+    val artistAlbumsCollapsedByDefaultFlow: Flow<Boolean> =
+            dataStore.data.map { preferences ->
+                preferences[PreferencesKeys.ARTIST_ALBUMS_COLLAPSED_BY_DEFAULT] ?: false
+            }.distinctUntilChanged()
 }

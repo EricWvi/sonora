@@ -57,6 +57,7 @@ import top.onlyquant.sonora.presentation.components.MiniPlayerBottomSpacer
 import top.onlyquant.sonora.presentation.components.MiniPlayerHeight
 import top.onlyquant.sonora.presentation.components.PlayerInternalNavigationBar
 import top.onlyquant.sonora.presentation.components.UnifiedPlayerSheetV2
+import top.onlyquant.sonora.presentation.navigation.Screen
 import top.onlyquant.sonora.presentation.components.calculatePlayerSheetCollapsedTargetY
 import top.onlyquant.sonora.presentation.components.resolveNavBarOccupiedHeight
 import top.onlyquant.sonora.presentation.components.resolveNavBarSurfaceHeight
@@ -77,8 +78,8 @@ private data class DismissUndoBarSlice(
  * queue, with the original's layout values.
  *
  * Left out for now: the navigation rail on wide screens (Sonora targets phones; PKB110), the
- * sidebar drawer (opened from the home screen, which comes later), hiding the bar on detail and
- * settings routes and while searching (those screens come later), and SmartMix. The nav bar
+ * sidebar drawer (opened from the home screen, which comes later), hiding the bar on settings
+ * routes and while searching (those screens come later), and SmartMix. The nav bar
  * settings read their defaults (style DEFAULT, not compact, 32 dp corners, smooth corners,
  * haptics on) until the settings screen is copied.
  */
@@ -116,7 +117,27 @@ fun MainUI(
     val bottomBarPadding = animatedBottomBarPadding
     val navBarHeight = resolveNavBarSurfaceHeight(navBarStyle, systemNavBarInset, navBarCompactMode)
     val navBarOccupiedHeight = resolveNavBarOccupiedHeight(systemNavBarInset, navBarCompactMode)
-    val shouldHideNavigationBar = false
+    // Sonora: the original's routesWithHiddenNavigationBar, with the routes that exist so far;
+    // the others (settings, playlists, search bar) join when their screens are copied.
+    val routesWithHiddenNavigationBar = remember {
+        setOf(
+            Screen.AlbumDetail.route,
+            Screen.ArtistDetail.route,
+        )
+    }
+    val shouldHideNavigationBar by remember(currentRoute) {
+        derivedStateOf {
+            currentRoute?.let { route ->
+                routesWithHiddenNavigationBar.any { hiddenRoute ->
+                    if (hiddenRoute.contains("{")) {
+                        route.startsWith(hiddenRoute.substringBefore("{"))
+                    } else {
+                        route == hiddenRoute
+                    }
+                }
+            } ?: false
+        }
+    }
     val navBarVisibilityProgressState = animateFloatAsState(
         targetValue = if (shouldHideNavigationBar) 0f else 1f,
         animationSpec = tween(

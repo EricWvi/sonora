@@ -16,8 +16,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
 import top.onlyquant.sonora.data.auth.AuthRepository
@@ -27,8 +25,7 @@ import top.onlyquant.sonora.presentation.auth.SessionState
 import top.onlyquant.sonora.presentation.main.BlankTab
 import top.onlyquant.sonora.presentation.main.MainUI
 import top.onlyquant.sonora.presentation.main.TrackListPlaceholder
-import top.onlyquant.sonora.presentation.screens.LibraryScreen
-import top.onlyquant.sonora.presentation.navigation.Screen
+import top.onlyquant.sonora.presentation.navigation.AppNavigation
 import top.onlyquant.sonora.presentation.viewmodel.LibraryViewModel
 import top.onlyquant.sonora.presentation.viewmodel.PlayerViewModel
 import top.onlyquant.sonora.ui.theme.PixelPlayerTheme
@@ -75,8 +72,10 @@ class MainActivity : ComponentActivity() {
                         LaunchedEffect(Unit) { libraryViewModel.sync() }
                         val navController = rememberNavController()
                         MainUI(playerViewModel, navController) { padding ->
-                            NavHost(navController, startDestination = Screen.Home.route) {
-                                composable(Screen.Home.route) {
+                            AppNavigation(
+                                playerViewModel = playerViewModel,
+                                navController = navController,
+                                homeContent = {
                                     TrackListPlaceholder(
                                         viewModel = hiltViewModel(),
                                         playerViewModel = playerViewModel,
@@ -84,12 +83,9 @@ class MainActivity : ComponentActivity() {
                                         contentPadding = padding,
                                         onSignOut = auth::signOut,
                                     )
-                                }
-                                composable(Screen.Search.route) { BlankTab() }
-                                composable(Screen.Library.route) {
-                                    LibraryScreen(navController = navController, playerViewModel = playerViewModel)
-                                }
-                            }
+                                },
+                                searchContent = { BlankTab() },
+                            )
                         }
                     }
                 }

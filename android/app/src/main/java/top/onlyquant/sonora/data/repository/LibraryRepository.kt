@@ -13,7 +13,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -120,9 +122,35 @@ class LibraryRepository @Inject constructor(
         else dao.getArtists(sortOrder).map { rows -> rows.map { it.toArtist(server) } }
     }
 
-    suspend fun songsForAlbum(albumId: Long): List<Song> = songs { dao.getSongsByAlbumId(albumId) }
+    suspend fun songsForAlbum(albumId: Long): List<Song> = songsForAlbumFlow(albumId).first()
 
-    suspend fun songsForArtist(artistId: Long): List<Song> = songs { dao.getSongsForArtist(artistId) }
+    suspend fun songsForArtist(artistId: Long): List<Song> = songsForArtistFlow(artistId).first()
+
+    /** The album's songs, updated by each sync, as the original's getSongsForAlbum. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun songsForAlbumFlow(albumId: Long): Flow<List<Song>> = server.flatMapLatest { server ->
+        if (server == null) flowOf(emptyList())
+        else dao.getSongsByAlbumId(albumId).map { rows -> rows.map { it.toSong(server) } }
+    }
+
+    /** The artist's songs, updated by each sync, as the original's getSongsForArtist. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun songsForArtistFlow(artistId: Long): Flow<List<Song>> = server.flatMapLatest { server ->
+        if (server == null) flowOf(emptyList())
+        else dao.getSongsForArtist(artistId).map { rows -> rows.map { it.toSong(server) } }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun album(albumId: Long): Flow<Album?> = server.flatMapLatest { server ->
+        if (server == null) flowOf(null)
+        else dao.getAlbumById(albumId).map { it?.toAlbum(server) }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun artist(artistId: Long): Flow<Artist?> = server.flatMapLatest { server ->
+        if (server == null) flowOf(null)
+        else dao.getArtistById(artistId).map { it?.toArtist(server) }
+    }
 
     suspend fun randomSongs(limit: Int): List<Song> = songs { dao.getRandomSongs(limit) }
 

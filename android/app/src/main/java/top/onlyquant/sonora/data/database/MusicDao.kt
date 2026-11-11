@@ -142,7 +142,7 @@ interface MusicDao {
             id ASC
         """
     )
-    suspend fun getSongsByAlbumId(albumId: Long): List<SongEntity>
+    fun getSongsByAlbumId(albumId: Long): Flow<List<SongEntity>>
 
     /** As the original, through the cross references; by title (here by sortKey). */
     @Query(
@@ -153,7 +153,13 @@ interface MusicDao {
         ORDER BY songs.sort_key ASC, songs.id ASC
         """
     )
-    suspend fun getSongsForArtist(artistId: Long): List<SongEntity>
+    fun getSongsForArtist(artistId: Long): Flow<List<SongEntity>>
+
+    @Query("SELECT * FROM albums WHERE id = :id")
+    fun getAlbumById(id: Long): Flow<AlbumEntity?>
+
+    @Query("SELECT * FROM artists WHERE id = :id")
+    fun getArtistById(id: Long): Flow<ArtistEntity?>
 
     @Query("SELECT * FROM songs ORDER BY RANDOM() LIMIT :limit")
     suspend fun getRandomSongs(limit: Int): List<SongEntity>

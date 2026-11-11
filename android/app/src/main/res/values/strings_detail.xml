@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Album and artist page strings, from the zh-CN strings of PixelPlayerOSS v0.4.0-alpha.53 (GPL-3.0). -->
+<resources>
+    <string name="album_cover_for">%1$s 的封面</string>
+    <string name="album_id_not_found">未找到该专辑ID</string>
+    <string name="album_not_found">未找到专辑</string>
+    <string name="artist_id_not_found">未找到该歌手ID</string>
+    <string name="artist_page_collapse_all_albums">全部收起</string>
+    <string name="artist_page_expand_all_albums">全部展开</string>
+    <string name="auth_cd_back">返回</string>
+    <string name="cloud_album_download">下载专辑</string>
+    <string name="cloud_album_remove_downloads">移除下载</string>
+    <string name="could_not_find_artist">找不到该歌手</string>
+    <string name="detail_hero_add_to_playlist">添加到歌单</string>
+    <string name="detail_hero_add_to_queue">添加到队列</string>
+    <string name="detail_hero_album_count_many">%1$d 张专辑</string>
+    <string name="detail_hero_album_count_one">1 张专辑</string>
+    <string name="detail_hero_duration_hours">%1$d 小时 %2$d 分钟</string>
+    <string name="detail_hero_duration_minutes">%1$d 分钟</string>
+    <string name="detail_hero_more_actions">更多操作</string>
+    <string name="detail_hero_pause">暂停</string>
+    <string name="detail_hero_play">播放</string>
+    <string name="detail_hero_play_next">下一首播放</string>
+    <string name="detail_hero_resume">继续播放</string>
+    <string name="detail_hero_shuffle">随机播放</string>
+    <string name="disc_number_header">第 %d 碟</string>
+    <string name="error_loading_album">加载专辑数据出错：%s</string>
+    <string name="error_loading_artist">加载歌手数据出错：%s</string>
+    <string name="invalid_album_id">无效的专辑ID</string>
+    <string name="invalid_artist_id">无效的歌手ID</string>
+    <string name="presentation_batch_d_cd_collapse_title">收起 %1$s</string>
+    <string name="presentation_batch_d_cd_expand_title">展开 %1$s</string>
+    <string name="presentation_batch_d_cd_play_title">播放 %1$s</string>
+</resources>
