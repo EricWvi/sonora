@@ -27,6 +27,7 @@ import top.onlyquant.sonora.presentation.auth.SessionState
 import top.onlyquant.sonora.presentation.main.BlankTab
 import top.onlyquant.sonora.presentation.main.MainUI
 import top.onlyquant.sonora.presentation.main.TrackListPlaceholder
+import top.onlyquant.sonora.presentation.screens.LibraryScreen
 import top.onlyquant.sonora.presentation.navigation.Screen
 import top.onlyquant.sonora.presentation.viewmodel.LibraryViewModel
 import top.onlyquant.sonora.presentation.viewmodel.PlayerViewModel
@@ -85,7 +86,9 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                                 composable(Screen.Search.route) { BlankTab() }
-                                composable(Screen.Library.route) { BlankTab() }
+                                composable(Screen.Library.route) {
+                                    LibraryScreen(navController = navController, playerViewModel = playerViewModel)
+                                }
                             }
                         }
                     }

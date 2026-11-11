@@ -26,6 +26,7 @@ import top.onlyquant.sonora.data.api.toSong
 import top.onlyquant.sonora.data.auth.SessionStore
 import top.onlyquant.sonora.data.database.LibraryStateEntity
 import top.onlyquant.sonora.data.database.MusicDao
+import top.onlyquant.sonora.data.database.SongEntity
 import top.onlyquant.sonora.data.model.Album
 import top.onlyquant.sonora.data.model.Artist
 import top.onlyquant.sonora.data.model.Song
@@ -104,6 +105,30 @@ class LibraryRepository @Inject constructor(
         if (server == null) emptyFlow()
         else Pager(PAGING_CONFIG) { dao.getArtistsPaginated(sortOrder) }.flow
             .map { data -> data.map { it.toArtist(server) } }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun albums(sortOrder: String, hideSingles: Boolean): Flow<List<Album>> =
+        server.flatMapLatest { server ->
+            if (server == null) emptyFlow()
+            else dao.getAlbums(sortOrder, hideSingles).map { rows -> rows.map { it.toAlbum(server) } }
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun artists(sortOrder: String): Flow<List<Artist>> = server.flatMapLatest { server ->
+        if (server == null) emptyFlow()
+        else dao.getArtists(sortOrder).map { rows -> rows.map { it.toArtist(server) } }
+    }
+
+    suspend fun songsForAlbum(albumId: Long): List<Song> = songs { dao.getSongsByAlbumId(albumId) }
+
+    suspend fun songsForArtist(artistId: Long): List<Song> = songs { dao.getSongsForArtist(artistId) }
+
+    suspend fun randomSongs(limit: Int): List<Song> = songs { dao.getRandomSongs(limit) }
+
+    private suspend fun songs(query: suspend () -> List<SongEntity>): List<Song> {
+        val server = sessions.current()?.server ?: return emptyList()
+        return query().map { it.toSong(server) }
     }
 
     val songCount: Flow<Int> = dao.getSongCount()

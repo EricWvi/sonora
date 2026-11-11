@@ -82,7 +82,7 @@ cd android && ./gradlew :app:assembleDebug :app:testDebugUnitTest
     - 源码确认与运行确认（2026-11-08，Mac）：`go test ./...` 通过；新测试覆盖首次同步、艺术家改名扩散到歌曲与专辑、专辑封面扩散到歌曲、歌词只改歌曲、歌曲换专辑与艺术家、`MergeArtists`（经 `UPDATE OR IGNORE`，触发器因此用先删后插而不是 `INSERT OR REPLACE`）、删除与清理孤立条目、分页、`reset`、从第 15 版带数据迁移，以及排序键与 SQL 排序顺序一致。
     - 运行确认（2026-11-08，开发服务器，提交 `70833eb`）：迁移 16 在开发库上执行成功，`go test ./internal/store ./internal/server` 通过；开发库的 369 首歌、311 张专辑、215 位艺术家按每页 500 条分 2 页取完，cursor 为 895（三者之和），再以该 cursor 请求为空且 cursor 不变；`since=-1` 返回 400。Mac 上用 2,000 首合成数据临时测得：全量同步约 19 ms，艺术家改名约 0.5 ms，之后的增量读取约 0.3 ms。
     - 待验证：线上曲库（1,632 首）上的迁移与同步。
-  - 顺序：播放器面板与队列 → 曲库 → 详情页 → 首页 → 搜索。曲库只留歌曲、专辑、艺术家三个标签。
+  - 顺序：播放器面板与队列 → 曲库 → 详情页 → 首页 → 搜索。曲库有歌曲、专辑、艺术家、歌单四个标签（2026-11-11 先定三个，同日 Eric 加上歌单，对应 Web 端的本地歌单）。
   - 播放器面板与队列（Eric，2026-11-10）：保留原版的睡眠定时（含播完本首、播放 N 首后停止）、播放速度与音频输出选择；去掉音频书签、歌曲信息页、手动导入歌词与“队列存为歌单”（歌单在第 5 项）。
     - 已复制（提交 `b124494`、`fd392d9`）：`UnifiedPlayerSheetV2` 及其 `components/scoped/`、`components/player/`、`QueueBottomSheet`、睡眠定时（`SleepTimer*`，在 `MusicService` 里执行）、播放速度、音频输出选择，以及承载面板的底部导航栏与外壳（原版 `MainActivity.MainUI`，在 `presentation/main/MainUI.kt`）。`PlayerViewModel` 精简为约 1,100 行（原版 5,191 行），方法体照原版。音频经 `media3-datasource-okhttp`、封面经 Coil 与通知的 `CoilBitmapLoader` 都走同一个 OkHttpClient，由拦截器给本服务器的请求加 device token。
     - 与原版的差异：歌词按钮在，点了没有反应（第 5 项接上）；喜欢按钮不生效（第 5 项）；去掉书签按钮、队列里每行的“更多”按钮（只用来打开歌曲信息页）与“存为歌单”；全屏播放器标题旁的云朵图标（原版标在流媒体歌曲上，Sonora 的歌都是流，Eric 2026-11-10 决定去掉）；封面取色只缓存在内存（原版存 Room）；外壳没有宽屏的导航栏、侧边抽屉、按页面隐藏导航栏与 SmartMix；导航栏的设置项取原版默认值。首页标签暂时是一个按入库时间排的歌曲列表（`GET tracks` 前 500 首，点一首用整个列表作队列），搜索和音乐库标签暂时空白，做曲库时替换。
@@ -97,15 +97,23 @@ cd android && ./gradlew :app:assembleDebug :app:testDebugUnitTest
       - 定时停止：“当前歌曲播放完毕”在“中学时代”结尾暂停，停在下一首“藏心”的 0 ms，不自动播放；“播放次数”设为 2 次时先单曲循环一遍，第二遍结尾暂停并回到 0 ms，循环按钮恢复为原来的关闭状态；自定义时长设为 1 分钟，23:18:34.540 设定，23:19:34.539 到期并暂停。
       - 整个过程 logcat 的 crash 缓冲区为空，App 进程没有错误日志。
     - 待验证：切换到其他音频输出设备（蓝牙等，PKB110 上）；实际听感。
-  - 曲库（Eric，2026-11-11）：照原版 `LibraryScreen`，只有歌曲、专辑、艺术家三个标签，数据来自本机 Room（用 `library/changes` 同步）。
+  - 曲库（Eric，2026-11-11）：照原版 `LibraryScreen`，有歌曲、专辑、艺术家、歌单四个标签（歌单对应 Web 端的本地歌单，内容在第 5 项），数据来自本机 Room（用 `library/changes` 同步）。
     - 歌曲的“⋮”菜单只留播放、喜欢、添加到队列、下一首、加入歌单（喜欢与歌单在第 5 项接上）；去掉分享、删除、设置提示音、在 MusicBrainz 上查找、编辑与“详情”页。
     - 长按多选保留，批量操作只留添加到队列、下一首、加入歌单、喜欢，去掉删除与批量编辑。
     - 标题右边去掉书签按钮（音频书签已去掉），保留设置按钮，设置页做好之前点了没有反应。
+    - 标签行去掉最后的“编辑标签”铅笔按钮（调整标签顺序），标签固定为默认顺序。
+    - 操作行的存储筛选按钮（全部 / 云端 / 本机）保留，暂时点了没有反应。
+    - 多选面板保留“全部播放”。
     - 排序面板去掉“云端 · 仅云端”开关（Sonora 的歌都在服务器上）；“默认顺序”用服务端列表的默认顺序：歌曲新入库在前，专辑按标题，艺术家按名称，与 Web 端一致。
     - “专辑”标签与 Web 端的专辑页一样隐藏标记为单曲的专辑（`hideSingles`，Eric，2026-11-11）。
     - 本机曲库（提交 `f799103`）：Room 数据库 `SonoraDatabase`，表名沿用原版（`songs`、`albums`、`artists`、`song_artist_cross_ref`），列按 Sonora 的接口，另有 `library_state` 记录服务器地址与 cursor。没有外键（一页变更里歌曲可能先于它的专辑与艺术家）；艺术家与专辑的 `sortKey` 只存在各自的表里，按艺术家、专辑排序歌曲时联表取。`LibraryRepository.sync()` 逐页取 `library/changes`，每页连同 cursor 在一个事务里写入；服务器地址变了或服务端返回 `reset` 时清空重来。打开 App（已登录）时同步一次。排序照原版 `SortOption` 的键在 SQL 里排，名称按 `sortKey`，“添加时间”按 ID（服务端按入库顺序分配、不复用；播放端 API 没有入库时间）。上线前改表结构直接删库重新同步（`fallbackToDestructiveMigration`），发布后照原版写迁移。
       - 运行确认（2026-11-11，模拟器，开发服务器 `2f4b8eb`）：首次同步后本机有 369 首歌、311 张专辑、215 位艺术家、420 条歌曲与艺术家的关系，cursor 897，与开发库的 `tracks`、`albums`、`artists`、`track_artists` 行数和 `library_changes` 最大序号相同；本机 SQL 排出的顺序与服务端列表逐项相同：歌曲的 `default`、`title`（升降序）、`artist`、`album`、`duration`、`createTime`，专辑的 `default`、`hideSingles=true`、`createTime` 降序，艺术家的 `default`。`./gradlew :app:testDebugUnitTest` 81 个测试通过，其中新增 3 个测试变更到本机行与 `Song` 的转换。
       - 待验证：增量同步（服务端改名、删除后再同步）、`reset`、断网时同步失败的提示。
+    - 曲库界面（未提交）：整份复制原版 `LibraryScreen`（只留主函数、同步提示、`AlbumGridItemRedesigned`、`ArtistListItem`、`AlbumListItem`）、`LibrarySongsTab`、`LibraryMediaTabs`（专辑、艺术家）、`LibraryEmptyState`、`LibraryPlaybackAwareSongItem`、`LibraryScrollRestore`、`LibrarySortScrollReset`、`TabAnimation`、`LibrarySortBottomSheet`、`MultiSelectionBottomSheet`、`SongInfoBottomSheet`、`EnhancedSongListItem`、`LibraryActionRow`、`SelectionActionRow`、多选（`presentation/selection/`）、`MultiSelectionStateHolder`、`LibraryTabsStateHolder`、`SortOption`、`LibraryTabId` 等；`LibraryStateHolder` 按原版缩减，排序选项照原版的键保存到 `UserPreferencesRepository`，分页与列表从 `LibraryRepository` 取；`PlayerViewModel` 加上原版的曲库部分（点歌以排序后的整个曲库为队列、随机播放、随机专辑、随机艺术家、定位当前歌曲、批量操作）。文案在 `res/values/strings_library.xml`（原版 zh-CN）。缩减处在代码里写了“Sonora: …”。
+      - 与原版的差异：没有文件夹、我喜欢、流派标签和紧凑导航（原版的设置项，默认是标签行）；歌单标签暂时是空白页（原版的 `PlaylistContainer` 与空状态在第 5 项），“新建”点了没有反应，没有 M3U“导入”按钮，排序面板没有歌单的布局切换；歌曲菜单只有选项页，没有分享、删除、设置提示音、MusicBrainz、编辑按钮和详情页，因此也没有底部的“选项 / 详情”切换条（原版为它留的 80dp 空白保留，菜单高度不变）；菜单和多选面板第一行去掉分享后，“播放”和“喜欢”按原来的比例变宽，喜欢按钮从圆形变成胶囊形；多选面板没有批量编辑、下载与“全部删除”，“播放列表”一行只剩一个按钮；同步提示只显示“正在同步”（原版按扫描阶段显示），首次同步的遮罩没有进度条（`library/changes` 没有总数）；喜欢与加入歌单点了没有反应（第 5 项）。
+      - 运行确认（2026-11-11，模拟器 `Medium_Phone`，开发服务器 `2f4b8eb`）：`./gradlew :app:assembleDebug :app:testDebugUnitTest` 通过（81 个测试）；四个标签显示，专辑标签只显示非单曲专辑；点“Angel”后会话为 `PLAYING`、队列 369 首、位于第 2 首（与标题排序一致）；当前歌曲滚出视野后出现定位按钮，点后滚回；排序改为“默认顺序”后前 3 首与 `GET tracks` 相同，再改回“标题”；歌曲标签“随机播放”开始 369 首的随机队列；长按多选，返回键退出多选；两张专辑多选后“⋮”面板显示 34 首（32 + 2）；下拉刷新触发同步（logcat `Library synced to cursor 897`）；全程 crash 缓冲区为空。
+      - 截图对照（同一模拟器、深色、原版 zh-CN，原版曲库 3 首、Sonora 369 首）：专辑标签的头部（标题、标签行、操作行）只有去掉的书签按钮和原版第 5 个标签不同；歌曲排序面板（拖动条到“时长”）与专辑排序面板（拖动条到“视图”切换）按面板顶部对齐后逐像素一致，原版下面的“云端”一节已按决定去掉；歌曲菜单的拖动条和“添加到队列 / 下一首”一行、多选面板的“添加到队列 / 下一首”一行逐像素一致。列表宽度不同是因为 Sonora 的列表可滚动、显示滚动条（原版 3 首不滚动），原版按是否可滚动留出滚动条的位置。
+      - 待验证：专辑列表视图、艺术家排序、PKB110 真机；相同数据下列表的逐像素对照（原版只有 3 首，Sonora 不能只显示这 3 首）。
 - [ ] **5. 用户数据**：喜欢、歌单、最近播放、歌词。验证：模拟器运行，并与 Web 端核对数据。
 - [ ] **6. 漫游 FM**。验证：模拟器运行。
 - [ ] **7. 歌曲缓存**：手动下载、播放缓存（默认 5 GB，超出后删最久没播放的）、下载管理页、已删除歌曲的清理、离线播放。验证：模拟器断网测试。

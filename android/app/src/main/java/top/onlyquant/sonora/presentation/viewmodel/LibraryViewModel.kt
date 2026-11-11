@@ -2,6 +2,7 @@ package top.onlyquant.sonora.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.paging.cachedIn
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
@@ -14,12 +15,21 @@ import top.onlyquant.sonora.data.repository.LibraryRepository
 
 /**
  * As the original's LibraryViewModel. Sonora: it also starts the library sync, which the original
- * leaves to SyncManager and its WorkManager workers; the paging flows come with the library tabs.
+ * leaves to SyncManager and its WorkManager workers; there is no liked tab (favoritesPagingFlow).
  */
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
     private val libraryRepository: LibraryRepository,
+    private val libraryStateHolder: LibraryStateHolder,
 ) : ViewModel() {
+
+    val songsPagingFlow = libraryStateHolder.songsPagingFlow.cachedIn(viewModelScope)
+
+    val albumsPagingFlow = libraryStateHolder.albumsPagingFlow.cachedIn(viewModelScope)
+
+    val artistsPagingFlow = libraryStateHolder.artistsPagingFlow.cachedIn(viewModelScope)
+
+    val isLoadingLibrary = libraryStateHolder.isLoadingLibrary
 
     val isSyncing: StateFlow<Boolean> = libraryRepository.isSyncing
 

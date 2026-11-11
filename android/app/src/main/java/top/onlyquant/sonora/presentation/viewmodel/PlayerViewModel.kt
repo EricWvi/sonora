@@ -24,6 +24,7 @@ import javax.inject.Inject
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -51,7 +52,12 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
 import timber.log.Timber
 import top.onlyquant.sonora.R
+import top.onlyquant.sonora.data.model.Album
 import top.onlyquant.sonora.data.model.Artist
+import top.onlyquant.sonora.data.model.LibraryTabId
+import top.onlyquant.sonora.data.model.SortOption
+import top.onlyquant.sonora.data.repository.LibraryRepository
+import top.onlyquant.sonora.presentation.selection.flattenDistinctGroups
 import top.onlyquant.sonora.data.model.Song
 import top.onlyquant.sonora.data.preferences.AlbumArtQuality
 import top.onlyquant.sonora.data.preferences.CarouselStyle
@@ -95,6 +101,13 @@ private fun moveQueueIndex(index: Int, fromIndex: Int, toIndex: Int): Int {
     }
 }
 
+private const val SHUFFLE_ALL_SONG_LIMIT = 10_000
+
+data class LocateScrollRequest(
+    val tab: LibraryTabId,
+    val index: Int
+)
+
 private data class PreparedPlaybackQueueSegments(
     val beforeCurrent: List<MediaItem>,
     val afterCurrent: List<MediaItem>,
@@ -124,10 +137,12 @@ data class PlaybackAudioMetadata(
  * repeat, the sleep timer, the album-art color scheme and the sheet state. The method bodies follow
  * the original.
  *
- * Left out until the screens that need them are copied: the library, folders, search, sorting,
- * daily mixes, stats, lyrics (step 5), likes (step 5), metadata editing, deletion, external media,
- * the cast and cloud sources, app shortcuts and queue persistence. Songs are known only from the
- * queue they were played with; the library step adds the local library as the source.
+ * The library tabs (songs, albums, artists) read the local library through [LibraryRepository]
+ * and [LibraryStateHolder], as the original reads MusicRepository.
+ *
+ * Left out until the screens that need them are copied: folders, search, daily mixes, stats,
+ * lyrics (step 5), likes (step 5), playlists (step 5), metadata editing, deletion, external media,
+ * the cast and cloud sources, app shortcuts and queue persistence.
  */
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
@@ -141,6 +156,10 @@ class PlayerViewModel @Inject constructor(
     private val playbackStateHolder: PlaybackStateHolder,
     private val sleepTimerStateHolder: SleepTimerStateHolder,
     val themeStateHolder: ThemeStateHolder,
+    private val libraryRepository: LibraryRepository,
+    private val libraryStateHolder: LibraryStateHolder,
+    private val libraryTabsStateHolder: LibraryTabsStateHolder,
+    val multiSelectionStateHolder: MultiSelectionStateHolder,
     private val dispatchers: DispatcherProvider
 ) : ViewModel() {
 
@@ -235,6 +254,8 @@ class PlayerViewModel @Inject constructor(
 
     private var albumNavigationJob: Job? = null
     private var artistNavigationJob: Job? = null
+    private var fullQueuePlaybackJob: Job? = null
+    private var fullQueuePlaybackToken: Long = 0L
     private var directPlaybackJob: Job? = null
     private var directPlaybackToken: Long = 0L
     private var pendingQueueSegmentsJob: Job? = null
@@ -321,6 +342,8 @@ class PlayerViewModel @Inject constructor(
     init {
         playbackStateHolder.initialize(coroutineScope = viewModelScope)
         themeStateHolder.initialize(viewModelScope)
+        libraryStateHolder.initialize(viewModelScope)
+        observeLibraryState()
 
         mediaControllerFuture.addListener({
             try {
@@ -349,6 +372,413 @@ class PlayerViewModel @Inject constructor(
             currentSongIdFlow = stablePlayerState.map { it.currentSong?.id },
             getUiState = { _playerUiState.value },
             onHideDismissUndoBar = { hideDismissUndoBar() }
+        )
+    }
+
+    // ------------------------
+    // Library (the original's library section, with LibraryRepository for MusicRepository)
+    // ------------------------
+
+    private val _scrollToIndexEvent = MutableSharedFlow<LocateScrollRequest>(extraBufferCapacity = 1)
+    val scrollToIndexEvent = _scrollToIndexEvent.asSharedFlow()
+
+    /** Sonora: likes come with step 5; until then no song is liked. */
+    val favoriteSongIds: StateFlow<Set<String>> = MutableStateFlow<Set<String>>(emptySet()).asStateFlow()
+
+    val lastLibraryTabIndexFlow: StateFlow<Int> =
+        userPreferencesRepository.lastLibraryTabIndexFlow.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 0
+        )
+
+    private val defaultLibraryTabs: ImmutableList<String> =
+        LibraryTabId.entries.map { it.storageKey }.toImmutableList()
+
+    /**
+     * Sonora: always the default order. The original reads the order saved by its "reorder tabs"
+     * sheet, which Sonora leaves out (Eric, 2026-11-11).
+     */
+    val libraryTabsFlow: StateFlow<ImmutableList<String>> =
+        MutableStateFlow(defaultLibraryTabs).asStateFlow()
+
+    private val _loadedTabs = MutableStateFlow(emptySet<String>())
+
+    private val _currentLibraryTabId = MutableStateFlow(LibraryTabId.SONGS)
+    val currentLibraryTabId: StateFlow<LibraryTabId> = _currentLibraryTabId.asStateFlow()
+
+    private val _isSortingSheetVisible = MutableStateFlow(false)
+    val isSortingSheetVisible: StateFlow<Boolean> = _isSortingSheetVisible.asStateFlow()
+
+    val availableSortOptions: StateFlow<List<SortOption>> =
+        currentLibraryTabId.map { tabId ->
+            when (tabId) {
+                LibraryTabId.SONGS -> SortOption.SONGS
+                LibraryTabId.ALBUMS -> SortOption.ALBUMS
+                LibraryTabId.ARTISTS -> SortOption.ARTISTS
+                LibraryTabId.PLAYLISTS -> SortOption.PLAYLISTS
+            }
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = SortOption.SONGS
+        )
+
+    val songCountFlow: StateFlow<Int> = libraryRepository.songCount
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 0
+        )
+
+    val albumsFlow: StateFlow<ImmutableList<Album>> = libraryStateHolder.albums
+    val artistsFlow: StateFlow<ImmutableList<Artist>> = libraryStateHolder.artists
+
+    private fun observeLibraryState() {
+        viewModelScope.launch {
+            userPreferencesRepository.isAlbumsListViewFlow.collect { albumsList ->
+                _playerUiState.update { it.copy(isAlbumsListView = albumsList) }
+            }
+        }
+        viewModelScope.launch {
+            // Sonora: the original's SyncManager.isSyncing; here the library sync.
+            libraryRepository.isSyncing.collect { isSyncing ->
+                _playerUiState.update { it.copy(isSyncingLibrary = isSyncing) }
+            }
+        }
+        viewModelScope.launch {
+            combine(
+                libraryStateHolder.isLoadingLibrary,
+                libraryStateHolder.isLoadingCategories,
+            ) { loadingLibrary, loadingCategories ->
+                loadingLibrary to loadingCategories
+            }.collect { (loadingLibrary, loadingCategories) ->
+                _playerUiState.update {
+                    it.copy(
+                        isLoadingInitialSongs = loadingLibrary,
+                        isLoadingLibraryCategories = loadingCategories,
+                    )
+                }
+            }
+        }
+        viewModelScope.launch {
+            combine(
+                libraryStateHolder.currentSongSortOption,
+                libraryStateHolder.currentAlbumSortOption,
+                libraryStateHolder.currentArtistSortOption,
+            ) { songSort, albumSort, artistSort ->
+                Triple(songSort, albumSort, artistSort)
+            }.collect { (songSort, albumSort, artistSort) ->
+                _playerUiState.update {
+                    it.copy(
+                        currentSongSortOption = songSort,
+                        currentAlbumSortOption = albumSort,
+                        currentArtistSortOption = artistSort,
+                    )
+                }
+            }
+        }
+    }
+
+    /** Finds the current song in the songs tab's list and emits its index on [scrollToIndexEvent]. */
+    fun requestLocateCurrentSong(tab: LibraryTabId) {
+        val currentSong = stablePlayerState.value.currentSong ?: return
+
+        viewModelScope.launch {
+            try {
+                val state = playerUiState.value
+                // Sonora: only the songs tab locates; the original also locates in liked.
+                val sortedIds = libraryRepository.allSongs(state.currentSongSortOption.storageKey)
+                    .map { it.id }
+                val index = sortedIds.indexOf(currentSong.id)
+
+                if (index != -1) {
+                    _scrollToIndexEvent.emit(LocateScrollRequest(tab = tab, index = index))
+                } else {
+                    sendToast(context.getString(R.string.player_song_not_found_in_list))
+                }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "Failed to locate current song")
+                sendToast(context.getString(R.string.player_could_not_locate_song))
+            }
+        }
+    }
+
+    fun showAndPlaySongFromLibrary(
+        song: Song,
+        queueName: String = context.getString(R.string.tab_library),
+        isVoluntaryPlay: Boolean = true
+    ) {
+        launchLatestFullQueuePlayback(
+            song = song,
+            queueName = queueName,
+            isVoluntaryPlay = isVoluntaryPlay,
+            failureMessage = "Failed to build full library queue for songId=%s"
+        ) {
+            libraryRepository.allSongs(playerUiState.value.currentSongSortOption.storageKey)
+        }
+    }
+
+    suspend fun getSongsForCurrentLibrarySelection(): List<Song> =
+        libraryRepository.allSongs(playerUiState.value.currentSongSortOption.storageKey)
+
+    /**
+     * Sonora: the provider returns the songs in order, read from Room; the original's returns
+     * their IDs, resolved through its in-memory library (resolvePlaybackQueueFromSortedIds).
+     */
+    private fun launchLatestFullQueuePlayback(
+        song: Song,
+        queueName: String,
+        isVoluntaryPlay: Boolean,
+        failureMessage: String,
+        queueProvider: suspend () -> List<Song>
+    ) {
+        cancelPendingFullQueuePlayback()
+        cancelPendingDirectPlayback()
+        val requestToken = fullQueuePlaybackToken
+
+        fullQueuePlaybackJob = viewModelScope.launch {
+            try {
+                val fullQueue = queueProvider()
+                throwIfFullQueuePlaybackRequestIsStale(requestToken)
+
+                showAndPlaySong(
+                    song = song,
+                    contextSongs = fullQueue.ifEmpty { listOf(song) },
+                    queueName = queueName,
+                    isVoluntaryPlay = isVoluntaryPlay,
+                    cancelPendingQueueBuild = false
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (requestToken != fullQueuePlaybackToken) {
+                    return@launch
+                }
+
+                Timber.e(error, failureMessage, song.id)
+                showAndPlaySong(
+                    song = song,
+                    contextSongs = listOf(song),
+                    queueName = queueName,
+                    isVoluntaryPlay = isVoluntaryPlay,
+                    cancelPendingQueueBuild = false
+                )
+            }
+        }
+    }
+
+    private fun cancelPendingFullQueuePlayback() {
+        fullQueuePlaybackToken += 1L
+        fullQueuePlaybackJob?.cancel()
+        fullQueuePlaybackJob = null
+    }
+
+    private fun throwIfFullQueuePlaybackRequestIsStale(requestToken: Long) {
+        if (requestToken != fullQueuePlaybackToken) {
+            throw CancellationException("Stale full-queue playback request")
+        }
+    }
+
+    private fun cancelPendingDirectPlayback() {
+        cancelPendingDirectPlaybackBuild()
+        pendingQueueSegmentsJob?.cancel()
+        pendingQueueSegmentsJob = null
+    }
+
+    fun shuffleAllSongs(queueName: String = context.getString(R.string.queue_name_all_songs_shuffled)) {
+        Timber.tag("ShuffleDebug").d("shuffleAllSongs called.")
+
+        viewModelScope.launch {
+            val randomSongs = libraryRepository.randomSongs(limit = SHUFFLE_ALL_SONG_LIMIT)
+            if (randomSongs.isNotEmpty()) {
+                playSongsShuffled(randomSongs, queueName, startAtZero = true)
+            }
+        }
+    }
+
+    /** Only the album pick is random; its tracks play in album order. */
+    fun playRandomAlbum() {
+        libraryStateHolder.albums.value.randomOrNull()?.let(::playAlbum)
+    }
+
+    fun shuffleRandomArtist() {
+        viewModelScope.launch {
+            val allArtists = libraryStateHolder.artists.value
+            if (allArtists.isNotEmpty()) {
+                val randomArtist = allArtists.random()
+                val artistSongs = libraryRepository.songsForArtist(randomArtist.id)
+                if (artistSongs.isNotEmpty()) {
+                    playSongsShuffled(artistSongs, randomArtist.name, startAtZero = true)
+                }
+            }
+        }
+    }
+
+    /** Sonora: the repository already orders the album by disc and track, as the original sorts here. */
+    fun playAlbum(album: Album) {
+        Timber.tag("ShuffleDebug").d("playAlbum called for album: ${album.title}")
+        viewModelScope.launch {
+            try {
+                val songsList: List<Song> = withContext(dispatchers.io) {
+                    libraryRepository.songsForAlbum(album.id)
+                }
+
+                if (songsList.isNotEmpty()) {
+                    playSongs(songsList, songsList.first(), album.title, null)
+                    _isSheetVisible.value = true
+                } else {
+                    Timber.tag("PlayerViewModel").w("Album '${album.title}' has no playable songs.")
+                }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.tag("PlayerViewModel").e(e, "Error playing album ${album.title}")
+            }
+        }
+    }
+
+    fun playSongsShuffled(
+        songsToPlay: List<Song>,
+        queueName: String = "None",
+        playlistId: String? = null,
+        startAtZero: Boolean = false
+    ) {
+        cancelPendingFullQueuePlayback()
+        val requestToken = beginDirectPlaybackRequest()
+        directPlaybackJob = viewModelScope.launch {
+            val result = queueStateHolder.prepareShuffledQueueSuspending(
+                songsToPlay,
+                startAtZero,
+                playlistId
+            )
+            throwIfDirectPlaybackRequestIsStale(requestToken)
+            if (result == null) {
+                sendToast(context.getString(R.string.player_no_songs_to_shuffle))
+                return@launch
+            }
+
+            val (shuffledQueue, startSong) = result
+            transitionSchedulerJob?.cancel()
+
+            playbackStateHolder.updateStablePlayerState { it.copy(isShuffleEnabled = true) }
+            launch { userPreferencesRepository.setShuffleOn(true) }
+
+            internalPlaySongs(shuffledQueue, startSong, queueName, playlistId)
+            if (requestToken == directPlaybackToken) {
+                directPlaybackJob = null
+            }
+        }
+    }
+
+    fun playSelectedSongs(songs: List<Song>) {
+        if (songs.isEmpty()) return
+        playSongs(songs, songs.first(), context.getString(R.string.queue_name_selected_songs))
+        multiSelectionStateHolder.clearSelection()
+    }
+
+    fun addSelectedToQueue(songs: List<Song>) {
+        songs.forEach { addSongToQueue(it) }
+        viewModelScope.launch {
+            val n = songs.size
+            _toastEvents.emit(
+                context.resources.getQuantityString(R.plurals.n_songs_added_to_queue, n, n),
+            )
+        }
+        multiSelectionStateHolder.clearSelection()
+    }
+
+    fun addSelectedAsNext(songs: List<Song>) {
+        songs.reversed().forEach { addSongNextToQueue(it) }
+        viewModelScope.launch {
+            val n = songs.size
+            _toastEvents.emit(
+                context.resources.getQuantityString(R.plurals.n_songs_will_play_next, n, n),
+            )
+        }
+        multiSelectionStateHolder.clearSelection()
+    }
+
+    /** Sonora: likes come with step 5; until then liking the selection does nothing. */
+    @Suppress("UNUSED_PARAMETER")
+    fun likeSelectedSongs(songs: List<Song>) = Unit
+
+    /** Sonora: likes come with step 5; until then unliking the selection does nothing. */
+    @Suppress("UNUSED_PARAMETER")
+    fun unlikeSelectedSongs(songs: List<Song>) = Unit
+
+    suspend fun resolveAlbumSongsForBatchActions(albums: List<Album>): List<Song> {
+        if (albums.isEmpty()) return emptyList()
+        val visibleSongIds = currentLibrarySelectionSongIds()
+        return withContext(dispatchers.io) {
+            flattenDistinctGroups(
+                groups = albums.map { album ->
+                    libraryRepository.songsForAlbum(album.id)
+                        .filter { it.id in visibleSongIds }
+                },
+                keyOf = Song::id
+            )
+        }
+    }
+
+    suspend fun resolveArtistSongsForBatchActions(artists: List<Artist>): List<Song> {
+        if (artists.isEmpty()) return emptyList()
+        val visibleSongIds = currentLibrarySelectionSongIds()
+        return withContext(dispatchers.io) {
+            flattenDistinctGroups(
+                groups = artists.map { artist ->
+                    libraryRepository.songsForArtist(artist.id)
+                        .filter { it.id in visibleSongIds }
+                },
+                keyOf = Song::id
+            )
+        }
+    }
+
+    private suspend fun currentLibrarySelectionSongIds(): Set<String> =
+        libraryRepository.allSongs(playerUiState.value.currentSongSortOption.storageKey)
+            .mapTo(hashSetOf()) { it.id }
+
+    fun sortSongs(sortOption: SortOption, persist: Boolean = true) {
+        libraryStateHolder.sortSongs(sortOption, persist)
+    }
+
+    fun sortAlbums(sortOption: SortOption, persist: Boolean = true) {
+        libraryStateHolder.sortAlbums(sortOption, persist)
+    }
+
+    fun sortArtists(sortOption: SortOption, persist: Boolean = true) {
+        libraryStateHolder.sortArtists(sortOption, persist)
+    }
+
+    fun setAlbumsListView(isList: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.setAlbumsListView(isList)
+        }
+    }
+
+    /** Sonora: the button is shown as in the original but does nothing (Eric, 2026-11-11). */
+    fun toggleStorageFilter() = Unit
+
+    fun showSortingSheet() {
+        libraryTabsStateHolder.showSortingSheet(_isSortingSheetVisible)
+    }
+
+    fun hideSortingSheet() {
+        libraryTabsStateHolder.hideSortingSheet(_isSortingSheetVisible)
+    }
+
+    fun onLibraryTabSelected(tabIndex: Int) {
+        libraryTabsStateHolder.onLibraryTabSelected(
+            tabIndex = tabIndex,
+            libraryTabs = libraryTabsFlow.value,
+            loadedTabs = _loadedTabs,
+            currentLibraryTabId = _currentLibraryTabId,
+            saveLastTabIndex = { index -> userPreferencesRepository.saveLastLibraryTabIndex(index) },
+            scope = viewModelScope,
+            loadSongs = { libraryStateHolder.startObservingLibraryData() },
+            loadAlbums = { libraryStateHolder.startObservingLibraryData() },
+            loadArtists = { libraryStateHolder.startObservingLibraryData() }
         )
     }
 
@@ -1457,6 +1887,7 @@ class PlayerViewModel @Inject constructor(
         // The holder moves progress updates to the PlayerViewModel left bound, or stops them when
         // none is; stopping them here would freeze the seek bar of the surviving instance.
         playbackStateHolder.onCleared(ownerScope)
+        libraryStateHolder.onCleared(ownerScope)
         themeStateHolder.onCleared(ownerScope)
         sleepTimerStateHolder.onCleared(ownerScope)
         queueUndoStateHolder.onCleared()

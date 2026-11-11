@@ -13,6 +13,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import top.onlyquant.sonora.data.model.SortOption
 import top.onlyquant.sonora.utils.PlaybackSpeedUtils
 
 /**
@@ -32,6 +33,12 @@ class UserPreferencesRepository @Inject constructor(
         val PREVIOUS_BUTTON_BEHAVIOR = stringPreferencesKey("previous_button_behavior")
         val PLAYBACK_SPEED = floatPreferencesKey("playback_speed")
         val SHOW_QUEUE_HISTORY = booleanPreferencesKey("show_queue_history")
+        val SONGS_SORT_OPTION = stringPreferencesKey("songs_sort_option")
+        val ALBUMS_SORT_OPTION = stringPreferencesKey("albums_sort_option")
+        val ARTISTS_SORT_OPTION = stringPreferencesKey("artists_sort_option")
+        val LAST_LIBRARY_TAB_INDEX =
+                intPreferencesKey("last_library_tab_index")
+        val IS_ALBUMS_LIST_VIEW = booleanPreferencesKey("is_albums_list_view")
     }
 
     suspend fun setRepeatMode(@Player.RepeatMode mode: Int) {
@@ -78,4 +85,76 @@ class UserPreferencesRepository @Inject constructor(
             dataStore.data.map { preferences ->
                 preferences[PreferencesKeys.SHOW_QUEUE_HISTORY] ?: false
             }
+
+    val isAlbumsListViewFlow: Flow<Boolean> =
+        dataStore.data.map { preferences ->
+            preferences[PreferencesKeys.IS_ALBUMS_LIST_VIEW] ?: false
+        }
+
+    suspend fun setAlbumsListView(isList: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.IS_ALBUMS_LIST_VIEW] = isList
+        }
+    }
+
+    val songsSortOptionFlow: Flow<String> =
+            dataStore.data.map { preferences ->
+                SortOption.fromStorageKey(
+                                preferences[PreferencesKeys.SONGS_SORT_OPTION],
+                                SortOption.SONGS,
+                                SortOption.SongTitleAZ
+                        )
+                        .storageKey
+            }
+
+    val albumsSortOptionFlow: Flow<String> =
+            dataStore.data.map { preferences ->
+                SortOption.fromStorageKey(
+                                preferences[PreferencesKeys.ALBUMS_SORT_OPTION],
+                                SortOption.ALBUMS,
+                                SortOption.AlbumTitleAZ
+                        )
+                        .storageKey
+            }
+
+    val artistsSortOptionFlow: Flow<String> =
+            dataStore.data.map { preferences ->
+                SortOption.fromStorageKey(
+                                preferences[PreferencesKeys.ARTISTS_SORT_OPTION],
+                                SortOption.ARTISTS,
+                                SortOption.ArtistNameAZ
+                        )
+                        .storageKey
+            }
+
+    // Sonora: the original also sets songs_sort_option_migrated_v2, a one-off migration of its
+    // older sort keys; Sonora has no older keys.
+    suspend fun setSongsSortOption(optionKey: String) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.SONGS_SORT_OPTION] = optionKey
+        }
+    }
+
+    suspend fun setAlbumsSortOption(optionKey: String) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.ALBUMS_SORT_OPTION] = optionKey
+        }
+    }
+
+    suspend fun setArtistsSortOption(optionKey: String) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.ARTISTS_SORT_OPTION] = optionKey
+        }
+    }
+
+    val lastLibraryTabIndexFlow: Flow<Int> =
+            dataStore.data.map { preferences ->
+                preferences[PreferencesKeys.LAST_LIBRARY_TAB_INDEX] ?: 0
+            }
+
+    suspend fun saveLastLibraryTabIndex(tabIndex: Int) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.LAST_LIBRARY_TAB_INDEX] = tabIndex
+        }
+    }
 }

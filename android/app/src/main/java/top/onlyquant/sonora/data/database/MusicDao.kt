@@ -94,6 +94,70 @@ interface MusicDao {
     )
     fun getArtistsPaginated(sortOrder: String): PagingSource<Int, ArtistEntity>
 
+    /** The albums tab as a list, for selecting all and the random album (the original's getAlbums). */
+    @Query(
+        """
+        SELECT albums.* FROM albums
+        LEFT JOIN artists AS ar ON ar.id = albums.artist_id
+        WHERE :hideSingles = 0 OR albums.single = 0
+        ORDER BY
+            CASE WHEN :sortOrder = 'album_title_za' THEN albums.sort_key END DESC,
+            CASE WHEN :sortOrder = 'album_artist' THEN COALESCE(ar.sort_key, '') END ASC,
+            CASE WHEN :sortOrder = 'album_artist_desc' THEN COALESCE(ar.sort_key, '') END DESC,
+            CASE WHEN :sortOrder = 'album_release_year' THEN albums.year END DESC,
+            CASE WHEN :sortOrder = 'album_release_year_asc' THEN albums.year END ASC,
+            CASE WHEN :sortOrder = 'album_date_added' THEN albums.id END DESC,
+            CASE WHEN :sortOrder = 'album_size_asc' THEN albums.song_count END ASC,
+            CASE WHEN :sortOrder = 'album_size_desc' THEN albums.song_count END DESC,
+            albums.sort_key ASC,
+            albums.id ASC
+        """
+    )
+    fun getAlbums(sortOrder: String, hideSingles: Boolean): Flow<List<AlbumEntity>>
+
+    /** The artists tab as a list (the original's getArtists). */
+    @Query(
+        """
+        SELECT * FROM artists
+        ORDER BY
+            CASE WHEN :sortOrder = 'artist_name_za' THEN sort_key END DESC,
+            CASE WHEN :sortOrder = 'artist_num_songs_desc' THEN track_count END DESC,
+            CASE WHEN :sortOrder = 'artist_num_songs_asc' THEN track_count END ASC,
+            sort_key ASC,
+            id ASC
+        """
+    )
+    fun getArtists(sortOrder: String): Flow<List<ArtistEntity>>
+
+    /** As the original: disc, then numbered tracks, then title (here by sortKey). */
+    @Query(
+        """
+        SELECT * FROM songs
+        WHERE album_id = :albumId
+        ORDER BY
+            CASE WHEN disc_number <= 0 THEN 1 ELSE disc_number END ASC,
+            CASE WHEN track_number > 0 THEN 0 ELSE 1 END ASC,
+            CASE WHEN track_number > 0 THEN track_number END ASC,
+            sort_key ASC,
+            id ASC
+        """
+    )
+    suspend fun getSongsByAlbumId(albumId: Long): List<SongEntity>
+
+    /** As the original, through the cross references; by title (here by sortKey). */
+    @Query(
+        """
+        SELECT songs.* FROM songs
+        INNER JOIN song_artist_cross_ref ON songs.id = song_artist_cross_ref.song_id
+        WHERE song_artist_cross_ref.artist_id = :artistId
+        ORDER BY songs.sort_key ASC, songs.id ASC
+        """
+    )
+    suspend fun getSongsForArtist(artistId: Long): List<SongEntity>
+
+    @Query("SELECT * FROM songs ORDER BY RANDOM() LIMIT :limit")
+    suspend fun getRandomSongs(limit: Int): List<SongEntity>
+
     @Query("SELECT COUNT(*) FROM songs")
     fun getSongCount(): Flow<Int>
 
