@@ -24,7 +24,6 @@ import top.onlyquant.sonora.presentation.auth.LoginScreen
 import top.onlyquant.sonora.presentation.auth.SessionState
 import top.onlyquant.sonora.presentation.main.BlankTab
 import top.onlyquant.sonora.presentation.main.MainUI
-import top.onlyquant.sonora.presentation.main.TrackListPlaceholder
 import top.onlyquant.sonora.presentation.navigation.AppNavigation
 import top.onlyquant.sonora.presentation.viewmodel.LibraryViewModel
 import top.onlyquant.sonora.presentation.viewmodel.PlayerViewModel
@@ -32,8 +31,7 @@ import top.onlyquant.sonora.ui.theme.PixelPlayerTheme
 
 /**
  * Shows the login until a device token is stored, then the main shell (MainUI) with the player
- * sheet. The Home tab is a temporary track list and the other tabs are blank until the library
- * screens arrive.
+ * sheet. The Search tab is blank until its screen is copied.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -75,16 +73,9 @@ class MainActivity : ComponentActivity() {
                             AppNavigation(
                                 playerViewModel = playerViewModel,
                                 navController = navController,
-                                homeContent = {
-                                    TrackListPlaceholder(
-                                        viewModel = hiltViewModel(),
-                                        playerViewModel = playerViewModel,
-                                        userName = ui.userName,
-                                        contentPadding = padding,
-                                        onSignOut = auth::signOut,
-                                    )
-                                },
+                                paddingValues = padding,
                                 searchContent = { BlankTab() },
+                                onSignOut = auth::signOut,
                             )
                         }
                     }

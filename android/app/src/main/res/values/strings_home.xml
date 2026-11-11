@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home screen strings. Roaming FM's are Eric's (2026-11-11) and the Web player's; the rest from the zh-CN strings of PixelPlayerOSS v0.4.0-alpha.53 (GPL-3.0). -->
+<resources>
+    <string name="home_roaming_title">漫游\n电台</string>
+    <string name="home_roaming_subtitle">Your Roaming Mix</string>
+    <string name="fm_queue_name">漫游电台</string>
+    <string name="cd_play_roaming_fm">播放漫游电台</string>
+    <string name="fm_load_failed">读取漫游 FM 失败</string>
+    <string name="fm_no_albums">还没有可以播放的专辑</string>
+    <!-- Sonora: the temporary sign-out behind the settings button, until the settings screen. -->
+    <string name="sign_out">退出登录</string>
+    <string name="sign_out_message">退出后要重新登录才能使用。</string>
+    <string name="fm_no_next_album">暂时取不到下一张专辑</string>
+    <string name="collage_pattern_arrow_fanfare">箭头礼赞</string>
+    <string name="collage_pattern_cosmic_swirl">宇宙漩涡</string>
+    <string name="collage_pattern_heart_garden">爱心花园</string>
+    <string name="collage_pattern_honeycomb_groove">蜂巢律动</string>
+    <string name="collage_pattern_pixel_cookie">像素饼干</string>
+    <string name="collage_pattern_pixel_mosaic">像素马赛克</string>
+    <string name="collage_pattern_soft_orbit">柔和轨道</string>
+    <string name="collage_pattern_stardust_scatter">星尘散落</string>
+    <string name="collage_pattern_sunny_bloom">阳光绽放</string>
+    <string name="collage_pattern_vinyl_stack">黑胶叠层</string>
+    <string name="home_empty_placeholder_refresh">刷新</string>
+    <string name="home_empty_placeholder_title">暂无内容</string>
+    <string name="presentation_batch_b_more_options">更多选项</string>
+    <string name="presentation_batch_b_queue_recently_played">最近播放</string>
+    <string name="presentation_batch_g_recently_played_title">最近播放</string>
+    <string name="settings_top_bar_title">设置</string>
+</resources>

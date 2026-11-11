@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.IntOffset
 import androidx.media3.common.util.UnstableApi
@@ -20,6 +21,7 @@ import androidx.navigation.navArgument
 import top.onlyquant.sonora.presentation.components.ScreenWrapper
 import top.onlyquant.sonora.presentation.screens.AlbumDetailScreen
 import top.onlyquant.sonora.presentation.screens.ArtistDetailScreen
+import top.onlyquant.sonora.presentation.screens.HomeScreen
 import top.onlyquant.sonora.presentation.screens.LibraryScreen
 import top.onlyquant.sonora.presentation.viewmodel.PlayerViewModel
 
@@ -27,16 +29,17 @@ import top.onlyquant.sonora.presentation.viewmodel.PlayerViewModel
  * The navigation graph, from AppNavigation in PixelPlayerOSS v0.4.0-alpha.53 (GPL-3.0). Sonora:
  * only the destinations that exist so far, with the original's transitions: the three main tabs,
  * the album page and the artist page. The original starts on the launch tab from the settings;
- * Sonora always starts on Home. Home and Search are passed in until their screens are copied
- * (step 4: the home screen, then search).
+ * Sonora always starts on Home. Search is passed in until its screen is copied (step 4), and there
+ * is no sidebar drawer (Eric, 2026-11-11), so Home has no onOpenSidebar.
  */
 @OptIn(UnstableApi::class)
 @Composable
 fun AppNavigation(
     playerViewModel: PlayerViewModel,
     navController: NavHostController,
-    homeContent: @Composable () -> Unit,
+    paddingValues: PaddingValues,
     searchContent: @Composable () -> Unit,
+    onSignOut: () -> Unit,
 ) {
     NavHost(
         navController = navController,
@@ -74,7 +77,12 @@ fun AppNavigation(
             },
         ) {
             ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
-                homeContent()
+                HomeScreen(
+                    navController = navController,
+                    paddingValuesParent = paddingValues,
+                    playerViewModel = playerViewModel,
+                    onSignOut = onSignOut
+                )
             }
         }
         composable(

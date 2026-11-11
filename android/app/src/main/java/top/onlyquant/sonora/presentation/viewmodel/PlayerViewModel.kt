@@ -72,6 +72,17 @@ import top.onlyquant.sonora.data.service.player.DualPlayerEngine
 import top.onlyquant.sonora.di.DispatcherProvider
 import top.onlyquant.sonora.presentation.navigation.PlayerSheetBackCoordinator
 import top.onlyquant.sonora.utils.MediaItemBuilder
+import top.onlyquant.sonora.data.api.ApiException
+import top.onlyquant.sonora.data.api.FmState
+import top.onlyquant.sonora.data.api.SonoraApi
+import top.onlyquant.sonora.data.auth.SessionStore
+import top.onlyquant.sonora.data.fm.FM_QUEUE_TAG
+import top.onlyquant.sonora.data.fm.albumEnded
+import top.onlyquant.sonora.data.fm.songs
+import top.onlyquant.sonora.data.fm.songsToAppend
+import top.onlyquant.sonora.data.fm.startSong
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import top.onlyquant.sonora.utils.QueueUtils
 
 private fun List<Song>.toPlaybackQueue(): ImmutableList<Song> = when (this) {
@@ -160,7 +171,10 @@ class PlayerViewModel @Inject constructor(
     private val libraryStateHolder: LibraryStateHolder,
     private val libraryTabsStateHolder: LibraryTabsStateHolder,
     val multiSelectionStateHolder: MultiSelectionStateHolder,
-    private val dispatchers: DispatcherProvider
+    private val dispatchers: DispatcherProvider,
+    // Sonora: Roaming FM (see the section of that name below).
+    private val api: SonoraApi,
+    private val sessions: SessionStore,
 ) : ViewModel() {
 
     private val _playerUiState = MutableStateFlow(PlayerUiState())
@@ -1335,6 +1349,7 @@ class PlayerViewModel @Inject constructor(
             }
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                onFmTransition(mediaItem, reason, playerCtrl)
                 playbackStateHolder.onPlaybackOccurrenceTransition(mediaItem?.mediaId)
                 preparePlaybackAudioMetadataForMedia(mediaItem?.mediaId)
                 transitionSchedulerJob?.cancel()
@@ -1389,6 +1404,10 @@ class PlayerViewModel @Inject constructor(
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
+                // Sonora: the radio's queue ran out before the next album arrived.
+                if (playbackState == Player.STATE_ENDED && isFmItem(playerCtrl.currentMediaItem)) {
+                    fmAdvancePastEnd()
+                }
                 refreshPlaybackAudioMetadata(playerCtrl)
                 syncDisplayedMediaItemIfChanged(playerCtrl)
 
@@ -1745,6 +1764,164 @@ class PlayerViewModel @Inject constructor(
         )
     }
 
+    // --- Roaming FM --------------------------------------------------------------------------
+    //
+    // Sonora: not in PixelPlayerOSS. As the Web player (PlayerController's 漫游 FM part, Eric
+    // 2026-11-07): the server lines up whole albums, their songs go into the ordinary queue
+    // tagged with FM_QUEUE_TAG, and the progress is kept on the server. See data/fm/RoamingFm.kt.
+
+    /** FM requests reach the server in the order they are made: a finish before the next position. */
+    private val fmMutex = Mutex()
+    private var fmLastItem: MediaItem? = null
+    private var fmLastIndex = C.INDEX_UNSET
+    private val _isRoamingFmPlaying = MutableStateFlow(false)
+    /** Whether the current song is the radio's (the home screen highlights its button). */
+    val isRoamingFmPlaying: StateFlow<Boolean> = _isRoamingFmPlaying.asStateFlow()
+
+    /** Plays the radio from the position the server keeps (the home screen's radio button). */
+    fun playRoamingFm() {
+        cancelPendingFullQueuePlayback()
+        val requestToken = beginDirectPlaybackRequest()
+        directPlaybackJob = viewModelScope.launch {
+            val server = sessions.current()?.server ?: return@launch
+            val state = try {
+                fmMutex.withLock { api.fm() }
+            } catch (e: ApiException) {
+                Timber.tag(FM_TAG).w(e, "Loading the radio failed")
+                sendToast(context.getString(R.string.fm_load_failed))
+                return@launch
+            }
+            throwIfDirectPlaybackRequestIsStale(requestToken)
+            val songs = state.songs(server)
+            val start = state.startSong(songs) ?: run {
+                sendToast(context.getString(R.string.fm_no_albums))
+                return@launch
+            }
+            // The server decides the order: no shuffle, and no repeat (the Web player has neither
+            // button in FM; here the buttons stay, so the modes are switched off).
+            playbackStateHolder.updateStablePlayerState { it.copy(isShuffleEnabled = false) }
+            mediaController?.repeatMode = Player.REPEAT_MODE_OFF
+            queueStateHolder.setOriginalQueueOrder(songs, List(songs.size) { FM_QUEUE_TAG })
+            internalPlaySongs(songs, start, context.getString(R.string.fm_queue_name), FM_QUEUE_TAG)
+            if (requestToken == directPlaybackToken) {
+                directPlaybackJob = null
+            }
+        }
+    }
+
+    private fun isFmItem(item: MediaItem?): Boolean =
+        item != null && MediaItemBuilder.playlistIdOf(item) == FM_QUEUE_TAG
+
+    /** The albums of the radio entries after [index], in queue order. */
+    private fun fmAlbumsAfter(player: Player, index: Int): List<Long> =
+        (index + 1 until player.mediaItemCount)
+            .map { player.getMediaItemAt(it) }
+            .filter(::isFmItem)
+            .mapNotNull { knownSongs[it.mediaId]?.albumId }
+
+    /**
+     * On every song change: leaving an album's last song for the next song counts the album as
+     * heard and appends what the server lines up next; a radio song saves the position (Web:
+     * fmBeforeNext and playSong). A song of a later album passes the ones before it over, which
+     * the server does by itself.
+     */
+    private fun onFmTransition(item: MediaItem?, reason: Int, player: Player) {
+        val previous = fmLastItem
+        val previousIndex = fmLastIndex
+        fmLastItem = item
+        fmLastIndex = player.currentMediaItemIndex
+        _isRoamingFmPlaying.value = isFmItem(item)
+        if (item == null) return
+        // A queue change reports the same entry again (appending the next album does).
+        if (previous?.mediaId == item.mediaId && previousIndex == player.currentMediaItemIndex) return
+        val previousAlbum = previous?.takeIf(::isFmItem)?.let { knownSongs[it.mediaId]?.albumId }
+        val isFm = isFmItem(item)
+        if (previousAlbum == null && !isFm) return
+
+        val index = player.currentMediaItemIndex
+        val moving = reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO ||
+            reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK
+        val forward = moving && index == previousIndex + 1
+        // The entry being left was at index - 1 when moving forward.
+        val ended = forward && previousAlbum != null &&
+            albumEnded(previousAlbum, fmAlbumsAfter(player, index - 1))
+        // Starting the radio queues its songs in the background; only a move within the queue
+        // can tell that nothing follows the current album.
+        val currentAlbum = knownSongs[item.mediaId]?.albumId
+        val needsMore = isFm && moving && fmAlbumsAfter(player, index).all { it == currentAlbum }
+        val trackId = item.mediaId.toLongOrNull()?.takeIf { isFm }
+        if (!ended && !needsMore && trackId == null) return
+
+        viewModelScope.launch {
+            fmMutex.withLock {
+                try {
+                    val state = when {
+                        ended -> api.fmFinish(previousAlbum!!)
+                        needsMore -> api.fm()
+                        else -> null
+                    }
+                    if (trackId != null) api.fmPosition(trackId)
+                    state?.let { fmAppend(it, finished = previousAlbum.takeIf { ended }) }
+                    Unit
+                } catch (e: ApiException) {
+                    Timber.tag(FM_TAG).w(e, "Radio request failed")
+                }
+            }
+        }
+    }
+
+    /**
+     * The current radio song is the queue's last: count its album as heard if this is its last
+     * song, wait for what the server lines up next and move on to it (Web: fmBeforeNext awaits the
+     * next album when the queue has nothing after the current entry). Normally the next album is
+     * queued long before; this happens when the server could not line one up in time, or the
+     * library has a single album the radio can play.
+     */
+    private fun fmAdvancePastEnd() {
+        val player = mediaController ?: return
+        val current = player.currentMediaItem ?: return
+        val albumId = knownSongs[current.mediaId]?.albumId
+        viewModelScope.launch {
+            val appended = fmMutex.withLock {
+                try {
+                    val state = if (albumId != null) api.fmFinish(albumId) else api.fm()
+                    fmAppend(state, finished = albumId)
+                } catch (e: ApiException) {
+                    Timber.tag(FM_TAG).w(e, "Radio request failed")
+                    0
+                }
+            }
+            // The controller's timeline catches up with addMediaItems later; its commands run in
+            // order, so the seek lands on the first appended song.
+            if (appended > 0) {
+                player.seekTo(player.currentMediaItemIndex + 1, 0L)
+                player.play()
+            } else {
+                sendToast(context.getString(R.string.fm_no_next_album))
+            }
+        }
+    }
+
+    /**
+     * Appends the albums the server lined up that the queue does not have yet (Web: fmAppend).
+     * [finished] is the album just heard: a small library can line it up again at once.
+     */
+    /** Returns how many songs were appended. */
+    private suspend fun fmAppend(state: FmState, finished: Long?): Int {
+        val player = mediaController ?: return 0
+        val server = sessions.current()?.server ?: return 0
+        val current = player.currentMediaItem
+        if (!isFmItem(current) && fmAlbumsAfter(player, player.currentMediaItemIndex).isEmpty()) return 0
+        val queued = fmAlbumsAfter(player, player.currentMediaItemIndex).toMutableSet()
+        current?.let { knownSongs[it.mediaId]?.albumId }?.takeIf { it != finished }?.let(queued::add)
+        val songs = state.songsToAppend(server, queued)
+        if (songs.isEmpty()) return 0
+        songs.forEach { knownSongs[it.id] = it }
+        player.addMediaItems(songs.map { buildPlaybackMediaItem(it, FM_QUEUE_TAG) })
+        Timber.tag(FM_TAG).d("Appended %d songs of albums %s", songs.size, songs.map { it.albumId }.distinct())
+        return songs.size
+    }
+
     fun cycleRepeatMode() {
         playbackStateHolder.cycleRepeatMode()
     }
@@ -1829,6 +2006,12 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun nextSong() {
+        // Sonora: at the end of a radio queue, wait for the next album (Roaming FM below).
+        val controller = mediaController
+        if (controller != null && isFmItem(controller.currentMediaItem) && !controller.hasNextMediaItem()) {
+            fmAdvancePastEnd()
+            return
+        }
         playbackStateHolder.nextSong()
     }
 
@@ -1967,3 +2150,5 @@ class PlayerViewModel @Inject constructor(
         )
     }
 }
+
+private const val FM_TAG = "RoamingFm"
