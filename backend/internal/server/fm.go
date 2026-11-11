@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"strconv"
 
 	"sonora/internal/admin"
 	"sonora/internal/store"
@@ -39,8 +40,19 @@ func respondFM(w http.ResponseWriter, r *http.Request, state store.FMState, err 
 	respond(w, r, out, err)
 }
 
+// getFM returns the radio. count (1–10, default 2) is how many albums to
+// return, the current one included; the Android home screen asks for five.
 func (s *server) getFM(w http.ResponseWriter, r *http.Request) {
-	state, err := s.store.FM(r.Context(), userID(r))
+	count := 2
+	if v := r.URL.Query().Get("count"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > store.FMMaxAhead {
+			admin.WriteError(w, http.StatusBadRequest, "invalid", "count 必须是 1 到 10 的整数")
+			return
+		}
+		count = n
+	}
+	state, err := s.store.FMAhead(r.Context(), userID(r), count)
 	respondFM(w, r, state, err)
 }
 

@@ -447,3 +447,44 @@ func TestFMForgetsDeletedAlbumsAndForeignPlaylists(t *testing.T) {
 		t.Fatal("another listener's playlist was accepted")
 	}
 }
+
+func TestFMAheadLinesUpMoreAlbums(t *testing.T) {
+	s := openTest(t)
+	ctx := context.Background()
+	user := newUser(t, s, "alice")
+	for i := range 8 {
+		fmAlbum(t, s, 10+i)
+	}
+
+	// Only big albums: one per draw, so six need more draws than two.
+	ahead, err := s.FMAhead(ctx, user, 6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ahead.Albums) != 6 {
+		t.Fatalf("albums %d", len(ahead.Albums))
+	}
+	seen := map[int64]bool{}
+	for _, a := range ahead.Albums {
+		if seen[a.ID] {
+			t.Fatalf("album %d twice", a.ID)
+		}
+		seen[a.ID] = true
+	}
+	// They are the radio's real plan: the player's two are the first two.
+	state, err := s.FM(ctx, user)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(state.Albums) != 2 || state.Albums[0].ID != ahead.Albums[0].ID || state.Albums[1].ID != ahead.Albums[1].ID {
+		t.Fatalf("player %+v, ahead %+v", state.Albums, ahead.Albums[:2])
+	}
+
+	// Clamped to 1..FMMaxAhead; the library only has eight albums.
+	if state, _ = s.FMAhead(ctx, user, 0); len(state.Albums) != 1 {
+		t.Fatalf("clamped low %d", len(state.Albums))
+	}
+	if state, _ = s.FMAhead(ctx, user, 99); len(state.Albums) != 8 {
+		t.Fatalf("clamped high %d", len(state.Albums))
+	}
+}

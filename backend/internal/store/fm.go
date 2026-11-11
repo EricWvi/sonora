@@ -29,6 +29,9 @@ const (
 	// fmLookahead is how many albums the plan keeps lined up, the current
 	// one included, so the player can load the next one early.
 	fmLookahead = 2
+	// FMMaxAhead caps how many albums one read may ask for, the current one
+	// included. The Android home screen shows five.
+	FMMaxAhead = 10
 	// fmMaxDraws bounds the draws one call makes when albums keep turning
 	// out to have nothing to add.
 	fmMaxDraws = 4
@@ -288,21 +291,23 @@ func fmCandidates(ctx context.Context, tx *sql.Tx, userID int64) ([]fmCandidate,
 }
 
 // fmFillPlan drops albums left without tracks and draws until the plan
-// holds what the player needs, or nothing more can be drawn.
-func fmFillPlan(ctx context.Context, tx *sql.Tx, userID int64) error {
+// holds ahead albums, or nothing more can be drawn.
+func fmFillPlan(ctx context.Context, tx *sql.Tx, userID int64, ahead int) error {
 	if _, err := tx.ExecContext(ctx, `
 		DELETE FROM fm_plan WHERE user_id = ? AND album_id NOT IN
 			(SELECT album_id FROM tracks WHERE album_id IS NOT NULL)`, userID); err != nil {
 		return err
 	}
 	rnd := rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64()))
-	for range fmMaxDraws {
+	// Without groups a cycle is a single big album, so asking further ahead
+	// takes as many more draws.
+	for range fmMaxDraws + ahead {
 		var planned, last int
 		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*), IFNULL(MAX(position), 0) FROM fm_plan WHERE user_id = ?`,
 			userID).Scan(&planned, &last); err != nil {
 			return err
 		}
-		if planned >= fmLookahead {
+		if planned >= ahead {
 			return nil
 		}
 		candidates, err := fmCandidates(ctx, tx, userID)
@@ -330,13 +335,13 @@ func fmFillPlan(ctx context.Context, tx *sql.Tx, userID int64) error {
 	return nil
 }
 
-func fmReadState(ctx context.Context, tx *sql.Tx, userID int64) (FMState, error) {
+func fmReadState(ctx context.Context, tx *sql.Tx, userID int64, ahead int) (FMState, error) {
 	state := FMState{Albums: []FMAlbum{}}
 	var err error
 	if state.GroupIDs, err = fmGroupIDs(ctx, tx, userID); err != nil {
 		return state, err
 	}
-	albums, err := queryIDs(ctx, tx, `SELECT album_id FROM fm_plan WHERE user_id = ? ORDER BY position LIMIT ?`, userID, fmLookahead)
+	albums, err := queryIDs(ctx, tx, `SELECT album_id FROM fm_plan WHERE user_id = ? ORDER BY position LIMIT ?`, userID, ahead)
 	if err != nil {
 		return state, err
 	}
@@ -383,16 +388,20 @@ func fmAlbumTracks(ctx context.Context, tx *sql.Tx, albumID int64) ([]Track, err
 }
 
 func (s *Store) fmUpdate(ctx context.Context, userID int64, change func(*sql.Tx) error) (FMState, error) {
+	return s.fmUpdateAhead(ctx, userID, fmLookahead, change)
+}
+
+func (s *Store) fmUpdateAhead(ctx context.Context, userID int64, ahead int, change func(*sql.Tx) error) (FMState, error) {
 	var state FMState
 	err := s.inTx(ctx, func(tx *sql.Tx) error {
 		if err := change(tx); err != nil {
 			return err
 		}
-		if err := fmFillPlan(ctx, tx, userID); err != nil {
+		if err := fmFillPlan(ctx, tx, userID, ahead); err != nil {
 			return err
 		}
 		var err error
-		state, err = fmReadState(ctx, tx, userID)
+		state, err = fmReadState(ctx, tx, userID, ahead)
 		return err
 	})
 	return state, err
@@ -400,7 +409,16 @@ func (s *Store) fmUpdate(ctx context.Context, userID int64, change func(*sql.Tx)
 
 // FM returns the listener's radio, lining up albums if needed.
 func (s *Store) FM(ctx context.Context, userID int64) (FMState, error) {
-	return s.fmUpdate(ctx, userID, func(*sql.Tx) error { return nil })
+	return s.FMAhead(ctx, userID, fmLookahead)
+}
+
+// FMAhead is FM with ahead albums, the current one included, instead of the
+// player's two: the Android home screen shows the albums coming up. They are
+// lined up for real, so they are what the radio goes on to play. ahead is
+// clamped to 1..FMMaxAhead.
+func (s *Store) FMAhead(ctx context.Context, userID int64, ahead int) (FMState, error) {
+	ahead = max(1, min(ahead, FMMaxAhead))
+	return s.fmUpdateAhead(ctx, userID, ahead, func(*sql.Tx) error { return nil })
 }
 
 // fmLeave takes the current album off the plan. It reports false for any

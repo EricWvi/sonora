@@ -289,6 +289,14 @@ func TestFMIsPerListener(t *testing.T) {
 	if len(state.Albums) != 0 || state.GroupIDs == nil {
 		t.Fatalf("fm %+v", state)
 	}
+	for _, count := range []string{"0", "11", "x"} {
+		if rec := ts.do("GET", playerAPI+"fm?count="+count, ""); rec.Code != http.StatusBadRequest {
+			t.Fatalf("count=%s: %d", count, rec.Code)
+		}
+	}
+	if rec := ts.do("GET", playerAPI+"fm?count=6", ""); rec.Code != http.StatusOK {
+		t.Fatalf("count=6: %d %s", rec.Code, rec.Body)
+	}
 	pl := decodeBody[store.Playlist](t, ts.do("POST", playerAPI+"playlists", `{"name":"CN"}`))
 	if rec := ts.do("PUT", playerAPI+"fm/groups", `{"playlistIds":[`+itoa(pl.ID)+`]}`); rec.Code != http.StatusOK {
 		t.Fatalf("groups: %d %s", rec.Code, rec.Body)
