@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -68,6 +69,10 @@ type importJob struct {
 
 	user  int64
 	album netease.ImportAlbum
+	// tracks are the songs to import: all of album, or those the listener
+	// picked (Eric, 2026-11-13). The album keeps all of them, so that what
+	// the store records of it, such as whether it is a single, stays whole.
+	tracks []netease.AlbumTrack
 }
 
 // importQueue holds the album imports of all listeners.
@@ -81,20 +86,22 @@ type importQueue struct {
 	lastFetch time.Time
 }
 
-// add queues an import of album for user, or returns the one of theirs
-// already waiting or running; start tells whether a worker must be started.
-func (q *importQueue) add(user int64, album netease.ImportAlbum) (job importJob, start bool) {
+// add queues an import of tracks of album for user, or returns the one of
+// theirs already waiting or running for the same songs; start tells whether a
+// worker must be started.
+func (q *importQueue) add(user int64, album netease.ImportAlbum, tracks []netease.AlbumTrack) (job importJob, start bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	for _, j := range q.jobs {
-		if j.user == user && j.AlbumID == album.ID && (j.State == importQueued || j.State == importRunning) {
+		if j.user == user && j.AlbumID == album.ID && (j.State == importQueued || j.State == importRunning) &&
+			sameSongs(j.tracks, tracks) {
 			return j.snapshot(), false
 		}
 	}
 	q.lastID++
 	j := &importJob{
 		ID: q.lastID, AlbumID: album.ID, Title: album.Title, State: importQueued,
-		Total: len(album.Tracks), Failed: []importFailure{}, user: user, album: album,
+		Total: len(tracks), Failed: []importFailure{}, user: user, album: album, tracks: tracks,
 	}
 	q.jobs = append(q.jobs, j)
 	start = !q.running
@@ -152,6 +159,10 @@ func (q *importQueue) of(user int64) []importJob {
 	return out
 }
 
+func sameSongs(a, b []netease.AlbumTrack) bool {
+	return slices.EqualFunc(a, b, func(x, y netease.AlbumTrack) bool { return x.Song.ID == y.Song.ID })
+}
+
 func (j *importJob) snapshot() importJob {
 	c := *j
 	c.Failed = slices.Clone(j.Failed)
@@ -193,35 +204,73 @@ type albumImportPreview struct {
 	SameTitle int `json:"sameTitle"`
 }
 
-func (s *server) importableAlbum(w http.ResponseWriter, r *http.Request) (netease.ImportAlbum, bool) {
+// importableAlbum reads the album to import and the songs of it to import:
+// all of them, or those the songs query names, a comma-separated list of
+// NetEase song IDs (Eric, 2026-11-13).
+func (s *server) importableAlbum(w http.ResponseWriter, r *http.Request) (netease.ImportAlbum, []netease.AlbumTrack, bool) {
 	if !s.canImport(auth.User(r.Context())) {
 		admin.WriteError(w, http.StatusForbidden, "import_forbidden", "没有导入歌曲的权限")
-		return netease.ImportAlbum{}, false
+		return netease.ImportAlbum{}, nil, false
 	}
 	id, ok := onlineID(w, r)
 	if !ok {
-		return netease.ImportAlbum{}, false
+		return netease.ImportAlbum{}, nil, false
+	}
+	picked, ok := pickedSongs(w, r)
+	if !ok {
+		return netease.ImportAlbum{}, nil, false
 	}
 	session, ok := s.neteaseSession(w, r)
 	if !ok {
-		return netease.ImportAlbum{}, false
+		return netease.ImportAlbum{}, nil, false
 	}
 	album, err := s.opts.Netease.AlbumForImport(r.Context(), session.Cookie, id)
 	if err != nil {
 		writeNeteaseError(w, r, err)
-		return album, false
+		return album, nil, false
 	}
-	return album, true
+	if picked == nil {
+		return album, album.Tracks, true
+	}
+	var tracks []netease.AlbumTrack
+	for _, t := range album.Tracks {
+		if picked[t.Song.ID] {
+			tracks = append(tracks, t)
+			delete(picked, t.Song.ID)
+		}
+	}
+	if len(picked) > 0 {
+		admin.WriteError(w, http.StatusBadRequest, "bad_request", "歌曲不在这张专辑中")
+		return album, nil, false
+	}
+	return album, tracks, true
+}
+
+// pickedSongs reads the songs query: nil when it is absent.
+func pickedSongs(w http.ResponseWriter, r *http.Request) (map[int64]bool, bool) {
+	if !r.URL.Query().Has("songs") {
+		return nil, true
+	}
+	picked := map[int64]bool{}
+	for _, part := range strings.Split(r.URL.Query().Get("songs"), ",") {
+		id, err := strconv.ParseInt(strings.TrimSpace(part), 10, 64)
+		if err != nil || id <= 0 {
+			admin.WriteError(w, http.StatusBadRequest, "bad_request", "无效的歌曲")
+			return nil, false
+		}
+		picked[id] = true
+	}
+	return picked, true
 }
 
 func (s *server) previewAlbumImport(w http.ResponseWriter, r *http.Request) {
-	album, ok := s.importableAlbum(w, r)
+	album, tracks, ok := s.importableAlbum(w, r)
 	if !ok {
 		return
 	}
 	ctx := r.Context()
-	ids := make([]int64, len(album.Tracks))
-	for i, t := range album.Tracks {
+	ids := make([]int64, len(tracks))
+	for i, t := range tracks {
 		ids[i] = t.Song.ID
 	}
 	places, err := s.store.ImportedPlacements(ctx, ids)
@@ -229,8 +278,8 @@ func (s *server) previewAlbumImport(w http.ResponseWriter, r *http.Request) {
 		writeStoreError(w, r, err)
 		return
 	}
-	out := albumImportPreview{Title: album.Title, Total: len(album.Tracks)}
-	for _, t := range album.Tracks {
+	out := albumImportPreview{Title: album.Title, Total: len(tracks)}
+	for _, t := range tracks {
 		p, in := places[t.Song.ID]
 		switch {
 		case in:
@@ -261,11 +310,11 @@ func (s *server) previewAlbumImport(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) startAlbumImport(w http.ResponseWriter, r *http.Request) {
-	album, ok := s.importableAlbum(w, r)
+	album, tracks, ok := s.importableAlbum(w, r)
 	if !ok {
 		return
 	}
-	job, start := s.imports.add(userID(r), album)
+	job, start := s.imports.add(userID(r), album, tracks)
 	if start {
 		go s.runImports()
 	}
@@ -301,7 +350,7 @@ const (
 func (s *server) runAlbumImport(job *importJob) {
 	album, artists := albumImportOf(job.album)
 	covers := map[string][]byte{}
-	for _, t := range job.album.Tracks {
+	for _, t := range job.tracks {
 		outcome, err := s.importAlbumSong(job.user, songImport{
 			song: t.Song, album: &album, albumArtists: artists, trackNo: t.TrackNo, discNo: t.DiscNo, covers: covers,
 		})

@@ -189,12 +189,13 @@ const reportError = (error: unknown, fallback: string) => {
 /**
  * 导入在线专辑：先预览数量并确认，再交给服务端在后台导入。
  * @param id 在线专辑 ID
+ * @param songs 只导入专辑中的这些歌曲（批量操作中选中的，Eric，2026-11-13），省略时为整张专辑
  */
-export const importAlbum = async (id: number) => {
+export const importAlbum = async (id: number, songs?: number[]) => {
   const loading = window.$message.loading("正在读取专辑", { duration: 0 });
   let preview;
   try {
-    preview = await source.previewAlbumImport(id);
+    preview = await source.previewAlbumImport(id, songs);
   } catch (error) {
     reportError(error, "读取专辑失败，请重试");
     return;
@@ -202,13 +203,15 @@ export const importAlbum = async (id: number) => {
     loading.destroy();
   }
   const { title, total, toImport, inLibrary, moving, unplayable } = preview;
+  // 选中的歌曲：提示里说“《专辑》中选中的歌曲”，而不是整张专辑
+  const subject = songs ? `《${title}》中选中的歌曲` : `《${title}》`;
   if (toImport === 0 && moving === 0) {
     window.$message.info(
       total === 0
         ? `网易云没有返回《${title}》的歌曲，请稍后重试`
         : unplayable
-          ? `《${title}》没有可以导入的歌曲：已在曲库 ${inLibrary} 首，无法播放 ${unplayable} 首`
-          : `《${title}》的歌曲都已在曲库中`,
+          ? `${subject}没有可以导入的：已在曲库 ${inLibrary} 首，无法播放 ${unplayable} 首`
+          : `${subject}都已在曲库中`,
     );
     return;
   }
@@ -219,7 +222,7 @@ export const importAlbum = async (id: number) => {
     unplayable && `${unplayable} 首无法播放，会跳过`,
   ].filter(Boolean);
   const text = [
-    `《${title}》共 ${total} 首：${counts.join("，")}。`,
+    `${songs ? `《${title}》中选中 ${total} 首` : `《${title}》共 ${total} 首`}：${counts.join("，")}。`,
     preview.target
       ? `歌曲会并入曲库中的专辑《${preview.target.title}》。`
       : "会在曲库中新建这张专辑。",
@@ -230,13 +233,13 @@ export const importAlbum = async (id: number) => {
     );
   text.push("文件由服务器下载，每首歌间隔 5 秒，导入期间可以继续使用。");
   window.$dialog.info({
-    title: "导入专辑到曲库",
+    title: songs ? "导入选中的歌曲到曲库" : "导入专辑到曲库",
     content: lines(text),
     positiveText: "导入",
     negativeText: "取消",
     onPositiveClick: async () => {
       try {
-        const job = await source.importOnlineAlbum(id);
+        const job = await source.importOnlineAlbum(id, songs);
         // 刚点了导入，进度马上出现，不等“正在读取专辑”的提示
         hiddenUntil = 0;
         showProgress(job);

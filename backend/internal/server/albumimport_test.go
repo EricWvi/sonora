@@ -180,14 +180,20 @@ func TestNeteaseAlbumImportNeedsTheGroup(t *testing.T) {
 
 func TestImportQueueKeepsOneJobPerAlbum(t *testing.T) {
 	var q importQueue
-	album := netease.ImportAlbum{ID: 7, Title: "A"}
-	first, start := q.add(1, album)
-	again, startAgain := q.add(1, album)
-	other, _ := q.add(2, album)
+	tracks := []netease.AlbumTrack{{Song: netease.Song{ID: 1}}, {Song: netease.Song{ID: 2}}}
+	album := netease.ImportAlbum{ID: 7, Title: "A", Tracks: tracks}
+	first, start := q.add(1, album, tracks)
+	again, startAgain := q.add(1, album, tracks)
+	other, _ := q.add(2, album, tracks)
 	if !start || startAgain || again.ID != first.ID || other.ID == first.ID {
 		t.Fatalf("first %d %v, again %d %v, other %d", first.ID, start, again.ID, startAgain, other.ID)
 	}
-	if got := q.of(1); len(got) != 1 || got[0].ID != first.ID {
+	// Other songs of the same album are another import.
+	picked, _ := q.add(1, album, tracks[:1])
+	if picked.ID == first.ID || picked.Total != 1 {
+		t.Fatalf("picked: %+v", picked)
+	}
+	if got := q.of(1); len(got) != 2 || got[1].ID != first.ID {
 		t.Fatalf("of: %+v", got)
 	}
 }
@@ -280,5 +286,56 @@ func TestImportFillsNewArtists(t *testing.T) {
 		if got[name] != w {
 			t.Errorf("%s: %s, want %s", name, got[name], w)
 		}
+	}
+}
+
+func TestNeteaseAlbumImportPickedSongs(t *testing.T) {
+	ts, _ := newAlbumImportTest(t)
+	ctx := context.Background()
+	for _, songs := range []string{"", "771,x", "0", "771,999"} {
+		for _, method := range []string{"GET", "POST"} {
+			if rec := ts.do(method, playerAPI+"netease/albums/77/import?songs="+songs, ""); rec.Code != http.StatusBadRequest {
+				t.Errorf("%s songs=%q: %d %s", method, songs, rec.Code, rec.Body)
+			}
+		}
+	}
+
+	// The grey 772 is counted but skipped.
+	preview := decodeBody[albumImportPreview](t, ts.do("GET", playerAPI+"netease/albums/77/import?songs=773,771,772", ""))
+	if preview != (albumImportPreview{Title: "Comp", Total: 3, ToImport: 2, Unplayable: 1}) {
+		t.Fatalf("preview: %+v", preview)
+	}
+	rec := ts.do("POST", playerAPI+"netease/albums/77/import?songs=773,771,772", "")
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("start: %d %s", rec.Code, rec.Body)
+	}
+	job := waitImport(t, ts, decodeBody[importJob](t, rec).ID)
+	if job.State != importDone || job.Total != 3 || job.Done != 3 || job.Created != 2 || job.Unplayable != 1 || len(job.Failed) != 0 {
+		t.Fatalf("job: %+v", job)
+	}
+	album, err := ts.store.ImportTarget(ctx, 77)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The album is the whole one, not a single of the songs picked.
+	if album.Title != "Comp" || album.Single || album.TrackCount != 2 || album.Artists[0].Name != "群星" {
+		t.Fatalf("album: %+v", album)
+	}
+	tracks, err := ts.store.Tracks(ctx, store.TrackQuery{AlbumID: album.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var places []string
+	for _, tr := range tracks.Items {
+		places = append(places, tr.Title+":"+itoa(int64(tr.DiscNo))+"/"+itoa(int64(tr.TrackNo)))
+	}
+	if !slices.Equal(places, []string{"song771:1/2", "song773:2/1"}) {
+		t.Fatalf("tracks: %v", places)
+	}
+
+	// One song of it later joins the same album.
+	if one := decodeBody[albumImportPreview](t, ts.do("GET", playerAPI+"netease/albums/77/import?songs=701", "")); one.Total != 1 ||
+		one.ToImport != 1 || one.Target == nil || one.Target.ID != album.ID {
+		t.Fatalf("one: %+v", one)
 	}
 }

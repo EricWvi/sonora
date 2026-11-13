@@ -95,8 +95,9 @@ export interface DataSource {
   importOnlineSong(
     id: number,
   ): Promise<{ status: "created" | "duplicate"; track: Track }>;
-  previewAlbumImport(id: number): Promise<AlbumImportPreview>;
-  importOnlineAlbum(id: number): Promise<ImportJob>;
+  /** `songs` 只预览、导入专辑中的这些歌曲（网易云歌曲 ID），省略时为整张专辑 */
+  previewAlbumImport(id: number, songs?: number[]): Promise<AlbumImportPreview>;
+  importOnlineAlbum(id: number, songs?: number[]): Promise<ImportJob>;
   importJobs(): Promise<ImportJob[]>;
   onlineLikeIds(): Promise<number[]>;
   /** 在网易云上收藏或取消收藏歌单、专辑，关注或取消关注艺术家 */
@@ -280,8 +281,13 @@ const httpSource: DataSource = {
     (await get<{ url: string }>(`netease/songs/${id}/url`)).url,
   onlineLyrics: (id) => get(`netease/songs/${id}/lyrics`),
   importOnlineSong: (id) => write("POST", `netease/songs/${id}/import`),
-  previewAlbumImport: (id) => get(`netease/albums/${id}/import`),
-  importOnlineAlbum: (id) => write("POST", `netease/albums/${id}/import`),
+  previewAlbumImport: (id, songs) =>
+    get(`netease/albums/${id}/import`, { songs: songs?.join(",") }),
+  importOnlineAlbum: (id, songs) =>
+    write(
+      "POST",
+      withQuery(`netease/albums/${id}/import`, { songs: songs?.join(",") }),
+    ),
   importJobs: async () =>
     (await get<{ items: ImportJob[] }>("netease/imports")).items,
   onlineLikeIds: async () =>

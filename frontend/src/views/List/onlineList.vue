@@ -228,7 +228,7 @@ const afterPublished = () => {
 
 // “更多”照搬 SPlayer：公开隐私歌单、删除歌单（自己创建的）、批量操作、复制分享链接、打开源页面。
 // 不做“刷新缓存”（在线列表不缓存）。艺术家页的批量操作只在歌曲标签下。
-// 专辑另有“导入专辑到曲库”（Sonora 新增，可以导入的用户才有）。
+// 专辑另有“导入专辑到曲库”，批量操作里另有“导入到曲库”（Sonora 新增，可以导入的用户才有）。
 const moreOptions = computed<DropdownOption[]>(() => {
   const type = listType.value;
   const id = listIdNumber.value;
@@ -255,12 +255,15 @@ const moreOptions = computed<DropdownOption[]>(() => {
       show: type !== "artist" || artistTab.value === "songs",
       props: {
         onClick: () =>
-          openBatchList(
-            displayData.value,
-            ownPlaylist.value
-              ? { playlistId: id, onlinePlaylist: true, onRemoved: removeSongs }
-              : {},
-          ),
+          openBatchList(displayData.value, {
+            ...(ownPlaylist.value && {
+              playlistId: id,
+              onlinePlaylist: true,
+              onRemoved: removeSongs,
+            }),
+            ...(type === "album" &&
+              userStore.user?.canImport && { importAlbumId: id }),
+          }),
       },
       icon: renderIcon("Batch"),
     },

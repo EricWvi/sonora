@@ -186,6 +186,7 @@ export const openCopySongInfo = async (song: Track) => {
  * @param options.playlistId 用户歌单 ID，提供“删除选中的歌曲”
  * @param options.onlinePlaylist playlistId 是自己的在线歌单
  * @param options.liked 我喜欢的音乐，提供“取消喜欢”
+ * @param options.importAlbumId 在线专辑 ID，提供“导入到曲库”（只导入选中的歌曲）
  * @param options.onRemoved 歌曲从当前列表移除后调用
  */
 export const openBatchList = async (
@@ -194,6 +195,7 @@ export const openBatchList = async (
     playlistId?: number;
     onlinePlaylist?: boolean;
     liked?: boolean;
+    importAlbumId?: number;
     onRemoved?: (keys: string[]) => void;
   } = {},
 ) => {
@@ -212,6 +214,7 @@ export const openBatchList = async (
         playlistId: options.playlistId,
         onlinePlaylist: options.onlinePlaylist,
         liked: options.liked,
+        importAlbumId: options.importAlbumId,
         onRemoved: options.onRemoved,
       }),
   });

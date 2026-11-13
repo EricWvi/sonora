@@ -1,7 +1,8 @@
 <!-- 批量操作。照搬 SPlayer components/Modal/BatchList.vue：表格勾选、“高级筛选”按序号范围选择。
 与 SPlayer 不同（阶段 7，Eric 确认 2026-11-04）：没有批量下载与删除本地歌曲；操作为
 “添加到歌单”“下一首播放”（Sonora 新增），歌单页另有“删除选中的歌曲”，
-我喜欢的音乐另有“取消喜欢”（Sonora 新增）。 -->
+我喜欢的音乐另有“取消喜欢”（Sonora 新增）。在线专辑另有“导入到曲库”，只导入选中的歌曲
+（Sonora 新增，可以导入的用户才有，Eric 2026-11-13）。 -->
 <template>
   <div class="batch-list">
     <n-data-table
@@ -74,6 +75,25 @@
           </template>
           取消喜欢
         </n-button>
+        <!-- 导入到曲库：只导入选中的歌曲，确认与进度沿用导入专辑 -->
+        <n-button
+          v-if="importAlbumId"
+          :disabled="!checkCount"
+          type="primary"
+          strong
+          secondary
+          @click="
+            importAlbum(
+              importAlbumId,
+              checkSongData.map((song) => song.id),
+            )
+          "
+        >
+          <template #icon>
+            <SvgIcon name="Download" />
+          </template>
+          导入到曲库
+        </n-button>
         <!-- 下一首播放 -->
         <n-button
           :disabled="!checkCount"
@@ -112,6 +132,7 @@ import { isOnline, trackKey } from "@/utils/track";
 import { ApiError, loginUrl, source } from "@/api/source";
 import { openPlaylistAdd } from "@/utils/modal";
 import { deleteSongs } from "@/utils/auth";
+import { importAlbum } from "@/utils/albumImport";
 import { useDataStore } from "@/stores";
 import { usePlayerController } from "@/core/player/PlayerController";
 
@@ -133,6 +154,8 @@ const props = defineProps<{
   onlinePlaylist?: boolean;
   // 我喜欢的音乐：显示“取消喜欢”
   liked?: boolean;
+  // 在线专辑 ID：显示“导入到曲库”
+  importAlbumId?: number;
 }>();
 
 const emit = defineEmits<{
