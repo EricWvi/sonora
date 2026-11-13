@@ -412,8 +412,14 @@ const handleDescriptionClick = () => {
         font-size: 30px;
         font-weight: bold;
         margin-bottom: 12px;
+        // 与 SPlayer 不同：折叠时字号不变，用 scale 缩到 22px 的视觉大小（见 .small）。
+        // 过渡 font-size 每帧都是新字号，macOS 每个新字号都要新建字体，单次 layout
+        // 约 15ms，120Hz 下折叠严重掉帧（Eric，2026-11-13）
+        width: 100%;
+        transform-origin: left top;
         transition:
-          font-size 0.3s var(--n-bezier),
+          transform 0.3s var(--n-bezier),
+          width 0.3s var(--n-bezier),
           color 0.3s var(--n-bezier);
         .n-icon {
           cursor: pointer;
@@ -473,9 +479,17 @@ const handleDescriptionClick = () => {
         left: 0;
         bottom: 0;
         width: 100%;
+        // 与 SPlayer 不同：不用 transition: all，避免过渡 font-size（原因见 .name）
         :deep(.n-button) {
           height: 40px;
-          transition: all 0.3s var(--n-bezier);
+          transition:
+            height 0.3s var(--n-bezier),
+            padding 0.3s var(--n-bezier),
+            color 0.3s var(--n-bezier),
+            background-color 0.3s var(--n-bezier),
+            border-color 0.3s var(--n-bezier),
+            box-shadow 0.3s var(--n-bezier),
+            opacity 0.3s var(--n-bezier);
         }
         .more {
           width: 40px;
@@ -486,7 +500,14 @@ const handleDescriptionClick = () => {
           display: flex;
           align-items: center;
           border-radius: 25px;
-          transition: all 0.3s var(--n-bezier);
+          transition:
+            width 0.3s var(--n-bezier),
+            height 0.3s var(--n-bezier),
+            color 0.3s var(--n-bezier),
+            background-color 0.3s var(--n-bezier),
+            border-color 0.3s var(--n-bezier),
+            box-shadow 0.3s var(--n-bezier),
+            opacity 0.3s var(--n-bezier);
           &.n-input--focus {
             width: 200px;
           }
@@ -552,8 +573,15 @@ const handleDescriptionClick = () => {
         }
       }
       .data {
+        // 30px 缩到 22px 的视觉大小；宽度按比例放大，缩放后仍占满原宽度，省略号位置不变
         .name {
-          font-size: 22px;
+          transform: scale(calc(22 / 30));
+          width: calc(100% * 30 / 22);
+          // 小屏展开时已是 22px，折叠不再缩小
+          @media (max-width: 768px) {
+            transform: none;
+            width: 100%;
+          }
         }
         .menu {
           :deep(.n-button),
