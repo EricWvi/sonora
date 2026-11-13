@@ -5,9 +5,9 @@
 useElementSize 测 .song-list 高度并绑定进模板，详情页折叠动画期间测量值每帧变化，导致整棵
 SongList 每帧重渲染（一次折叠约 256 次 SongCard 更新）而掉帧；内联高度本身是承重的（内容多于
 视口的页面靠它约束 .song-list，纯 CSS height:100% 会跟着内容增长撑破布局），不能去掉，改为在
-ResizeObserver 回调里直接写 wrapper 的 style，测量不再经过响应式。模板不输出 height（保持
-undefined）：patchStyle 对样式对象是无条件写入，重渲染会把命令式高度覆盖回模板字面量（切回
-标签页后设置同步 patch store 触发过一次，列表高度卡死在 0）；挂载与重挂的 0px 也由 watch 写。
+ResizeObserver 回调里直接写 wrapper 的 style，测量不再经过响应式。模板的样式对象里不出现
+height 这个 key：patchStyle 每次重渲染都会写入样式对象的每个 key（undefined 写成空串），
+'0px' 会把高度卡死在 0，undefined 会清空退回 height:100%，只有不出现才不被覆盖。
 传了数值 height 的页面仍由模板绑定（折叠时靠 SCSS 的 height 过渡平滑），height="auto" 不变。 -->
 <template>
   <Transition name="fade">
@@ -16,17 +16,7 @@ undefined）：patchStyle 对样式对象是无条件写入，重渲染会把命
         <div
           ref="virtualWrapperRef"
           :key="listKey"
-          :style="{
-            height:
-              height !== undefined
-                ? height === 'auto'
-                  ? 'auto'
-                  : `${height}px`
-                : undefined,
-            transition: disableHeightTransition
-              ? 'transform 0.3s, opacity 0.3s'
-              : undefined,
-          }"
+          :style="wrapperStyle"
           class="virtual-list-wrapper"
         >
           <!-- 悬浮顶栏 -->
@@ -453,22 +443,34 @@ const hasPlaySong = computed(() => {
 // 虚拟列表容器。未传 height 时由下面的 ResizeObserver 命令式写高度
 const virtualWrapperRef = ref<HTMLElement | null>(null);
 
+// wrapper 的内联样式。未传 height 时样式对象里不能出现 height 这个 key：
+// Vue 的 patchStyle 每次重渲染都会无条件写入样式对象的每个 key，值为
+// undefined/null 时写成空串（prev 里有、next 里为 null 的 key 同样清空），
+// 所以 height: '0px' 会把命令式高度冲回 0，height: undefined 会把它清空、
+// 退回 SCSS 的 height:100%（内容多于视口时被撑破）。只有完全不出现，
+// patchStyle 才不碰它。
+const wrapperStyle = computed(() => ({
+  ...(props.height !== undefined && {
+    height: props.height === "auto" ? "auto" : `${props.height}px`,
+  }),
+  transition: props.disableHeightTransition
+    ? "transform 0.3s, opacity 0.3s"
+    : undefined,
+}));
+
 // 列表元素高度测量。未传 height 时把测量值直接写进 wrapper 的内联高度，
 // 不经过响应式：绑定进模板会让折叠动画期间每帧的测量触发整棵 SongList
-// 重渲染（见文件头注释）。内联高度由这里独占：挂载与换 key 重挂时先写
-// 0px（打断“wrapper 高度跟着 .song-list 内容增长”的循环），之后由测量
-// 接管。模板不再输出 height（undefined），否则组件因 store 改动重渲染时
-// Vue 的 patchStyle 会无条件把内联高度写回模板字面量（如 '0px'），覆盖
-// 命令式写入；而测量值没变不触发本 watch，高度就卡死在 0（标签页切回后
-// 设置同步 patch store 即触发，见 History 页列表消失的问题）。height="auto"
-// 时停止测量，交给页面滚动。
+// 重渲染（见文件头注释）。内联高度由这里独占（见 wrapperStyle）：
+// virtualWrapperRef 绑定（挂载或换 key 重挂）时写入当前测量值，测量值为
+// 0 时写 0px，打断“wrapper 高度跟着 .song-list 内容增长”的循环。height
+// 从数值切回 undefined 时 patchStyle 先清空，post watch 随后补写。
+// height="auto" 时停止测量，交给页面滚动。
 const { height: songListHeight, stop: stopCalcHeight } =
   useElementSize(songListRef);
 watch(
   [songListHeight, virtualWrapperRef, () => props.height],
   ([h, wrapper, height]) => {
     if (height !== undefined || !wrapper) return;
-    // 初次绑定与换 key 后的新元素先归零（打断内容撑高循环），h 为 0 时保持 0
     wrapper.style.height = h ? `${h}px` : "0px";
   },
   { flush: "post" },
