@@ -259,6 +259,9 @@ fun MainUI(
                                 },
                             color = NavigationBarDefaults.containerColor
                         ) {
+                            val onSearchIconDoubleTap = remember(playerViewModel) {
+                                { playerViewModel.onSearchNavIconDoubleTapped() }
+                            }
                             PlayerInternalNavigationBar(
                                 navController = navController,
                                 navItems = MainNavItems,
@@ -266,6 +269,7 @@ fun MainUI(
                                 navBarStyle = navBarStyle,
                                 compactMode = navBarCompactMode,
                                 bottomBarPadding = bottomBarPadding,
+                                onSearchIconDoubleTap = onSearchIconDoubleTap,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }

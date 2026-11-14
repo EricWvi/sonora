@@ -13,6 +13,8 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import top.onlyquant.sonora.data.auth.AuthRepository
 import top.onlyquant.sonora.data.auth.SessionStore
+import top.onlyquant.sonora.data.model.Album
+import top.onlyquant.sonora.data.model.Artist
 import top.onlyquant.sonora.data.model.Song
 
 /** A failed player API call; [status] is the HTTP status, 0 when the server was not reached. */
@@ -47,6 +49,30 @@ class SonoraApi @Inject constructor(
         return get("tracks?offset=$offset&limit=$limit&sort=$sort", Page.serializer(Track.serializer()))
             .items.map { it.toSong(server) }
     }
+
+    /*
+     * Search (docs/api.md, 通用约定): the first page of each list with `q`, by relevance. Albums
+     * and artists come in the shapes library/changes sends, so they convert the same way.
+     */
+    suspend fun searchSongs(q: String, limit: Int = SEARCH_LIMIT): List<Song> {
+        val server = sessions.current()?.server ?: throw ApiException(401, "未登录")
+        return get("tracks?q=${encode(q)}&limit=$limit", Page.serializer(Track.serializer()))
+            .items.map { it.toSong(server) }
+    }
+
+    suspend fun searchAlbums(q: String, limit: Int = SEARCH_LIMIT): List<Album> {
+        val server = sessions.current()?.server ?: throw ApiException(401, "未登录")
+        return get("albums?q=${encode(q)}&limit=$limit", Page.serializer(ChangedAlbum.serializer()))
+            .items.map { it.toEntity().toAlbum(server) }
+    }
+
+    suspend fun searchArtists(q: String, limit: Int = SEARCH_LIMIT): List<Artist> {
+        val server = sessions.current()?.server ?: throw ApiException(401, "未登录")
+        return get("artists?q=${encode(q)}&limit=$limit", Page.serializer(ChangedArtist.serializer()))
+            .items.map { it.toEntity().toArtist(server) }
+    }
+
+    private fun encode(q: String): String = java.net.URLEncoder.encode(q, "UTF-8")
 
     /** One page of `GET library/changes` after [since] (docs/api.md#曲库变更). */
     suspend fun libraryChanges(since: Long, limit: Int = 500): LibraryChanges =
@@ -108,6 +134,11 @@ class SonoraApi @Inject constructor(
 
     @Serializable
     private data class Error(val error: String)
+
+    private companion object {
+        /** The list maximum (docs/api.md, 分页); the original lists every match. */
+        const val SEARCH_LIMIT = 500
+    }
 
     @Serializable
     private data class HistoryItem(val track: Track)

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Search strings, from the zh-CN strings of PixelPlayerOSS v0.4.0-alpha.53 (GPL-3.0). -->
+<resources>
+    <string name="cd_artist_format">艺术家：%1$s</string>
+    <string name="cd_artist_icon">艺术家</string>
+    <string name="cd_clear_search_query">清空搜索</string>
+    <string name="cd_no_search_results">无搜索结果</string>
+    <string name="cd_play_album">播放专辑</string>
+    <string name="cd_play_artist">播放该艺术家</string>
+    <string name="cd_search_icon">搜索</string>
+    <string name="search_filter_all">全部</string>
+    <string name="search_no_results_for_query">未找到“%1$s”相关内容</string>
+    <string name="search_no_results_found">没有匹配结果。</string>
+    <string name="search_nothing_found">什么都没找到</string>
+    <string name="search_placeholder">搜索…</string>
+    <string name="search_try_different_or_filters">尝试更换关键词，或检查筛选条件。</string>
+</resources>

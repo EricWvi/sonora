@@ -22,7 +22,6 @@ import top.onlyquant.sonora.data.auth.AuthRepository
 import top.onlyquant.sonora.presentation.auth.AuthViewModel
 import top.onlyquant.sonora.presentation.auth.LoginScreen
 import top.onlyquant.sonora.presentation.auth.SessionState
-import top.onlyquant.sonora.presentation.main.BlankTab
 import top.onlyquant.sonora.presentation.main.MainUI
 import top.onlyquant.sonora.presentation.navigation.AppNavigation
 import top.onlyquant.sonora.presentation.viewmodel.LibraryViewModel
@@ -74,7 +73,6 @@ class MainActivity : ComponentActivity() {
                                 playerViewModel = playerViewModel,
                                 navController = navController,
                                 paddingValues = padding,
-                                searchContent = { BlankTab() },
                                 onSignOut = auth::signOut,
                             )
                         }

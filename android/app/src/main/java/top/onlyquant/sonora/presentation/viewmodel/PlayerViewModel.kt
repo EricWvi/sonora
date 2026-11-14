@@ -3,6 +3,9 @@ package top.onlyquant.sonora.presentation.viewmodel
 import android.content.ComponentName
 import android.content.Context
 import androidx.compose.animation.core.Animatable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
@@ -55,6 +58,7 @@ import top.onlyquant.sonora.R
 import top.onlyquant.sonora.data.model.Album
 import top.onlyquant.sonora.data.model.Artist
 import top.onlyquant.sonora.data.model.LibraryTabId
+import top.onlyquant.sonora.data.model.SearchFilterType
 import top.onlyquant.sonora.data.model.SortOption
 import top.onlyquant.sonora.data.repository.LibraryRepository
 import top.onlyquant.sonora.presentation.selection.flattenDistinctGroups
@@ -171,6 +175,7 @@ class PlayerViewModel @Inject constructor(
     private val libraryStateHolder: LibraryStateHolder,
     private val libraryTabsStateHolder: LibraryTabsStateHolder,
     val multiSelectionStateHolder: MultiSelectionStateHolder,
+    private val searchStateHolder: SearchStateHolder,
     private val dispatchers: DispatcherProvider,
     // Sonora: Roaming FM (see the section of that name below).
     private val api: SonoraApi,
@@ -380,6 +385,24 @@ class PlayerViewModel @Inject constructor(
                 _playerUiState.value.currentPlaybackQueue.firstOrNull { it.id == songId }?.title
             }
         )
+
+        searchStateHolder.initialize(viewModelScope)
+
+        viewModelScope.launch {
+            combine(
+                searchStateHolder.searchResults,
+                searchStateHolder.selectedSearchFilter,
+            ) { results, filter ->
+                results to filter
+            }.collect { (results, filter) ->
+                _playerUiState.update {
+                    it.copy(
+                        searchResults = results,
+                        selectedSearchFilter = filter,
+                    )
+                }
+            }
+        }
 
         playlistDismissUndoStateHolder.observeUndoStateAgainstPlayback(
             scope = viewModelScope,
@@ -794,6 +817,54 @@ class PlayerViewModel @Inject constructor(
             loadAlbums = { libraryStateHolder.startObservingLibraryData() },
             loadArtists = { libraryStateHolder.startObservingLibraryData() }
         )
+    }
+
+    // ------------------------
+    // Search (the original's search section; Sonora: without the search history)
+    // ------------------------
+
+    private val _searchNavDoubleTapEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val searchNavDoubleTapEvents = _searchNavDoubleTapEvents.asSharedFlow()
+
+    fun onSearchNavIconDoubleTapped() {
+        _searchNavDoubleTapEvents.tryEmit(Unit)
+    }
+
+    var searchQuery by mutableStateOf("")
+        private set
+
+    fun updateSearchQuery(query: String) {
+        searchQuery = query
+    }
+
+    fun updateSearchFilter(filterType: SearchFilterType) {
+        searchStateHolder.updateSearchFilter(filterType)
+    }
+
+    fun performSearch(query: String) {
+        searchStateHolder.performSearch(query)
+    }
+
+    /** As the original; the repository orders the artist's songs as the artist page does. */
+    fun playArtist(artist: Artist) {
+        Timber.tag("ShuffleDebug").d("playArtist called for artist: ${artist.name}")
+        viewModelScope.launch {
+            try {
+                val songsList: List<Song> = withContext(dispatchers.io) {
+                    libraryRepository.songsForArtist(artist.id)
+                }
+
+                if (songsList.isNotEmpty()) {
+                    playSongs(songsList, songsList.first(), artist.name, null)
+                    _isSheetVisible.value = true
+                } else {
+                    Timber.tag("PlayerViewModel").w("Artist '${artist.name}' has no playable songs.")
+                }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.tag("PlayerViewModel").e(e, "Error playing artist ${artist.name}")
+            }
+        }
     }
 
     fun sendToast(message: String) {
@@ -2073,6 +2144,7 @@ class PlayerViewModel @Inject constructor(
         libraryStateHolder.onCleared(ownerScope)
         themeStateHolder.onCleared(ownerScope)
         sleepTimerStateHolder.onCleared(ownerScope)
+        searchStateHolder.onCleared(ownerScope)
         queueUndoStateHolder.onCleared()
         playlistDismissUndoStateHolder.onCleared()
     }

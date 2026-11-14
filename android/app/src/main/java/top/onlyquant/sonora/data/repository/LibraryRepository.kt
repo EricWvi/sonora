@@ -32,6 +32,14 @@ import top.onlyquant.sonora.data.database.SongEntity
 import top.onlyquant.sonora.data.model.Album
 import top.onlyquant.sonora.data.model.Artist
 import top.onlyquant.sonora.data.model.Song
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.flow
+import top.onlyquant.sonora.data.database.parseArtistsJson
+import top.onlyquant.sonora.data.model.SearchFilterType
+import top.onlyquant.sonora.data.model.SearchResultItem
+import top.onlyquant.sonora.data.model.SortOption
 
 /**
  * The library on the device. Sonora: in the original, MusicRepository reads Room and the
@@ -166,6 +174,65 @@ class LibraryRepository @Inject constructor(
         val server = sessions.current()?.server ?: return emptyList()
         return dao.getAllSongs(sortOrder).map { it.toSong(server) }
     }
+
+    /**
+     * The original's MusicRepository.searchAll: the matches of [query] for [filterType], songs,
+     * then albums, then artists, each by relevance. Sonora: asks the server (Eric, 2026-11-08) and
+     * falls back to the local copy, ranked the same way, when the server cannot answer. Albums
+     * include singles, as the Web player's search. Playlists come with step 5.
+     */
+    fun searchAll(query: String, filterType: SearchFilterType): Flow<List<SearchResultItem>> = flow {
+        if (query.isBlank()) {
+            emit(emptyList())
+            return@flow
+        }
+        val wantSongs = filterType == SearchFilterType.ALL || filterType == SearchFilterType.SONGS
+        val wantAlbums = filterType == SearchFilterType.ALL || filterType == SearchFilterType.ALBUMS
+        val wantArtists = filterType == SearchFilterType.ALL || filterType == SearchFilterType.ARTISTS
+        val results = try {
+            coroutineScope {
+                val songs = async { if (wantSongs) api.searchSongs(query) else emptyList() }
+                val albums = async { if (wantAlbums) api.searchAlbums(query) else emptyList() }
+                val artists = async { if (wantArtists) api.searchArtists(query) else emptyList() }
+                searchResults(songs.await(), albums.await(), artists.await())
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.tag(TAG).w(e, "Search on the server failed; searching the local library")
+            searchLocally(query, wantSongs, wantAlbums, wantArtists)
+        }
+        emit(results)
+    }
+
+    private suspend fun searchLocally(
+        query: String,
+        wantSongs: Boolean,
+        wantAlbums: Boolean,
+        wantArtists: Boolean,
+    ): List<SearchResultItem> {
+        val server = sessions.current()?.server ?: return emptyList()
+        // The server's tiers (store.Tracks, Albums, Artists) over the lists in their default order.
+        val songs = if (!wantSongs) emptyList() else rankLocalMatches(
+            query, dao.getAllSongs(SortOption.SongDefaultOrder.storageKey)
+        ) { s -> listOf(listOf(s.title), listOf(s.albumName) + parseArtistsJson(s.artistsJson).map { it.name }) }
+        val albums = if (!wantAlbums) emptyList() else rankLocalMatches(
+            query, dao.getAlbums(SortOption.AlbumTitleAZ.storageKey, hideSingles = false).first()
+        ) { a -> listOf(listOf(a.title), parseArtistsJson(a.artistsJson).map { it.name }) }
+        val artists = if (!wantArtists) emptyList() else rankLocalMatches(
+            query, dao.getArtists(SortOption.ArtistNameAZ.storageKey).first()
+        ) { a -> listOf(listOf(a.name)) }
+        return searchResults(
+            songs.map { it.toSong(server) },
+            albums.map { it.toAlbum(server) },
+            artists.map { it.toArtist(server) },
+        )
+    }
+
+    private fun searchResults(songs: List<Song>, albums: List<Album>, artists: List<Artist>) =
+        songs.map { SearchResultItem.SongItem(it) } +
+            albums.map { SearchResultItem.AlbumItem(it) } +
+            artists.map { SearchResultItem.ArtistItem(it) }
 
     private companion object {
         const val TAG = "LibraryRepository"

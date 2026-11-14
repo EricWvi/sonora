@@ -23,14 +23,15 @@ import top.onlyquant.sonora.presentation.screens.AlbumDetailScreen
 import top.onlyquant.sonora.presentation.screens.ArtistDetailScreen
 import top.onlyquant.sonora.presentation.screens.HomeScreen
 import top.onlyquant.sonora.presentation.screens.LibraryScreen
+import top.onlyquant.sonora.presentation.screens.SearchScreen
 import top.onlyquant.sonora.presentation.viewmodel.PlayerViewModel
 
 /**
  * The navigation graph, from AppNavigation in PixelPlayerOSS v0.4.0-alpha.53 (GPL-3.0). Sonora:
  * only the destinations that exist so far, with the original's transitions: the three main tabs,
  * the album page and the artist page. The original starts on the launch tab from the settings;
- * Sonora always starts on Home. Search is passed in until its screen is copied (step 4), and there
- * is no sidebar drawer (Eric, 2026-11-11), so Home has no onOpenSidebar.
+ * Sonora always starts on Home, and there is no sidebar drawer (Eric, 2026-11-11), so Home has no
+ * onOpenSidebar.
  */
 @OptIn(UnstableApi::class)
 @Composable
@@ -38,7 +39,6 @@ fun AppNavigation(
     playerViewModel: PlayerViewModel,
     navController: NavHostController,
     paddingValues: PaddingValues,
-    searchContent: @Composable () -> Unit,
     onSignOut: () -> Unit,
 ) {
     NavHost(
@@ -117,7 +117,12 @@ fun AppNavigation(
             },
         ) {
             ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
-                searchContent()
+                SearchScreen(
+                    paddingValues = paddingValues,
+                    playerViewModel = playerViewModel,
+                    navController = navController,
+                    onSignOut = onSignOut
+                )
             }
         }
         composable(
