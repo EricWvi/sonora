@@ -125,6 +125,8 @@ object MediaItemBuilder {
     const val EXTERNAL_EXTRA_SAMPLE_RATE = EXTERNAL_EXTRA_PREFIX + "SAMPLE_RATE"
     const val EXTERNAL_EXTRA_FILE_PATH = EXTERNAL_EXTRA_PREFIX + "FILE_PATH"
     const val EXTERNAL_EXTRA_NAVIDROME_ID = EXTERNAL_EXTRA_PREFIX + "NAVIDROME_ID"
+    /** Sonora: [Song.gainDb], absent when null. ReplayGainProcessor reads it. */
+    const val EXTERNAL_EXTRA_GAIN_DB = EXTERNAL_EXTRA_PREFIX + "GAIN_DB"
 
     fun build(song: Song): MediaItem {
         return MediaItem.Builder()
@@ -281,6 +283,7 @@ object MediaItemBuilder {
             putInt(EXTERNAL_EXTRA_SAMPLE_RATE, song.sampleRate ?: 0)
             putString(EXTERNAL_EXTRA_FILE_PATH, song.path)
             song.navidromeId?.let { putString(EXTERNAL_EXTRA_NAVIDROME_ID, it) }
+            song.gainDb?.let { putDouble(EXTERNAL_EXTRA_GAIN_DB, it) }
         }
 
         metadataBuilder.setExtras(extras)

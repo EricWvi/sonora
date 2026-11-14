@@ -4,6 +4,7 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.os.Bundle
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
@@ -29,7 +30,8 @@ import top.onlyquant.sonora.data.service.player.DualPlayerEngine
 
 /**
  * Reduced from MusicService in PixelPlayerOSS v0.4.0-alpha.53 (GPL-3.0). Keeps the session wiring
- * around DualPlayerEngine and the sleep timer (its custom session commands and player events);
+ * around DualPlayerEngine, the sleep timer (its custom session commands and player events) and
+ * ReplayGain, which applies the server's loudness gain;
  * widgets, the equalizer, stats, queue persistence, the other custom session commands and the
  * custom notification layout are left out, and come back only when needed.
  */
@@ -53,6 +55,13 @@ class MusicService : MediaSessionService() {
         )
     }
 
+    private val replayGainProcessor by lazy {
+        ReplayGainProcessor(
+            engine = engine,
+            currentSessionMediaItem = { mediaSession?.player?.currentMediaItem },
+        )
+    }
+
     /** The player [playerListener] is on; the engine swaps players for crossfades. */
     private var listenedPlayer: Player? = null
 
@@ -61,16 +70,63 @@ class MusicService : MediaSessionService() {
         listenedPlayer?.removeListener(playerListener)
         newPlayer.addListener(playerListener)
         listenedPlayer = newPlayer
+        replayGainProcessor.prepareForTransition(newPlayer)
         applyPlaybackSpeed(newPlayer)
     }
 
+    /*
+     * Sonora: the original also publishes the incoming crossfade player to the session here;
+     * that comes with TransitionController, which is not copied yet (nothing starts a crossfade).
+     */
+    private val transitionDisplayPlayerListener: (Player) -> Unit = { displayPlayer ->
+        replayGainProcessor.prepareForTransition(displayPlayer)
+    }
+
+    private val transitionFinishedListener: () -> Unit = {
+        replayGainProcessor.onTransitionFinished()
+    }
+
     private val playerListener = object : Player.Listener {
+        override fun onVolumeChanged(volume: Float) {
+            replayGainProcessor.onPlayerVolumeChanged(volume)
+        }
+
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (isPlaying) {
+                replayGainProcessor.reapplyLastAppliedVolume(mediaSession?.player ?: engine.masterPlayer)
+            }
+        }
+
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (playbackState == Player.STATE_ENDED) sleepTimerController.onPlaybackEnded()
         }
 
+        override fun onPositionDiscontinuity(
+            oldPosition: Player.PositionInfo,
+            newPosition: Player.PositionInfo,
+            reason: Int,
+        ) {
+            if (reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION ||
+                reason == Player.DISCONTINUITY_REASON_SEEK
+            ) {
+                val oldMediaId = oldPosition.mediaItem?.mediaId
+                val newMediaId = newPosition.mediaItem?.mediaId
+                if (oldMediaId != null && oldMediaId == newMediaId) {
+                    replayGainProcessor.reapplyLastAppliedVolume(engine.masterPlayer)
+                } else {
+                    replayGainProcessor.apply(mediaSession?.player?.currentMediaItem)
+                }
+            }
+        }
+
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             sleepTimerController.onMediaItemTransition(mediaItem, reason)
+            replayGainProcessor.apply(mediaSession?.player?.currentMediaItem)
+        }
+
+        override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
+            val activePlayer = mediaSession?.player ?: engine.masterPlayer
+            replayGainProcessor.onMediaMetadataChanged(activePlayer.currentMediaItem)
         }
 
         override fun onRepeatModeChanged(repeatMode: Int) {
@@ -124,7 +180,10 @@ class MusicService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
         engine.initialize()
+        replayGainProcessor.captureUserVolume(engine.masterPlayer.volume)
         engine.addPlayerSwapListener(playerSwapListener)
+        engine.addTransitionDisplayPlayerListener(transitionDisplayPlayerListener)
+        engine.addTransitionFinishedListener(transitionFinishedListener)
         engine.masterPlayer.addListener(playerListener)
         listenedPlayer = engine.masterPlayer
         mediaSession = MediaSession.Builder(this, engine.masterPlayer)
@@ -148,6 +207,13 @@ class MusicService : MediaSessionService() {
                 applyPlaybackSpeed(mediaSession?.player ?: engine.masterPlayer)
             }
         }
+        // As in the original: the switch takes effect on the current song at once.
+        serviceScope.launch {
+            userPreferencesRepository.replayGainEnabledFlow.collect { enabled ->
+                replayGainProcessor.setEnabled(enabled)
+                replayGainProcessor.apply(mediaSession?.player?.currentMediaItem)
+            }
+        }
         // As in the original: the monochrome player glyph in the status bar.
         setMediaNotificationProvider(
             DefaultMediaNotificationProvider.Builder(this).build().also {
@@ -168,6 +234,8 @@ class MusicService : MediaSessionService() {
         listenedPlayer?.removeListener(playerListener)
         listenedPlayer = null
         engine.removePlayerSwapListener(playerSwapListener)
+        engine.removeTransitionDisplayPlayerListener(transitionDisplayPlayerListener)
+        engine.removeTransitionFinishedListener(transitionFinishedListener)
         mediaSession?.release()
         mediaSession = null
         engine.release()

@@ -17,7 +17,7 @@ import androidx.room.RoomDatabase
         SongArtistCrossRef::class,
         LibraryStateEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 abstract class SonoraDatabase : RoomDatabase() {

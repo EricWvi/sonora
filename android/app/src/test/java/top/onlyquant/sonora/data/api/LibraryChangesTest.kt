@@ -72,5 +72,28 @@ class LibraryChangesTest {
         assertThat(song.artistId).isEqualTo(-1)
         assertThat(song.artists).isEmpty()
         assertThat(song.albumArtUriString).isNull()
+        assertThat(song.gainDb).isNull()
+    }
+
+    @Test
+    fun `the loudness gain survives the local copy`() {
+        val changes = json.decodeFromString(
+            LibraryChanges.serializer(),
+            """{"cursor":1,"tracks":[{"id":7,"title":"Red Flag","gainDb":-0.58}]}""",
+        )
+        val entity = changes.toPage("http://s").songs.single()
+        assertThat(entity.gainDb).isEqualTo(-0.58)
+        assertThat(entity.toSong("http://s").gainDb).isEqualTo(-0.58)
+    }
+
+    @Test
+    fun `a track from the player API keeps its loudness gain`() {
+        val track = json.decodeFromString(
+            Track.serializer(),
+            """{"id":7,"title":"Three Laps Is A Lifetime","gainDb":-3.04}""",
+        )
+        assertThat(track.toSong("http://s").gainDb).isEqualTo(-3.04)
+        val unmeasured = json.decodeFromString(Track.serializer(), """{"id":8,"title":"x","gainDb":null}""")
+        assertThat(unmeasured.toSong("http://s").gainDb).isNull()
     }
 }

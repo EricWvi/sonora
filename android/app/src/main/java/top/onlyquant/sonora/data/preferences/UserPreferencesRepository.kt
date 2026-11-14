@@ -41,6 +41,7 @@ class UserPreferencesRepository @Inject constructor(
         val IS_ALBUMS_LIST_VIEW = booleanPreferencesKey("is_albums_list_view")
         val ARTIST_ALBUMS_COLLAPSED_BY_DEFAULT =
                 booleanPreferencesKey("artist_albums_collapsed_by_default")
+        val REPLAYGAIN_ENABLED = booleanPreferencesKey("replaygain_enabled")
     }
 
     suspend fun setRepeatMode(@Player.RepeatMode mode: Int) {
@@ -80,6 +81,22 @@ class UserPreferencesRepository @Inject constructor(
     suspend fun setPlaybackSpeed(speed: Float) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.PLAYBACK_SPEED] = PlaybackSpeedUtils.normalize(speed)
+        }
+    }
+
+    /**
+     * Sonora: on by default (the original's is off), as the Web player's 音量平衡 switch. The
+     * original's album-gain switch is left out, since the server sends one gain per song.
+     * No settings screen yet; the switch joins the original's 音量标准化(ReplayGain) group there.
+     */
+    val replayGainEnabledFlow: Flow<Boolean> =
+        dataStore.data.map { preferences ->
+            preferences[PreferencesKeys.REPLAYGAIN_ENABLED] ?: true
+        }.distinctUntilChanged()
+
+    suspend fun setReplayGainEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.REPLAYGAIN_ENABLED] = enabled
         }
     }
 

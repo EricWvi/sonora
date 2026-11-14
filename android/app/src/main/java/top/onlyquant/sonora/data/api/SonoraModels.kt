@@ -27,6 +27,8 @@ data class Track(
     val format: String = "",
     val cover: Cover? = null,
     val hasLyrics: Boolean = false,
+    /** Loudness normalization gain in dB, or null to play as is (docs/api.md#音量均衡). */
+    val gainDb: Double? = null,
 )
 
 @Serializable
@@ -66,6 +68,7 @@ fun Track.toSong(server: String): Song {
         mimeType = formatMimeType(format),
         bitrate = null,
         sampleRate = null,
+        gainDb = gainDb,
     )
 }
 

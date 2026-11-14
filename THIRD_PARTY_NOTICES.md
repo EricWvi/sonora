@@ -84,6 +84,7 @@
 
 - `data/service/player/`：`DualPlayerEngine`（去掉云端流代理与 URI 解析）、`QueueWindowPolicy`、`AudioDecoderPolicy`、`HiFiCapabilityChecker`、`HiResSampleRateCapAudioProcessor`、`SurroundDownmixProcessor`、`UnsupportedAudioListener`，以及对应的单元测试。
 - `data/service/MusicService.kt`：按原版缩减，只保留会话部分。
+- `data/service/ReplayGainProcessor.kt`（阶段 8 第 4 项，音量均衡）：按原版改编，增益取自服务端的 `gainDb`，不读文件标签，去掉专辑增益开关。
 - `data/model/AudioOutputMode.kt`、`data/model/Transition.kt`（去掉 `TransitionRule`）、`utils/Envelope.kt`。
 - `android/app/build.gradle.kts`、`android/gradle/`：构建配置与依赖版本取自原版，Gradle Wrapper 复制自原版。
 - `ui/theme/`：`Color.kt`、`Shape.kt`、`Type.kt` 照搬，`Theme.kt` 去掉 AMOLED 预设与正在播放取色的覆盖。

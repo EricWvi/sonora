@@ -47,6 +47,8 @@ data class SongEntity(
     @ColumnInfo(name = "year") val year: Int,
     @ColumnInfo(name = "format") val format: String,
     @ColumnInfo(name = "has_lyrics") val hasLyrics: Boolean,
+    /** The server's loudness normalization gain in dB; null when not measured. */
+    @ColumnInfo(name = "gain_db") val gainDb: Double?,
     @ColumnInfo(name = "sort_key") val sortKey: String,
 )
 

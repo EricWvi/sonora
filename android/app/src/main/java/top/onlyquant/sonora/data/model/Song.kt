@@ -37,6 +37,11 @@ data class Song(
     val sampleRate: Int?,
     val navidromeId: String? = null,
     val jellyfinId: String? = null,
+    /**
+     * Sonora: the server's loudness normalization gain in dB (docs/api.md#音量均衡), in place of
+     * the ReplayGain tags the original reads from local files; null plays the song as is.
+     */
+    val gainDb: Double? = null,
 ) : Parcelable {
     /**
      * Returns the display string for artists.
