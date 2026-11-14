@@ -5,6 +5,8 @@ import type { ThemeColorType } from "@/types/color";
  * 设置。字段名、含义与默认值照搬 SPlayer stores/setting.ts，只保留阶段 2 确定保留的设置项
  * （见 docs/phase/phase-2-player-baseline.md 的“设置”）；在线服务、下载、本地歌曲等不做的项不迁入。
  * 阶段 5 补充了全屏播放器元素、歌单界面元素与右键菜单的显示设置，去掉动态封面与音量平衡。
+ * 音量平衡在 2026-11-14 加回，与 SPlayer 不同（Eric，2026-11-14）：默认开启，增益由服务端按响度算好，
+ * 没有平衡模式（replayGainMode）。
  * 除标为“设备”的项外都按用户保存在服务端（见 core/settings/sync.ts）。
  */
 export interface SettingState {
@@ -238,6 +240,8 @@ export interface SettingState {
   playDevice: "default" | string;
   /** 音频延迟手动补偿（毫秒，设备） */
   audioDelayCompensation: number;
+  /** 是否启用 ReplayGain (音量平衡) */
+  enableReplayGain: boolean;
 
   // ---- 常规 ----
   /** 显示搜索历史 */
@@ -379,6 +383,7 @@ export const defaultSettingState = (): SettingState => ({
   songVolumeFadeTime: 300,
   playDevice: "default",
   audioDelayCompensation: 0,
+  enableReplayGain: true,
   showSearchHistory: true,
   enableSearchKeyword: true,
   searchInputBehavior: "normal",

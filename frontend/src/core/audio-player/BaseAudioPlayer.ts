@@ -21,7 +21,9 @@ const SEEK_FADE_TIME = 0.05;
  * 音频播放器抽象基类
  *
  * 照搬 SPlayer core/audio-player/BaseAudioPlayer.ts：管理 AudioContext、音量增益、EQ 连接、
- * 以及通用的淡入淡出/Seek 逻辑。去掉 ReplayGain、倍速、延迟补偿与自动混音的滤波。
+ * 以及通用的淡入淡出/Seek 逻辑。去掉倍速、延迟补偿与自动混音的滤波。
+ * ReplayGain 与 SPlayer 不同（Eric，2026-11-14）：SPlayer 把它乘进主音量节点，随淡入淡出一起变化；
+ * Sonora 施加在输入节点上，与音量、淡入淡出互不影响。
  */
 export abstract class BaseAudioPlayer
   extends TypedEventTarget<AudioEventMap>
@@ -40,6 +42,8 @@ export abstract class BaseAudioPlayer
   protected isInitialized = false;
   /** 目标音量 (0-1) */
   protected volume: number = 1;
+  /** ReplayGain 增益 (1.0 = 0dB) */
+  protected replayGain: number = 1.0;
 
   /** 音频与歌词同步补偿（毫秒） */
   protected audioDelayCompensation = 0;
@@ -58,7 +62,7 @@ export abstract class BaseAudioPlayer
     try {
       this.audioCtx = getSharedAudioContext();
       this.inputNode = this.audioCtx.createGain();
-      this.inputNode.gain.value = 1; // 直通
+      this.inputNode.gain.value = this.replayGain;
       this.gainNode = this.audioCtx.createGain();
       this.effectManager = new AudioEffectManager(this.audioCtx);
 
@@ -313,6 +317,18 @@ export abstract class BaseAudioPlayer
         safeStartTime + duration,
       );
     }
+  }
+
+  /**
+   * 设置 ReplayGain 增益
+   * @param gain 线性增益值
+   */
+  public setReplayGain(gain: number) {
+    this.replayGain = gain;
+    if (!this.inputNode || !this.audioCtx) return;
+    // 短暂平滑，播放中切换开关时不出爆音
+    this.inputNode.gain.cancelScheduledValues(this.audioCtx.currentTime);
+    this.inputNode.gain.setTargetAtTime(gain, this.audioCtx.currentTime, 0.02);
   }
 
   /**

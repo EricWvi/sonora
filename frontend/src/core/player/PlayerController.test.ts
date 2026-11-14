@@ -41,8 +41,13 @@ class FakeEngine
   volume = 1;
   rate = 1;
 
+  replayGain = 1;
+
   setRate(rate: number) {
     this.rate = rate;
+  }
+  setReplayGain(gain: number) {
+    this.replayGain = gain;
   }
 
   async play(url?: string, options: PlayOptions = {}) {
@@ -1116,5 +1121,44 @@ describe("补全歌词", () => {
     expect(useDataStore().playList[0].hasLyrics).toBe(true);
     expect(setupSong).toHaveBeenCalledTimes(1);
     expect(useStatusStore().currentTime).toBe(5000);
+  });
+});
+
+describe("音量平衡", () => {
+  const withGain = (id: number, gainDb: number | null): Track => ({
+    ...track(id),
+    gainDb,
+  });
+
+  it("按歌曲的 gainDb 施加增益，换歌时跟着换", async () => {
+    const player = newPlayer();
+    void player.updatePlayList([withGain(1, -6), withGain(2, null)]);
+    await settle();
+    expect(engine.replayGain).toBeCloseTo(10 ** (-6 / 20));
+    void player.nextOrPrev("next");
+    await settle();
+    expect(engine.replayGain).toBe(1);
+  });
+
+  it("在线歌曲不做均衡", async () => {
+    const player = newPlayer();
+    void player.updatePlayList([
+      { ...withGain(1, -6), source: "online", playable: true },
+    ]);
+    await settle();
+    expect(engine.replayGain).toBe(1);
+  });
+
+  it("关闭后恢复原音量，重新开启时作用于当前歌曲", async () => {
+    const player = newPlayer();
+    void player.updatePlayList([withGain(1, 3)]);
+    await settle();
+    expect(engine.replayGain).toBeCloseTo(10 ** (3 / 20));
+    useSettingStore().enableReplayGain = false;
+    expect(player.applyReplayGain()).toBe(1);
+    expect(engine.replayGain).toBe(1);
+    useSettingStore().enableReplayGain = true;
+    player.applyReplayGain();
+    expect(engine.replayGain).toBeCloseTo(10 ** (3 / 20));
   });
 });

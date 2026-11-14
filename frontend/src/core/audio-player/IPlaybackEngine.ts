@@ -100,6 +100,8 @@ export interface IPlaybackEngine extends TypedEventTarget<AudioEventMap> {
   getVolume(): number;
   /** 设置播放速率。换歌后保持 */
   setRate(rate: number): void;
+  /** 设置 ReplayGain 增益（线性，1 = 0 dB）。换歌后保持，由控制器按歌曲重新设置 */
+  setReplayGain(gain: number): void;
   /** 设置输出设备 */
   setSinkId(deviceId: string): Promise<void>;
   /**

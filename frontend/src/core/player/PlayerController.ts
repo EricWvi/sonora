@@ -160,6 +160,25 @@ export class PlayerController {
     return this.deps.engine;
   }
 
+  /**
+   * 应用 ReplayGain (音量平衡)。照搬 SPlayer PlayerController.applyReplayGain。
+   * 与 SPlayer 不同（Eric，2026-11-14）：增益是服务端按响度算好的 gainDb（见 docs/api.md 的“音量均衡”），
+   * 防削波也已在服务端按真峰值处理，所以没有单曲/专辑模式，也不读歌曲标签；在线歌曲不做均衡。
+   * @param entry 歌曲，默认为当前条目
+   * @returns 施加的线性增益
+   */
+  public applyReplayGain(
+    entry: Track | undefined = this.currentEntry(),
+  ): number {
+    const gainDb =
+      useSettingStore().enableReplayGain && entry && !isOnline(entry)
+        ? entry.gainDb
+        : null;
+    const gain = gainDb == null ? 1 : Math.pow(10, gainDb / 20);
+    this.engine.setReplayGain(gain);
+    return gain;
+  }
+
   /** 当前条目 */
   private currentEntry(): QueueEntry | undefined {
     const dataStore = useDataStore();
@@ -415,6 +434,7 @@ export class PlayerController {
     if (requestToken !== this.currentRequestToken) return;
     this.setState("loading");
     this.engine.setVolume(statusStore.playVolume);
+    this.applyReplayGain(entry);
     // 应用输出设备：音频图谱建立后输出走 AudioContext
     if (useSettingStore().playDevice !== "default")
       void this.toggleOutputDevice().catch((error) =>
@@ -1503,7 +1523,7 @@ export const usePlayerController = (): PlayerController => {
 
 /**
  * 启动时载入播放器：恢复浏览器中保存的队列与位置（不自动播放，除非开启了“自动播放”），
- * 载入喜爱的歌曲，并应用均衡器、输出设备与同步补偿。开发时由 fixture 指定状态（`?player=`）。
+ * 载入喜爱的歌曲，并应用均衡器、输出设备、音量平衡与同步补偿。开发时由 fixture 指定状态（`?player=`）。
  */
 export async function initPlayer() {
   const player = usePlayerController();
@@ -1540,6 +1560,11 @@ export async function initPlayer() {
   watch(
     () => [settingStore.useNextPrefetch, player.nextAutoEntry()?.entryId],
     () => player.preloadNext(),
+  );
+  // 音量平衡：开关变化时（包括从其他设备同步来的）立即作用于当前歌曲
+  watch(
+    () => settingStore.enableReplayGain,
+    () => player.applyReplayGain(),
   );
   // 音频与歌词同步补偿
   watch(

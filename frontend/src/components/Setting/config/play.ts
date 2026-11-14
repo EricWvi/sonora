@@ -1,5 +1,7 @@
 // 照搬 SPlayer components/Setting/config/play.ts，条目按阶段 2 的设置表与阶段 5 的决定：
-// - 去掉自动混音、音质、Fuck AI/DJ/*** Mode、播放引擎、Web Audio 延迟策略、播放试听、音量平衡与音乐解锁。
+// - 去掉自动混音、音质、Fuck AI/DJ/*** Mode、播放引擎、Web Audio 延迟策略、播放试听与音乐解锁。
+// - 音量平衡与 SPlayer 不同（Eric，2026-11-14）：默认开启，放在“音频设置”；增益由服务端按响度算好，
+//   不需要歌曲标签，没有“平衡模式”子项，说明随之修改。
 // - 自动播放与音频输出设备在网页中也显示（SPlayer 只在 Electron 中）。输出设备只走 Web Audio 的分支；
 //   Chrome 要有麦克风权限才列出设备，第一次展开下拉框且设备名为空时请求一次，拿到后立即停用。
 // - “下一首歌曲预载”在 Sonora 中预加载下一首的音频，说明随之修改。
@@ -221,6 +223,17 @@ export const usePlaySettings = (): SettingConfig => {
               set: (v) => (settingStore.audioDelayCompensation = v ?? 0),
             }),
             defaultValue: 0,
+          },
+          {
+            key: "enableReplayGain",
+            label: "音量平衡",
+            type: "switch",
+            description:
+              "按服务端测得的响度调整音量，让不同歌曲听起来差不多响（在线歌曲不调整）",
+            value: computed({
+              get: () => settingStore.enableReplayGain,
+              set: (v) => (settingStore.enableReplayGain = v),
+            }),
           },
           {
             key: "playDevice",

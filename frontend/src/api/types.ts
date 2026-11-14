@@ -55,6 +55,11 @@ export type Track = {
   playable?: boolean;
   /** 本地歌曲关联的在线 ID，没有时为 null；在线歌曲没有这个字段 */
   onlineId?: number | null;
+  /**
+   * 音量均衡的增益（dB），服务端按歌曲响度算好，见 docs/api.md 的“音量均衡”；
+   * 尚未测量或无法测量时为 null，在线歌曲没有这个字段
+   */
+  gainDb?: number | null;
 };
 
 /** 从关联的在线内容补全了哪些字段。 */
