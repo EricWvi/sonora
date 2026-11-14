@@ -83,6 +83,10 @@ type playerTrack struct {
 	// OnlineID is the NetEase song the import or the admin linked; nil when
 	// none is.
 	OnlineID *int64 `json:"onlineId"`
+	// GainDB is the loudness normalization gain in dB the player applies,
+	// worked out by the server so that every client applies the same rule;
+	// nil plays the track as it is.
+	GainDB *float64 `json:"gainDb"`
 }
 
 type playerAlbumRef struct {
@@ -124,6 +128,7 @@ func toPlayerTrack(t store.Track) playerTrack {
 	out := playerTrack{
 		ID: t.ID, Title: t.Title, Artists: t.Artists, TrackNo: t.TrackNo, DiscNo: t.DiscNo, Year: t.Year,
 		DurationMs: t.DurationMs, Format: t.Format, Cover: t.Cover, HasLyrics: t.HasLyrics, OnlineID: t.NeteaseID,
+		GainDB: t.GainDB,
 	}
 	if t.Album != nil {
 		out.Album = &playerAlbumRef{ID: t.Album.ID, Title: t.Album.Title, Artists: t.Album.Artists}

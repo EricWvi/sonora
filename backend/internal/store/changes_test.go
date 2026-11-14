@@ -176,6 +176,12 @@ func TestMigrationLogsTheExistingLibrary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Undo migration 17 first.
+	for _, col := range []string{"loudness", "true_peak", "loudness_version"} {
+		if _, err := db.Exec(`ALTER TABLE tracks DROP COLUMN ` + col); err != nil {
+			t.Fatal(err)
+		}
+	}
 	rows, err := db.Query(`SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'library_%'`)
 	if err != nil {
 		t.Fatal(err)

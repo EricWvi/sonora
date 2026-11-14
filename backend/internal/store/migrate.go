@@ -380,6 +380,16 @@ var migrations = []migration{
 	INSERT INTO library_changes (kind, item_id) SELECT 'album', id FROM albums ORDER BY id;
 	INSERT INTO library_changes (kind, item_id) SELECT 'track', id FROM tracks ORDER BY id;
 	` + libraryChangeTriggers),
+
+	// Loudness normalization (loudness.go): a track's integrated loudness
+	// (LUFS) and true peak (dBTP). loudness_version is the measurement the
+	// values come from, 0 for none yet; loudness stays NULL when the file
+	// could not be measured.
+	execSQL(`
+	ALTER TABLE tracks ADD COLUMN loudness REAL;
+	ALTER TABLE tracks ADD COLUMN true_peak REAL;
+	ALTER TABLE tracks ADD COLUMN loudness_version INTEGER NOT NULL DEFAULT 0;
+	`),
 }
 
 // touch moves the kind rows of the IDs ids selects (as column id) to new

@@ -246,6 +246,9 @@ func (s *Store) ingest(ctx context.Context, u *Upload, lyrics []byte, ids Neteas
 		s.collectCovers(ctx)
 		return IngestResult{}, err
 	}
+	// Measured in the background: decoding takes seconds the upload
+	// should not wait for.
+	s.wakeLoudness()
 	return IngestResult{Status: Created, Track: d}, nil
 }
 

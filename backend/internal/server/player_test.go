@@ -77,6 +77,9 @@ func TestPlayerCatalog(t *testing.T) {
 	if rec := ts.do("PUT", api+"albums/"+itoa(tr.Album.ID), string(albumIn)); rec.Code != http.StatusOK {
 		t.Fatalf("album description: %d %s", rec.Code, rec.Body)
 	}
+	if rec := ts.do("GET", api+"tracks/"+itoa(tr.ID), ""); strings.Contains(rec.Body.String(), "gainDb") {
+		t.Fatalf("admin track shows gainDb: %s", rec.Body)
+	}
 	ts.cookie = ""
 	ts.signIn("alice", "Alice")
 
@@ -88,6 +91,11 @@ func TestPlayerCatalog(t *testing.T) {
 		if strings.Contains(rec.Body.String(), `"`+field) {
 			t.Fatalf("player track exposes %s: %s", field, rec.Body)
 		}
+	}
+	// Not measured yet: the player plays it as it is. The admin API does
+	// not show the gain.
+	if !strings.Contains(rec.Body.String(), `"gainDb":null`) {
+		t.Fatalf("player track has no null gainDb: %s", rec.Body)
 	}
 	tracks := decodeBody[store.Page[playerTrack]](t, rec)
 	if tracks.Total != 1 || tracks.Items[0].ID != tr.ID || !tracks.Items[0].HasLyrics {

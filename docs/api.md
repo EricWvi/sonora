@@ -126,10 +126,21 @@
 
 数据形态：
 
-- 歌曲 `{id, title, artists, album, trackNo, discNo, year, durationMs, format, cover, hasLyrics, onlineId}`，`onlineId` 是关联的网易云歌曲，没有时为 `null`。`album` 为 `{id, title, artists}` 或 `null`；`cover` 是歌曲实际显示的封面，单曲封面优先，否则为专辑封面，都没有时为 `null`。
+- 歌曲 `{id, title, artists, album, trackNo, discNo, year, durationMs, format, cover, hasLyrics, onlineId, gainDb}`，`onlineId` 是关联的网易云歌曲，没有时为 `null`。`album` 为 `{id, title, artists}` 或 `null`；`cover` 是歌曲实际显示的封面，单曲封面优先，否则为专辑封面，都没有时为 `null`。`gainDb` 见[音量均衡](#音量均衡)。
 - 专辑 `{id, title, artists, year, cover, description, trackCount, durationMs}`。`description` 为管理后台填写的简介，没有时为空字符串。
 - 艺术家 `{id, name, image, description, trackCount, albumCount}`，`image` 是管理后台上传的图片，没有时为 `null`；`description` 为管理后台填写的简介，没有时为空字符串。
 - `artists` 与 `cover` 的形态和管理 API 一致：`[{id, name}]` 与 `{name, thumbhash}`。
+
+### 音量均衡
+
+歌曲的 `gainDb` 是音量均衡（响度标准化）的增益，单位 dB，保留两位小数（2026-11-14 起）。播放端开启音量均衡时把音量乘以 10^(gainDb/20)，为 `null` 时按原音量播放。在线歌曲不经过本接口，不做均衡。
+
+- **测量**：服务端按 ITU-R BS.1770 / EBU R128 测每首歌的积分响度（K 加权，400 ms 块、75% 重叠，-70 LUFS 绝对门限与低 10 LU 的相对门限）和真峰值（4 倍过采样）。单声道按双单声道计（+3 dB），与两个扬声器满幅播放时听到的一致。能解码的格式是 MP3、FLAC 与 Ogg Vorbis；M4A、Opus 和解码失败的文件 `gainDb` 为 `null`。
+- **增益**：每首歌按自己的响度调到 -16 LUFS，不区分专辑与单曲。调小不受限；调大时调后的真峰值不超过 -1 dBTP，超出就截到这个上限，不加限幅器；真峰值本来就超过 -1 dBTP 的较安静歌曲不调。
+- **由服务端算好下发**：规则、目标响度与峰值上限只在服务端，Web 与安卓的结果一致，以后调整不需要更新客户端。
+- **时机**：新歌入库后由后台任务测量，一首几秒，测完之前 `gainDb` 为 `null`；升级后存量曲库同样在后台补算，不阻塞启动。测量结果写入歌曲时，[曲库变更](#曲库变更)会带上这首歌。
+
+实现：[loudness](../backend/internal/loudness/) 包测量，[media/loudness.go](../backend/internal/media/loudness.go) 解码，[store/loudness.go](../backend/internal/store/loudness.go) 是后台任务与增益规则，迁移 17 增加 `tracks.loudness`、`true_peak`、`loudness_version`。
 
 ### 曲库变更
 

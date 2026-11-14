@@ -66,6 +66,10 @@ type Track struct {
 	// NeteaseID is the NetEase song the track was imported from; nil for
 	// an upload.
 	NeteaseID *int64 `json:"neteaseId"`
+	// GainDB is the loudness normalization gain in dB, see
+	// normalizationGain; nil until the track is measured, or when it
+	// cannot be. Only the player API shows it.
+	GainDB *float64 `json:"-"`
 }
 
 // TrackDetail is a track with its lyrics.
@@ -265,7 +269,8 @@ var trackColumns = `
 	t.cover, ` + placeholderOf("t.cover") + `, t.lyrics <> '',
 	CASE WHEN t.lyrics = '' THEN '' ELSE t.lyrics_format END, t.original_name, t.created_at, t.netease_id, ` +
 	artistsJSON("track_artists", "track_id", "t.id") + `,
-	al.id, al.title, al.cover, ` + placeholderOf("al.cover") + `, ` + artistsJSON("album_artists", "album_id", "al.id")
+	al.id, al.title, al.cover, ` + placeholderOf("al.cover") + `, ` + artistsJSON("album_artists", "album_id", "al.id") + `,
+	t.loudness, t.true_peak`
 
 const trackFrom = `
 	FROM tracks t
@@ -311,12 +316,15 @@ func scanTrack(row scanner, extra ...any) (Track, error) {
 	var alID, neteaseID sql.NullInt64
 	var cover, coverHash, alTitle, alCover, alCoverHash sql.NullString
 	var alArtists []Ref
+	var level, peak sql.NullFloat64
 	dest := []any{&t.ID, &t.Title, &t.TrackNo, &t.DiscNo, &t.Year, &t.DurationMs, &t.Format, &t.Size,
 		&cover, &coverHash, &t.HasLyrics, &t.LyricsFormat, &t.OriginalName, &t.CreatedAt, &neteaseID, (*refs)(&t.Artists),
-		&alID, &alTitle, &alCover, &alCoverHash, (*refs)(&alArtists)}
+		&alID, &alTitle, &alCover, &alCoverHash, (*refs)(&alArtists),
+		&level, &peak}
 	if err := row.Scan(append(dest, extra...)...); err != nil {
 		return t, err
 	}
+	t.GainDB = trackGain(level, peak)
 	t.Cover = coverOf(cover, coverHash)
 	t.NeteaseID = nullID(neteaseID)
 	if alID.Valid {

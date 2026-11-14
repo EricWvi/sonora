@@ -100,6 +100,15 @@ func run(configPath string) error {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
+	// Measures loudness in the background; startup does not wait for the
+	// library to be measured, shutdown waits for the current file.
+	loudnessDone := make(chan struct{})
+	go func() {
+		defer close(loudnessDone)
+		st.RunLoudness(ctx)
+	}()
+	defer func() { stop(); <-loudnessDone }()
+
 	errc := make(chan error, 1)
 	go func() {
 		slog.Info("listening", "addr", cfg.Listen, "data_dir", cfg.DataDir, "media_dir", cfg.MediaDir, "version", version)

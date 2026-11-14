@@ -43,6 +43,8 @@ type Store struct {
 	// decoding bounds concurrent thumbnail decodes, which hold whole
 	// images in memory.
 	decoding chan struct{}
+	// loudnessWake wakes RunLoudness after an ingest.
+	loudnessWake chan struct{}
 }
 
 // Open opens (and migrates) the database inside dataDir and prepares the
@@ -73,7 +75,8 @@ func Open(dataDir, mediaDir string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
-	s := &Store{db: db, coverDir: coverDir, mediaDir: mediaDir, incoming: incoming, decoding: make(chan struct{}, 2)}
+	s := &Store{db: db, coverDir: coverDir, mediaDir: mediaDir, incoming: incoming, decoding: make(chan struct{}, 2),
+		loudnessWake: make(chan struct{}, 1)}
 	if err := s.backfillPlaceholders(context.Background()); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("cover placeholders: %w", err)
