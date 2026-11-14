@@ -128,7 +128,7 @@ cd android && ./gradlew :app:assembleDebug :app:testDebugUnitTest
     - 运行确认（2026-11-11，模拟器，开发服务器上用临时目录编译的未提交后端 `/tmp/sonora-fm/sonora-dev`）：`./gradlew :app:assembleDebug :app:testDebugUnitTest` 通过（84 个测试）；首页显示漫游电台标题区、拼贴与最近播放（服务端历史）；点收音机按钮后会话为 `PLAYING`、队列为 FM 的专辑；换歌后服务端 `fm_plan.track_id` 随之更新；从服务端记录的位置继续播放；在专辑最后一首按“下一首”后 `fm_albums.plays` 加 1、队列接上后续专辑并切到它的第一首；FM 播放时按钮变为高亮色；点拼贴封面进入专辑页，返回回到首页；crash 缓冲区为空。
     - 运行确认（2026-11-11，同上，开发库给听者 `listener` 建了分组歌单“漫游分组（开发测试）”，含 10 张小专辑各一首，并设为 FM 分组）：拼贴显示 5 张不同的专辑；F1 最后一首按“下一首”后 F1 的 `plays` 加 1，切到下一张“音乐傲骨”的第一首，队列接上再下一张“我去2000年”的 3 首；设置按钮弹出退出登录确认框，取消后关闭。
     - 待验证：播放到队列末尾自然结束时的衔接（按“下一首”的路径已验证）；PKB110 真机。
-  - 音量均衡（2026-11-14，服务端与 Web 端见提交 `4e9cf69`、`68c8cda`，接口见 [api.md](../api.md#音量均衡)）：歌曲带服务端算好的 `gainDb`，`library/changes` 同步到本机 `songs.gain_db`（`SonoraDatabase` 第 2 版，升级时删库重新同步），经 MediaItem 的 extras 交给播放器。
+  - 音量均衡（2026-11-14，提交 `407a0fa`；服务端与 Web 端见提交 `4e9cf69`、`68c8cda`，接口见 [api.md](../api.md#音量均衡)）：歌曲带服务端算好的 `gainDb`，`library/changes` 同步到本机 `songs.gain_db`（`SonoraDatabase` 第 2 版，升级时删库重新同步），经 MediaItem 的 extras 交给播放器。
     - 施加方式（已定）：用 `player.volume`，不用 AudioProcessor（引擎默认开 audio offload，开启后处理器不运行；处理器在缓冲之后，增益会偏离歌曲边界）。增益大于 0 dB 时截到 1（开发库 369 首里 10 首需要调大，最多 +4.5 dB）。在线歌曲不做均衡，安卓还没有在线歌曲，`normalizationVolume` 留了这个参数。
     - 复制原版 `ReplayGainProcessor`，增益来源由读文件标签（`ReplayGainManager`，异步读取、缓存、预取）换成 extras 里的 `gainDb`，同步取得；去掉“使用专辑增益”开关（服务端每首只有一个增益）；关掉开关时清掉上次的增益，原版在关掉后恢复播放会把旧增益设回去。`MusicService` 的调用点照原版：换播放器、交叉淡入淡出开始与结束、`onVolumeChanged`、开始播放、跳转、换歌、元数据变化、开关变化。
     - 开关（Eric，2026-11-14）：偏好项 `replaygain_enabled`，默认开启（原版默认关闭，与 Web 端的“音量平衡”一致），这次不做界面。设置页做好时照原版放进“音量标准化(ReplayGain)”分组，开关“启用 ReplayGain”取原版文案，副标题改为说明按服务端测得的响度统一音量，不放专辑增益开关。
