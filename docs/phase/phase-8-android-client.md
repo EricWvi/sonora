@@ -128,7 +128,7 @@ cd android && ./gradlew :app:assembleDebug :app:testDebugUnitTest
     - 运行确认（2026-11-11，模拟器，开发服务器上用临时目录编译的未提交后端 `/tmp/sonora-fm/sonora-dev`）：`./gradlew :app:assembleDebug :app:testDebugUnitTest` 通过（84 个测试）；首页显示漫游电台标题区、拼贴与最近播放（服务端历史）；点收音机按钮后会话为 `PLAYING`、队列为 FM 的专辑；换歌后服务端 `fm_plan.track_id` 随之更新；从服务端记录的位置继续播放；在专辑最后一首按“下一首”后 `fm_albums.plays` 加 1、队列接上后续专辑并切到它的第一首；FM 播放时按钮变为高亮色；点拼贴封面进入专辑页，返回回到首页；crash 缓冲区为空。
     - 运行确认（2026-11-11，同上，开发库给听者 `listener` 建了分组歌单“漫游分组（开发测试）”，含 10 张小专辑各一首，并设为 FM 分组）：拼贴显示 5 张不同的专辑；F1 最后一首按“下一首”后 F1 的 `plays` 加 1，切到下一张“音乐傲骨”的第一首，队列接上再下一张“我去2000年”的 3 首；设置按钮弹出退出登录确认框，取消后关闭。
     - 待验证：播放到队列末尾自然结束时的衔接（按“下一首”的路径已验证）；PKB110 真机。
-  - 搜索（Eric，2026-11-14）：复制原版 `SearchScreen`（替换占位的 `BlankTab`）与 `SearchStateHolder`，在 `AppNavigation` 的 Search 路由接上。
+  - 搜索（Eric，2026-11-14，提交 `8c4eac4`）：复制原版 `SearchScreen`（替换占位的 `BlankTab`）与 `SearchStateHolder`，在 `AppNavigation` 的 Search 路由接上。
     - 搜索框为空时原版显示流派网格，Sonora 没有流派，留空，只有搜索框；不记录搜索历史（原版提交时记录，但界面上没有地方显示）。
     - 筛选标签照原版：全部、歌曲、专辑、艺术家、歌单。“歌单”保留，歌单结果在第 5 项接上 `GET playlists?q=`，在那之前这一分区始终为空。
     - 只有歌曲能长按多选，“⋮”菜单与多选面板和曲库相同；去掉专辑、歌单与流派的多选。专辑结果包括单曲专辑（与 Web 端搜索相同）。
